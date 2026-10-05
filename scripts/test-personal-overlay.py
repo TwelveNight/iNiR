@@ -449,6 +449,92 @@ cleanup_orphans
         self.bash(f'source "{personal}/setup-entry.sh" install --skip-deps --skip-setups')
         self.assertFalse(log.exists(), "internal files stage must not recurse into wrapper")
 
+    def kitty_generator_fixture(self):
+        self.env["HOME"] = str(self.base)
+        self.env.pop("INIR_INSTALL_SHARED_APP_CONFIGS", None)
+        binary = self.base / "mock-bin"
+        binary.mkdir()
+        mock = binary / "pkill"
+        mock.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$MOCK_RELOAD_LOG"\n')
+        mock.chmod(0o755)
+        self.env.update(PATH=str(binary) + ":" + self.env["PATH"], MOCK_RELOAD_LOG=str(self.base / "reload.log"))
+        palette = self.base / "palette.json"
+        palette.write_text(json.dumps({"term0": "#112233", "term7": "#ccddee", "term15": "#eeeeff",
+                                       "primary": "#aabbcc", "on_primary": "#001122", "error": "#ee4455"}))
+        scss = self.base / "colors.scss"
+        scss.write_text("$term0: #112233;\n$term7: #ccddee;\n$term15: #eeeeff;\n")
+        theme = self.state / "quickshell/user/generated/terminal/kitty-theme.conf"
+        theme.parent.mkdir(parents=True)
+        theme.write_text("background #old-color\n")
+        return theme, ["python3", str(ROOT / "scripts/colors/generate_terminal_configs.py"),
+                       "--scss", str(scss), "--colors", str(palette),
+                       "--terminal-json", str(palette), "--terminals", "kitty"]
+
+    def test_kitty_generation_uses_ii_color_path_without_editing_base_config(self):
+        theme, command = self.kitty_generator_fixture()
+        kitty = self.config / "kitty"
+        kitty.mkdir()
+        config = kitty / "kitty.conf"
+        config.write_text(f"globinclude {theme}\nfont_family FiraCode Nerd Font\nshell zsh\nremember_window_size no\n")
+        original = config.read_bytes()
+        link = kitty / "current-theme.conf"
+        link.symlink_to(theme)
+        original_link = link.readlink()
+        for _ in range(2):
+            subprocess.run(command, env=self.env, check=True, capture_output=True)
+            self.assertEqual(config.read_bytes(), original)
+            self.assertEqual(link.readlink(), original_link)
+            self.assertEqual(link.resolve().read_bytes(), theme.read_bytes())
+            self.assertFalse((kitty / "theme.conf").exists())
+            self.assertIn("background              #112233", theme.read_text())
+            self.assertIn("color255 #aabbcc", theme.read_text())
+            self.assertIn("color232 #001122", theme.read_text())
+            self.assertIn("color244 #ee4455", theme.read_text())
+        self.assertEqual((self.base / "reload.log").read_text().splitlines(),
+                         ["--signal SIGUSR1 -x kitty"] * 2)
+        # Kitty's own parser must accept the generated file through the user's
+        # existing include while retaining non-color settings.
+        parsed = subprocess.run(["kitty", "+runpy", """
+import os
+from pathlib import Path
+from kitty.config import load_config
+bad = []
+opts = load_config(str(Path(os.environ['XDG_CONFIG_HOME']) / 'kitty/kitty.conf'), accumulate_bad_lines=bad)
+assert not bad, bad
+assert opts.shell == 'zsh'
+assert not opts.remember_window_size
+assert int(opts.background) == 0x112233
+assert int(opts.color255) == 0xaabbcc
+print('Kitty config parser passed')
+"""], env=self.env, capture_output=True, text=True, check=True)
+        self.assertIn("Kitty config parser passed", parsed.stdout)
+
+    def test_kitty_generation_does_not_create_or_replace_unrelated_config(self):
+        theme, command = self.kitty_generator_fixture()
+        subprocess.run(command, env=self.env, check=True, capture_output=True)
+        kitty = self.config / "kitty"
+        self.assertFalse(kitty.exists())
+        kitty.mkdir()
+        config = kitty / "kitty.conf"
+        config.write_text("font_family Personal Font\ninclude my-theme.conf\n")
+        link = kitty / "current-theme.conf"
+        link.symlink_to("my-theme.conf")
+        custom = kitty / "my-theme.conf"
+        custom.write_text("background #ffffff\n")
+        subprocess.run(command, env=self.env, check=True, capture_output=True)
+        self.assertEqual(config.read_text(), "font_family Personal Font\ninclude my-theme.conf\n")
+        self.assertEqual(link.readlink(), Path("my-theme.conf"))
+        self.assertEqual(custom.read_text(), "background #ffffff\n")
+        self.assertIn("#112233", theme.read_text())
+
+    def test_kitty_config_integration_requires_explicit_opt_in(self):
+        theme, command = self.kitty_generator_fixture()
+        self.env["INIR_INSTALL_SHARED_APP_CONFIGS"] = "true"
+        subprocess.run(command, env=self.env, check=True, capture_output=True)
+        kitty = self.config / "kitty"
+        self.assertEqual((kitty / "current-theme.conf").resolve(), theme)
+        self.assertEqual((kitty / "kitty.conf").read_text(), "include current-theme.conf\n")
+
     def test_menu_install_cannot_bypass_personal_wrapper(self):
         source = (ROOT / "setup").read_text()
         body = source[source.index("run_install() {"):source.index("    detect_distro", source.index("run_install() {"))]

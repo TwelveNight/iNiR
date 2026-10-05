@@ -90,7 +90,7 @@ python3 scripts/test-runtime-payload.py
 niri validate --config defaults/niri/config.kdl
 ```
 
-已完成：24 项个人隔离测试、6 项共享数据/样式离屏测试、10 项分发测试、完整本地分发检查、Niri 校验及修改文件的 QML/Shell 语法检查。本次本地分发检查因尚无 iNiR Python 环境跳过终端配色数值测试；上一轮已用临时目录内的 v3.0.4 库通过该项，未修改 II 的 Python 环境。
+已完成：27 项个人隔离测试、6 项共享数据/样式离屏测试、10 项分发测试、完整本地分发检查、Niri 校验及修改文件的 QML/Shell 语法检查。本次本地分发检查因尚无 iNiR Python 环境跳过终端配色数值测试；上一轮已用临时目录内的 v3.0.4 库通过该项，未修改 II 的 Python 环境。
 
 需要部署后实际确认：
 
@@ -136,3 +136,12 @@ niri validate --config defaults/niri/config.kdl
 - 共享配色不能覆盖 Shell 透明样式；自定义 widget 路径遵守 `INIR_CONFIG_DIR`。
 - CLI 重装和 TUI 安装入口统一经过个人预检与备份；旧 II Super 服务清理已停用，更新默认保留已有 Vesktop 主题文件。
 - 离屏测试使用临时 XDG 目录、独立 D-Bus 和模拟钥匙环，不读取实际通知、任务和凭据。
+
+
+## Kitty 复审
+
+Niri/iNiR 默认启动同一个 `kitty`，沿用现有 `~/.config/kitty/kitty.conf`，不安装上游的 Kitty 基础配置。目前主机配置为 FiraCode Nerd Font、zsh、现有搜索/复制/缩放快捷键，以及 `remember_window_size no`。实际配置与 chezmoi 源文件逐字一致，Kitty 自身解析器检查为零错误。
+
+两边现在写入同一个 `~/.local/state/quickshell/user/generated/terminal/kitty-theme.conf`；iNiR 不追加 include、不替换 `current-theme.conf` 链接、不创建另一份 `~/.config/kitty/theme.conf`。保留 II 提示符使用的扩展颜色槽。现有 globinclude 和指向共享文件的链接能读取任一会话产生的新配色；通过 SIGUSR1 通知 Kitty 重载。非默认 XDG 状态目录同样生效。
+
+当前主机已有正确的共享颜色引用，无需修改 live Kitty 配置；配色生成与链接保留测试均在临时目录运行。自定义 Kitty 配置若没有引用这个共享文件，将保留自己的主题而不会被强制接入。
