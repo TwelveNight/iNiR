@@ -112,7 +112,7 @@ _steam_migration_needs_theme() {
 
 migration_check() {
   _steam_migration_needs_config && return 0
-  if _steam_migration_enabled; then
+  if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] && _steam_migration_enabled; then
     _steam_migration_needs_millennium_config && return 0
     _steam_migration_needs_theme && return 0
   fi
@@ -135,7 +135,7 @@ migration_apply() {
   millennium_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/millennium/config.json"
   repo_root="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)}"
 
-  mkdir -p "$cfg_dir" "$(dirname "$millennium_cfg")"
+  mkdir -p "$cfg_dir"
 
   if [[ -f "$config_file" ]]; then
     python3 - "$config_file" <<'PY'
@@ -164,7 +164,7 @@ os.replace(tmp, path)
 PY
   fi
 
-  if ! _steam_migration_enabled; then
+  if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" != true ]] || ! _steam_migration_enabled; then
     _steam_migration_needs_config && return 1
     return 0
   fi

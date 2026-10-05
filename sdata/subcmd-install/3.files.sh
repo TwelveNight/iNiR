@@ -885,7 +885,7 @@ if [[ -z "$_xdg_pictures" || "$_xdg_pictures" != /* || "$_xdg_pictures" == "$HOM
   _xdg_pictures="$HOME/Pictures"
 fi
 USER_WALLPAPERS_DIR="${_xdg_pictures}/Wallpapers"
-if [[ -d "${II_TARGET}/assets/wallpapers" ]]; then
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && -d "${II_TARGET}/assets/wallpapers" ]]; then
   mkdir -p "${USER_WALLPAPERS_DIR}"
   COPIED_COUNT=0
   for wallpaper in "${II_TARGET}/assets/wallpapers"/*; do
@@ -904,7 +904,7 @@ fi
 
 # Optional extra wallpapers (fresh install interactive only)
 INIR_WALLS_DEFAULT_OVERRIDE=""
-if [[ "${INSTALL_FIRSTRUN}" == true && "${ask}" == "true" ]]; then
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && "${INSTALL_FIRSTRUN}" == true && "${ask}" == "true" ]]; then
   if tui_confirm "Download and install iNiR-Walls wallpapers?" "no"; then
     EXTRAS_INIR_WALLS_FIRST_IMAGE=""
     extras_install_inir_walls
@@ -919,7 +919,7 @@ fi
 # Optional monochrome icon theme (YAMIS by dirn-typo).
 # Preinstalled on fresh installs, but non-intrusive: only places the theme files
 # in user-scope. Does NOT change the user's icon theme — they switch via Settings.
-if [[ "${INSTALL_FIRSTRUN}" == true ]]; then
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && "${INSTALL_FIRSTRUN}" == true ]]; then
   if [[ "${ask}" == "true" ]]; then
     if tui_confirm "Install YAMIS monochrome icon theme? (~23 MiB, GPL-3, optional)" "yes"; then
       extras_install_yamis_icons
@@ -1028,7 +1028,7 @@ fi
 # Migrate: Generate Darkly.colors for existing users (Qt file dialogs fix)
 #####################################################################################
 DARKLY_COLORS_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/color-schemes/Darkly.colors"
-if [[ ! -f "${DARKLY_COLORS_FILE}" ]]; then
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && ! -f "${DARKLY_COLORS_FILE}" ]]; then
   tui_info "Generating Darkly color scheme for Qt apps..."
 
   # Ensure directory exists

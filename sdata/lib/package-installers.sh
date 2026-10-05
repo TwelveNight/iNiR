@@ -599,6 +599,11 @@ ensure-ytmusic-js-runtime(){
     return 0
   fi
 
+  if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" != true ]]; then
+    log_warning "YT Music: compatible Deno unavailable; preserving shared executables. Install Deno separately if needed."
+    return 0
+  fi
+
   # yt-dlp's current YouTube extractor requires an external JS runtime. Deno is
   # the upstream-recommended runtime; install a verified standalone binary into
   # the user's normal executable directory when the distro cannot provide a

@@ -25,6 +25,9 @@ SESSION_IMPACT_NOTICE_ACTIONS=()
 # Historical migrations that no longer own current upgrade state.
 # Keep their files for history, but repair current state through present owners.
 RETIRED_MIGRATIONS=(
+    # Personal overlay reuses system packages; Niri's current installer detects Qt.
+    "012-plasma-integration-qt-theming"
+    "029-plasma-browser-integration"
     # Shared profiles and SDDM belong to the existing desktop installation.
     "020-rename-venv-env-var"
     "025-sddm-dropin-rename"

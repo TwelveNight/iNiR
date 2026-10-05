@@ -25,6 +25,7 @@ class SafetyTests(unittest.TestCase):
                         REPO_ROOT=str(ROOT), TMPDIR=str(self.base))
         for key in ["DOTS_CORE_CONFDIR", "INIR_CONFIG_DIR", "INIR_STATE_DIR", "INIR_VENV", "INIR_RUNTIME_DIR"]:
             self.env.pop(key, None)
+        self.env["INIR_INSTALL_SHARED_APP_CONFIGS"] = "false"
 
     def run_command(self, args, **kwargs):
         return subprocess.run(args, env=self.env, capture_output=True, text=True, **kwargs)
@@ -249,6 +250,81 @@ uninstall_remove_inir_only
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(helper.read_text(), "shared helper")
         self.assertFalse(private.exists())
+
+    def test_package_and_sddm_migrations_cannot_bypass_personal_install(self):
+        result = self.shell('''source "$1/sdata/lib/migrations.sh"
+tui_check_skip() { :; }
+pkg_sudo() { touch "$TMPDIR/unexpected-package-write"; return 99; }
+for id in 012-plasma-integration-qt-theming 029-plasma-browser-integration 039-sddm-preserve-greeter-backend; do
+    is_migration_needed "$id" && exit 1
+    apply_migration "$id" true || exit 1
+done
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.base / "unexpected-package-write").exists())
+
+    def test_steam_migration_only_converts_private_setting(self):
+        private = self.config / "inir/config.json"
+        private.parent.mkdir()
+        private.write_text('{"appearance":{"wallpaperTheming":{"enableAdwSteam":true}}}')
+        shared = self.config / "millennium/config.json"
+        shared.parent.mkdir()
+        shared.write_text('{"themes":{"activeTheme":"personal"}}')
+        result = self.shell('''source "$1/sdata/migrations/024-steam-millennium.sh"
+migration_apply
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(private.read_text())["appearance"]["wallpaperTheming"]["enableSteam"])
+        self.assertEqual(shared.read_text(), '{"themes":{"activeTheme":"personal"}}')
+
+    def test_missing_deno_does_not_download_or_replace_shared_binary(self):
+        binary = self.base / "bin/deno"
+        binary.parent.mkdir()
+        binary.write_text("personal runtime sentinel")
+        result = self.shell('''source "$1/sdata/lib/package-installers.sh"
+ytmusic-deno-compatible() { return 1; }
+log_warning() { :; }
+curl() { touch "$TMPDIR/unexpected-download"; return 99; }
+ensure-ytmusic-js-runtime
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.base / "unexpected-download").exists())
+        self.assertEqual(binary.read_text(), "personal runtime sentinel")
+
+    def test_install_resource_stage_preserves_wallpapers_and_shared_theme(self):
+        # Execute the real resource/theme stage with synthetic paths and hooks.
+        text = (ROOT / "sdata/subcmd-install/3.files.sh").read_text()
+        stage = text[text.index('tui_info "Copying wallpapers..."'):text.index('# Reset first run marker')]
+        stage_path = self.base / "resource-stage.sh"
+        stage_path.write_text(stage)
+        runtime = self.config / "quickshell/inir"
+        (runtime / "assets/wallpapers").mkdir(parents=True)
+        (runtime / "assets/wallpapers/existing.jpg").write_text("bundled replacement")
+        (runtime / "scripts/colors").mkdir(parents=True)
+        (runtime / "scripts/colors/apply-gtk-theme.sh").write_text('touch "$HOME/unexpected-theme"\n')
+        generated = self.state / "quickshell/user/generated"
+        generated.mkdir(parents=True)
+        (generated / "material_colors.scss").write_text("shared palette sentinel")
+        wallpaper = self.base / "Pictures/Wallpapers/existing.jpg"
+        wallpaper.parent.mkdir(parents=True)
+        wallpaper.touch()  # Old installer overwrote existing empty files.
+        for interactive in ["false", "true"]:
+            result = self.shell('''tui_info() { :; }; log_info() { :; }; log_success() { :; }
+tui_confirm() { return 0; }
+extras_install_yamis_icons() { touch "$HOME/unexpected-icons"; }
+extras_install_inir_walls() { touch "$HOME/unexpected-walls"; }
+xdg-user-dir() { printf '%s/Pictures\\n' "$HOME"; }
+INSTALL_FIRSTRUN=true
+INIR_WALLPAPER_BACKEND=skwd-wall
+ask="$3"
+source "$2"
+''', stage_path, interactive)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(wallpaper.read_bytes(), b"")
+        self.assertEqual((generated / "material_colors.scss").read_text(), "shared palette sentinel")
+        for action in ["theme", "icons", "walls"]:
+            self.assertFalse((self.base / f"unexpected-{action}").exists())
+        self.assertFalse((self.base / "data/color-schemes").exists())
 
 
 if __name__ == "__main__":

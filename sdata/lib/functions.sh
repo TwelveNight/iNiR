@@ -356,6 +356,7 @@ sync_user_desktop_integration_from_repo() {
   local name source target tmp command
 
   if [[ -f "$icon_source" ]]; then
+    [[ ! -L "$icon_target" ]] || return 1
     mkdir -p "$(dirname "$icon_target")"
     if [[ ! -f "$icon_target" ]] || ! cmp -s "$icon_source" "$icon_target"; then
       cp -f "$icon_source" "$icon_target" || return 1
@@ -368,6 +369,7 @@ sync_user_desktop_integration_from_repo() {
     source="${REPO_ROOT}/assets/applications/${name}.desktop"
     [[ -f "$source" ]] || continue
     target="${applications_dir}/${name}.desktop"
+    [[ ! -L "$target" ]] || return 1
     command="service restart"
     [[ "$name" == "inir-settings" ]] && command="settings"
     tmp="${XDG_CACHE_HOME:-$HOME/.cache}/${name}.desktop.$$"

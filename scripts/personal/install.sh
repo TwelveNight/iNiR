@@ -43,6 +43,22 @@ for name in niri systemd/user/inir.service systemd/user/inir.service.d systemd/u
         cp -a "$config_home/$name" "$snapshot/config/$name"
     fi
 done
+# Service wiring removes obsolete iNiR links from other targets. Preserve those
+# exact directory entries too, including dangling links; never copy entire units.
+for link in "$config_home"/systemd/user/*.wants/inir.service; do
+    [[ -e "$link" || -L "$link" ]] || continue
+    name="${link#"$config_home/"}"
+    [[ -e "$snapshot/config/$name" || -L "$snapshot/config/$name" ]] && continue
+    mkdir -p "$snapshot/config/$(dirname "$name")"
+    cp -a "$link" "$snapshot/config/$name"
+done
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+for name in applications/inir.desktop applications/inir-settings.desktop icons/hicolor/scalable/apps/inir.svg; do
+    if [[ -e "$data_home/$name" || -L "$data_home/$name" ]]; then
+        mkdir -p "$snapshot/data/$(dirname "$name")"
+        cp -a "$data_home/$name" "$snapshot/data/$name"
+    fi
+done
 if [[ -d "$config_home/quickshell/inir" ]]; then
     cp -a "$config_home/quickshell/inir" "$snapshot/runtime"
 fi
