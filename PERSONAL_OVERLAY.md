@@ -84,13 +84,14 @@ GDM 登录时选择 **Niri**。标准入口通过 `niri.service` 启动；`inir.
 ```sh
 python3 scripts/test-personal-overlay.py
 python3 scripts/test-shared-data-boundaries.py
+python3 scripts/test-shared-app-colors.py
 python3 scripts/test-skwd-backend.py
 python3 scripts/test-disabled-wallpaper-backends.py
 python3 scripts/test-runtime-payload.py
 niri validate --config defaults/niri/config.kdl
 ```
 
-已完成：27 项个人隔离测试、6 项共享数据/样式离屏测试、10 项分发测试、完整本地分发检查、Niri 校验及修改文件的 QML/Shell 语法检查。本次本地分发检查因尚无 iNiR Python 环境跳过终端配色数值测试；上一轮已用临时目录内的 v3.0.4 库通过该项，未修改 II 的 Python 环境。
+已完成：27 项个人隔离测试、8 项共享数据/样式/服务离屏测试、11 项共享应用配色测试、Go 编辑器配置保护测试、10 项分发测试、完整本地分发检查、Niri 校验及修改文件的 QML/Shell 语法检查。本次本地分发检查因尚无 iNiR Python 环境跳过终端配色数值测试；上一轮已用临时目录内的 v3.0.4 库通过该项，未修改 II 的 Python 环境。
 
 需要部署后实际确认：
 
@@ -145,3 +146,21 @@ Niri/iNiR 默认启动同一个 `kitty`，沿用现有 `~/.config/kitty/kitty.co
 两边现在写入同一个 `~/.local/state/quickshell/user/generated/terminal/kitty-theme.conf`；iNiR 不追加 include、不替换 `current-theme.conf` 链接、不创建另一份 `~/.config/kitty/theme.conf`。保留 II 提示符使用的扩展颜色槽。现有 globinclude 和指向共享文件的链接能读取任一会话产生的新配色；通过 SIGUSR1 通知 Kitty 重载。非默认 XDG 状态目录同样生效。
 
 当前主机已有正确的共享颜色引用，无需修改 live Kitty 配置；配色生成与链接保留测试均在临时目录运行。自定义 Kitty 配置若没有引用这个共享文件，将保留自己的主题而不会被强制接入。
+
+## 共享应用配置写入复审
+
+默认配色刷新更新已有的颜色输出，保留应用基础设置：
+
+- GTK 只合并命名颜色和颜色变量，保留 CSS 的导入、选择器、字体、尺寸、注释和现有符号链接；Matugen 的 GTK 模板先写生成目录，避免在合并前覆盖用户样式。遗留模板也经过同样的重定向，尊重 XDG 路径。
+- KDE/Qt 只合并调色板字段，保留字体、图标、控件样式和其他分组。GTK `settings.ini` 不因配色刷新而重写。GTK 与 Qt 的关闭开关分别生效。
+- Alacritty、Foot、WezTerm、Ghostty、btop、lazygit、Yazi 等继续生成颜色文件，保留原有配置和主题选择；已引用生成文件的应用会使用新颜色。Starship 只更新已经选中的 `ii` 调色板，保留提示符布局和自定义颜色项。
+- Chrome 只更新可写的现有策略目录中的 `BrowserThemeColor`，保留其他策略及个人 Preferences；不再改变后台运行策略，也不为普通配色刷新请求提权或放宽目录权限。损坏的策略文件保持原样。
+- VS Code 的 Python 和 Go 两种生成器都保留已有设置、自定义颜色和主题选择。Pear Desktop 更新生成 CSS；已有接入可继续使用，不自动添加主题或开启调试端口。
+
+尚未引用生成配色的应用保留原主题；此分支不强制所有应用接入。上游的自动配置功能需要显式 `INIR_INSTALL_SHARED_APP_CONFIGS=true`；个人安装包装器固定关闭这个选项。可选接入后使用共享应用路径，影响两边会话，不属于 Shell 私有样式。
+
+图标服务启动时读取共享的系统选择，不恢复私有配置中的旧值；用户在界面主动选择系统图标主题时仍会更新共享设置。网络和 USB 监控由各自的 Quickshell Process 管理，不再全局清理同名进程。Niri 夜灯只查询、停止 `inir-wlsunset.service`，随 `niri.service` 退出；不影响其他来源的 wlsunset。
+
+SDDM 配色模块和模板后置钩子都要求实际登录管理器为 SDDM；GDM 主机上的遗留 SDDM 文件不会触发它们。安装的通用备份已确认只复制文件，不移动现有应用配置。
+
+上述验证使用合成配置和模拟系统命令。本轮未安装、未修改实际应用配置、未推送；实际 GDM 登录仍需部署后验收。

@@ -16,7 +16,7 @@ XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 PALETTE_JSON="$XDG_STATE_HOME/quickshell/user/generated/palette.json"
 APP_PALETTE_JSON="$XDG_STATE_HOME/quickshell/user/generated/app-palette.json"
 COLORS_JSON="$XDG_STATE_HOME/quickshell/user/generated/colors.json"
-KDEGLOBALS="$HOME/.config/kdeglobals"
+KDEGLOBALS="$XDG_CONFIG_HOME/kdeglobals"
 DARKLY_COLORS="$XDG_DATA_HOME/color-schemes/Darkly.colors"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THEME_LOCK="$XDG_STATE_HOME/quickshell/user/generated/app-theme.lock"
@@ -35,8 +35,8 @@ SHELL_CONFIG_FILE="$(inir_config_file)"
 enable_apps_shell="true"
 enable_qt_apps="true"
 if [[ -f "$SHELL_CONFIG_FILE" ]] && command -v jq &>/dev/null; then
-    enable_apps_shell=$(jq -r '.appearance.wallpaperTheming.enableAppsAndShell // true' "$SHELL_CONFIG_FILE")
-    enable_qt_apps=$(jq -r '.appearance.wallpaperTheming.enableQtApps // true' "$SHELL_CONFIG_FILE")
+    enable_apps_shell=$(jq -r '.appearance.wallpaperTheming.enableAppsAndShell | if . == null then true else . end' "$SHELL_CONFIG_FILE")
+    enable_qt_apps=$(jq -r '.appearance.wallpaperTheming.enableQtApps | if . == null then true else . end' "$SHELL_CONFIG_FILE")
 fi
 
 # Exit only when both shell/GTK and Qt app theming are disabled
@@ -66,14 +66,15 @@ if [[ "$THEME_MODE" != "light" && "$THEME_MODE" != "dark" ]]; then
     [[ "$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)" == "'prefer-light'" ]] \
         && THEME_MODE="light" || THEME_MODE="dark"
 fi
-CHOSEN_ICON_THEME=$(jq -r '.appearance.iconTheme // empty' "$SHELL_CONFIG_FILE" 2>/dev/null || true)
-[[ -z "$CHOSEN_ICON_THEME" ]] && CHOSEN_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || true)
-APPLIED_ICON_THEME=""
-if [[ -n "$CHOSEN_ICON_THEME" ]]; then
+# Icon choice is a shared system preference. Only an explicit application
+# setup opt-in may select/repair a theme; palette reloads otherwise read it.
+CHOSEN_ICON_THEME=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'" || true)
+APPLIED_ICON_THEME="$CHOSEN_ICON_THEME"
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]]; then
+    saved_icon_theme=$(jq -r '.appearance.iconTheme // empty' "$SHELL_CONFIG_FILE" 2>/dev/null || true)
+    [[ -z "$saved_icon_theme" ]] || CHOSEN_ICON_THEME="$saved_icon_theme"
     APPLIED_ICON_THEME=$("$SCRIPT_DIR/icon-theme-for-mode.sh" "$CHOSEN_ICON_THEME" "$THEME_MODE" 2>/dev/null || echo "$CHOSEN_ICON_THEME")
-    if [[ "$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'")" != "$APPLIED_ICON_THEME" ]]; then
-        gsettings set org.gnome.desktop.interface icon-theme "$APPLIED_ICON_THEME" 2>/dev/null || true
-    fi
+    gsettings set org.gnome.desktop.interface icon-theme "$APPLIED_ICON_THEME" 2>/dev/null || true
     "$SCRIPT_DIR/icon-theme-polarity.sh" "$APPLIED_ICON_THEME" 2>/dev/null || true
 fi
 
@@ -149,7 +150,7 @@ adjust_color() {
 # Break a symlink, replacing it with a regular file slot.
 # Prevents writing through symlinks to external themes.
 break_symlink() {
-    if [[ -L "$1" ]]; then
+    if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && -L "$1" ]]; then
         rm -f "$1"
     fi
 }
@@ -159,6 +160,13 @@ break_symlink() {
 # wallpaper/style changes arrive close together.
 write_if_changed() {
     local target="$1"
+    if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" != true ]]; then
+        local status=0
+        python3 "$SCRIPT_DIR/lib/shared-theme-config.py" css "$target" || status=$?
+        # Called inside an if: explicitly propagate errors beyond that test.
+        [[ "$status" -le 1 ]] || exit "$status"
+        return "$status"
+    fi
     local temp
     temp=$(mktemp "${target}.tmp.XXXXXX")
     cat > "$temp"
@@ -716,9 +724,22 @@ inactiveForeground=${fg_inactive_rgb}
 EOF
 }
 
+# Keep existing global styles, fonts and app preferences; only palette entries
+# belong to the shared color pipeline. Exit 1 means the file was unchanged.
+write_shared_ini() {
+    local kind="$1" target="$2" status=0
+    if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]]; then
+        mkdir -p "$(dirname "$target")"
+        cat > "$target"
+    else
+        python3 "$SCRIPT_DIR/lib/shared-theme-config.py" "$kind" "$target" || status=$?
+        [[ "$status" -le 1 ]]
+    fi
+}
+
 # Apply KDE/Qt theming if enabled
 if [[ "$enable_qt_apps" != "false" ]]; then
-    generate_kdeglobals > "$KDEGLOBALS"
+    generate_kdeglobals | write_shared_ini kde "$KDEGLOBALS"
     
     # Generate Darkly color scheme for Qt style
     mkdir -p "$(dirname "$DARKLY_COLORS")"
@@ -726,12 +747,13 @@ if [[ "$enable_qt_apps" != "false" ]]; then
 fi
 
 # Generate Pywalfox colors for Firefox theming
+gtk_css_changed=false
+if [[ "$enable_apps_shell" != false ]]; then
 mkdir -p "$XDG_STATE_HOME/quickshell/user/generated"
 generate_pywalfox > "$XDG_STATE_HOME/quickshell/user/generated/pywalfox-colors.json"
 
 # Generate GTK3 CSS (legacy apps)
-gtk_css_changed=false
-GTK3_CSS="$HOME/.config/gtk-3.0/gtk.css"
+GTK3_CSS="$XDG_CONFIG_HOME/gtk-3.0/gtk.css"
 mkdir -p "$(dirname "$GTK3_CSS")"
 break_symlink "$GTK3_CSS"
 if write_if_changed "$GTK3_CSS" << EOF
@@ -897,7 +919,7 @@ fi
 
 # Generate GTK4/libadwaita CSS (Nautilus, GNOME apps)
 # GTK4 does NOT support !important - use CSS custom properties instead
-GTK4_CSS="$HOME/.config/gtk-4.0/gtk.css"
+GTK4_CSS="$XDG_CONFIG_HOME/gtk-4.0/gtk.css"
 mkdir -p "$(dirname "$GTK4_CSS")"
 break_symlink "$GTK4_CSS"
 if write_if_changed "$GTK4_CSS" << EOF
@@ -1019,10 +1041,12 @@ EOF
 then
     gtk_css_changed=true
 fi
+fi # enable_apps_shell
 
 # Configure qt6ct to use the Darkly color scheme (fixes Dolphin and other Qt apps being white)
 # qt6ct is the platform theme (QT_QPA_PLATFORMTHEME=qt6ct) — it needs a color scheme
-QT6CT_CONF="$HOME/.config/qt6ct/qt6ct.conf"
+if [[ "$enable_qt_apps" != false ]]; then
+QT6CT_CONF="$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
 mkdir -p "$(dirname "$QT6CT_CONF")"
 touch "$QT6CT_CONF"
 CURRENT_ICON_THEME="$APPLIED_ICON_THEME"
@@ -1036,7 +1060,7 @@ if [[ -z "$CURRENT_ICON_THEME" ]]; then
 fi
 CURRENT_QT_STYLE=$(grep '^style=' "$QT6CT_CONF" 2>/dev/null | cut -d= -f2 || true)
 [[ -z "$CURRENT_QT_STYLE" ]] && CURRENT_QT_STYLE="Darkly"
-cat > "$QT6CT_CONF" << EOF
+write_shared_ini qt "$QT6CT_CONF" << EOF
 [Appearance]
 color_scheme_path=${DARKLY_COLORS}
 custom_palette=true
@@ -1045,7 +1069,7 @@ style=${CURRENT_QT_STYLE}
 EOF
 
 # Configure qt5ct to use the Darkly color scheme (mirrors qt6ct setup above)
-QT5CT_CONF="$HOME/.config/qt5ct/qt5ct.conf"
+QT5CT_CONF="$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
 mkdir -p "$(dirname "$QT5CT_CONF")"
 touch "$QT5CT_CONF"
 CURRENT_QT5_ICON_THEME="$APPLIED_ICON_THEME"
@@ -1053,13 +1077,14 @@ CURRENT_QT5_ICON_THEME="$APPLIED_ICON_THEME"
 [[ -z "$CURRENT_QT5_ICON_THEME" ]] && CURRENT_QT5_ICON_THEME="$CURRENT_ICON_THEME"
 CURRENT_QT5_STYLE=$(grep '^style=' "$QT5CT_CONF" 2>/dev/null | cut -d= -f2 || true)
 [[ -z "$CURRENT_QT5_STYLE" ]] && CURRENT_QT5_STYLE="Darkly"
-cat > "$QT5CT_CONF" << EOF
+write_shared_ini qt "$QT5CT_CONF" << EOF
 [Appearance]
 color_scheme_path=${DARKLY_COLORS}
 custom_palette=true
 icon_theme=${CURRENT_QT5_ICON_THEME}
 style=${CURRENT_QT5_STYLE}
 EOF
+fi # enable_qt_apps
 
 # Keep static GTK settings aligned with GSettings. GTK applications are split
 # between the desktop settings service and settings.ini readers, so stale files
@@ -1148,13 +1173,15 @@ sync_gtk_settings_ini() {
     fi
 }
 
-sync_gtk_settings_ini "$HOME/.config/gtk-3.0/settings.ini" "$SCRIPT_DIR/../../defaults/gtk-3.0/settings.ini" true
-sync_gtk_settings_ini "$HOME/.config/gtk-4.0/settings.ini" "$SCRIPT_DIR/../../defaults/gtk-4.0/settings.ini" false
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && "$enable_apps_shell" != false ]]; then
+    sync_gtk_settings_ini "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" "$SCRIPT_DIR/../../defaults/gtk-3.0/settings.ini" true
+    sync_gtk_settings_ini "$XDG_CONFIG_HOME/gtk-4.0/settings.ini" "$SCRIPT_DIR/../../defaults/gtk-4.0/settings.ini" false
+fi
 
 # GTK user CSS is loaded per process. Refresh only consumers that are known to
 # stay alive across theme changes; restarting the GTK portal backend makes new
 # file chooser/access dialogs use the current generated palette.
-if [[ "$gtk_css_changed" == true || "$gtk_settings_changed" == true ]]; then
+if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] && [[ "$gtk_css_changed" == true || "$gtk_settings_changed" == true ]]; then
     if pgrep -x nautilus >/dev/null 2>&1; then
         nautilus -q >/dev/null 2>&1 || true
     fi

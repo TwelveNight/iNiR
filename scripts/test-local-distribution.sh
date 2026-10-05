@@ -2115,4 +2115,7 @@ fi
 step "installed payload boundaries"
 python3 "$runtime_root/scripts/test-runtime-payload.py"
 
+step "shared application color boundaries"
+python3 "$runtime_root/scripts/test-shared-app-colors.py"
+
 printf '\nAll local distribution checks passed.\n'

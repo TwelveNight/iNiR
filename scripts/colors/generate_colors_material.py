@@ -5,6 +5,10 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib.paths import theme_template_output
 
 import numpy as np
 
@@ -1211,7 +1215,9 @@ if args.render_templates:
 
         templates_base = os.path.join(template_dir, "templates")
         for entry in manifest.get("templates", []):
-            output_path = os.path.abspath(os.path.expanduser(entry["output"]))
+            # Resolve before comparing with managed outputs; XDG overrides
+            # must not let a legacy template bypass their overwrite protection.
+            output_path = str(theme_template_output(entry["output"]))
             if output_path in managed_outputs:
                 continue
             template_entries.append(
@@ -1243,7 +1249,7 @@ if args.render_templates:
                     continue
 
                 resolved_input = os.path.expanduser(input_path)
-                resolved_output = os.path.abspath(os.path.expanduser(output_path))
+                resolved_output = str(theme_template_output(output_path))
                 if resolved_output in managed_outputs:
                     continue
                 if not os.path.isfile(resolved_input) and "/templates/" in input_path:
@@ -1456,7 +1462,8 @@ if args.render_templates:
     # SDDM sync post-hook: run only if script and theme exist
     sddm_sync = os.path.expanduser("~/.local/bin/sync-pixel-sddm.py")
     sddm_theme = "/usr/share/sddm/themes/ii-pixel"
-    if os.path.isfile(sddm_sync) and os.path.isdir(sddm_theme):
+    active_dm = Path("/etc/systemd/system/display-manager.service").resolve().name
+    if active_dm == "sddm.service" and os.path.isfile(sddm_sync) and os.path.isdir(sddm_theme):
         import subprocess
 
         subprocess.Popen(

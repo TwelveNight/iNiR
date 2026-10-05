@@ -537,12 +537,17 @@ main() {
     log_module "generated CSS: $css_file"
   fi
 
-  # Register theme in pear-desktop config (for disk-based loading on next app start)
-  register_theme_in_config "$css_file" || true
+  # Refresh an existing integration, without selecting a theme or enabling a
+  # debugging port on every palette reload. New integration is setup opt-in.
+  if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]]; then
+    register_theme_in_config "$css_file" || return 1
+    ensure_cdp_flag
+  elif ! jq -e --arg p "$css_file" '.options.themes // [] | index($p) != null' "$PEAR_CONFIG_FILE" >/dev/null 2>&1; then
+    log_module "colors generated; preserving existing app theme selection"
+    return 0
+  fi
 
-  ensure_cdp_flag
-
-  # Reload app with new CSS (CDP injection or restart)
+  # Reload an already selected theme through an existing CDP connection.
   reload_pear "$css_file"
 
   log_module "done"

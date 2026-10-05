@@ -166,6 +166,51 @@ ShellRoot {
         self.assertFalse((self.base / "font-sync-called").exists())
         self.assertTrue(json.loads((self.base / "state/inir/user/todo.json").read_text())[0]["done"])
 
+    def test_icon_startup_reads_shared_choice_without_restoring_private_setting(self):
+        self.copy_singleton("services/IconThemeService.qml")
+        icon_service = self.base / "services/IconThemeService.qml"
+        # Substitute only the executable path; keep production lifecycle logic.
+        icon_service.write_text(icon_service.read_text().replace('"/usr/bin/gsettings"', '"gsettings"'))
+        self.executable("gsettings", '''#!/bin/sh
+printf '%s\\n' "$*" >> "$HOME/icon-settings.log"
+[ "$1" = get ] || exit 9
+printf "'Shared Fixture Icons'\\n"
+''')
+        (self.base / "config/inir/config.json").write_text('{"appearance":{"iconTheme":"Stale Private Icons"}}')
+        self.qml('Config.ready; IconThemeService.ensureInitialized();', '''
+            verify(IconThemeService.currentTheme === "Shared Fixture Icons", "shared icon choice was not read")
+            verify(Config.options.appearance.iconTheme === "Stale Private Icons", "private setting was unexpectedly rewritten")
+        ''')
+        self.assertEqual((self.base / "icon-settings.log").read_text().splitlines(),
+                         ["get org.gnome.desktop.interface icon-theme"])
+
+    def test_niri_nightlight_controls_only_its_owned_service(self):
+        self.copy_singleton("services/Hyprsunset.qml")
+        self.stub("services", "CompositorService", 'property bool isNiri: true')
+        (self.base / "services/DateTime.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject { property var clock: ({hours: 12, minutes: 0, date: new Date()}) }
+''')
+        service = self.base / "services/Hyprsunset.qml"
+        text = service.read_text()
+        for name in ["systemctl", "systemd-run", "pkill", "pidof"]:
+            # Keep every production command argument, using fixture executables.
+            text = text.replace(f"/usr/bin/{name}", str(self.base / "bin" / name))
+            self.executable(name, f'''#!/bin/sh
+printf '{name} %s\\n' "$*" >> "$HOME/nightlight-actions.log"
+case "$*" in *is-active*) exit 1;; esac
+exit 0
+''')
+        service.write_text(text)
+        self.qml('Config.ready; Hyprsunset.load();', 'Hyprsunset.enable();',
+                 'verify(Hyprsunset.active, "nightlight did not enable"); Hyprsunset.disable();')
+        actions = (self.base / "nightlight-actions.log").read_text()
+        self.assertIn("systemctl --user is-active --quiet inir-wlsunset.service", actions)
+        self.assertIn("systemctl --user stop inir-wlsunset.service", actions)
+        self.assertIn("--unit=inir-wlsunset.service --property=PartOf=niri.service", actions)
+        self.assertNotIn("pkill ", actions)
+        self.assertNotIn("pidof ", actions)
+
     def test_keyring_edits_preserve_other_provider_fields_and_queue_saves(self):
         self.qml('KeyringStorage.fetchKeyringData();', '''
             verify(KeyringStorage.loaded, "keyring not loaded")

@@ -226,9 +226,8 @@ Singleton {
     property bool _destroying: false
 
     Component.onCompleted: {
-        // Kill any orphaned nmcli monitor processes from previous shell instances,
-        // then start the fresh subscriber once cleanup finishes.
-        _cleanupStale.running = true;
+        // This Process is owned and stopped by this Shell instance.
+        subscriber.running = true;
         // Prime initial state once; subsequent updates come from nmcli monitor.
         Qt.callLater(() => root.update())
     }
@@ -236,13 +235,6 @@ Singleton {
     Component.onDestruction: {
         root._destroying = true;
         subscriber.running = false;
-    }
-
-    Process {
-        id: _cleanupStale
-        command: ["pkill", "-f", "nmcli monitor"]
-        running: false
-        onExited: subscriber.running = true
     }
 
     Process {

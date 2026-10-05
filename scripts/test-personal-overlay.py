@@ -143,7 +143,8 @@ source "{script}"
         manifest = json.loads((ROOT / "defaults/matugen/templates.json").read_text())
         outputs = [entry["output"] for entry in manifest["templates"]]
         self.assertIn("~/.local/state/quickshell/user/generated/color.txt", outputs)
-        self.assertIn("~/.config/gtk-4.0/gtk.css", outputs)
+        self.assertIn("~/.local/state/quickshell/user/generated/gtk-4-rendered.css", outputs)
+        self.assertNotIn("~/.config/gtk-4.0/gtk.css", outputs)
         # Execute the actual resolver used by the production colour modules.
         output = self.bash(f'''
 source "{ROOT}/scripts/colors/lib/module-runtime.sh"

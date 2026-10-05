@@ -364,7 +364,16 @@ func ensureExtensionRegistered(forkKey, extDir string) error {
 
 	var entries []map[string]any
 	if data, err := os.ReadFile(registryPath); err == nil {
-		_ = json.Unmarshal(data, &entries)
+		if err := json.Unmarshal(data, &entries); err != nil || entries == nil {
+			return fmt.Errorf("preserving incompatible extension registry: %s", registryPath)
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	for _, entry := range entries {
+		if entry == nil {
+			return fmt.Errorf("preserving incompatible extension registry: %s", registryPath)
+		}
 	}
 
 	extID := "inir." + themeExtensionID
@@ -613,8 +622,9 @@ func generateThemeForFork(colorsPath, terminalJSONPath, scssPath, settingsPath, 
 		}
 	}
 
-	// Clean up legacy extensions from older iNiR versions
-	cleanLegacyExtensions(forkKey)
+	if os.Getenv("INIR_INSTALL_SHARED_APP_CONFIGS") == "true" {
+		cleanLegacyExtensions(forkKey)
+	}
 
 	// Install local extension with _watch: true.
 	// Only write package.json once — rewriting mid-session causes extension host errors.
@@ -639,6 +649,10 @@ func generateThemeForFork(colorsPath, terminalJSONPath, scssPath, settingsPath, 
 	themePath := filepath.Join(extDir, "themes", activeFile)
 	if err := writeThemeFile(themePath, colors, termColors); err != nil {
 		return false, fmt.Errorf("failed to write theme: %v", err)
+	}
+	if os.Getenv("INIR_INSTALL_SHARED_APP_CONFIGS") != "true" {
+		// Existing selections reload the color file; keep settings and custom overrides.
+		return true, nil
 	}
 
 	// Only touch settings.json when needed: first activation or legacy cleanup.
@@ -913,15 +927,17 @@ func stripThemeForFork(settingsPath, forkKey string) bool {
 		changed = true
 	}
 
-	// Clean up legacy injection keys from any previous iNiR version
-	for _, key := range []string{
-		"workbench.colorCustomizations",
-		"editor.tokenColorCustomizations",
-		"editor.semanticTokenColorCustomizations",
-	} {
-		if _, ok := settings[key]; ok {
-			delete(settings, key)
-			changed = true
+	// Legacy keys may contain user overrides; cleanup requires setup opt-in.
+	if os.Getenv("INIR_INSTALL_SHARED_APP_CONFIGS") == "true" {
+		for _, key := range []string{
+			"workbench.colorCustomizations",
+			"editor.tokenColorCustomizations",
+			"editor.semanticTokenColorCustomizations",
+		} {
+			if _, ok := settings[key]; ok {
+				delete(settings, key)
+				changed = true
+			}
 		}
 	}
 	if !changed {

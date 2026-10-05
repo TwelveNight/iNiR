@@ -106,7 +106,7 @@ Singleton {
             // A transient user unit also gives us a precise lifecycle owner.
             Quickshell.execDetached([
                 "/usr/bin/systemd-run", "--user", "--collect",
-                "--unit=inir-wlsunset.service",
+                "--unit=inir-wlsunset.service", "--property=PartOf=niri.service",
                 "/usr/bin/wlsunset", "-T", "6500", "-t",
                 root.colorTemperature.toString(), "-s", "00:00", "-S", "23:59"
             ]);
@@ -172,11 +172,8 @@ Singleton {
     // === Niri processes (wlsunset) ===
     Process {
         id: wlsunsetKillProc
-        // Stop the owned transient service. pkill is retained only to clean up
-        // pre-2.30 legacy instances that were spawned directly by Quickshell.
-        command: ["/usr/bin/bash", "-c",
-            "/usr/bin/systemctl --user stop inir-wlsunset.service >/dev/null 2>&1 || true; "
-            + "/usr/bin/pkill -x wlsunset >/dev/null 2>&1 || true"]
+        // Stop only our own unit; another session may own its own wlsunset.
+        command: ["/usr/bin/systemctl", "--user", "stop", "inir-wlsunset.service"]
         onExited: {
             // If we're enabling, start wlsunset after kill completes
             if (root.active) {
@@ -188,9 +185,7 @@ Singleton {
     Process {
         id: niriFetchProc
         running: CompositorService.isNiri
-        command: ["/usr/bin/bash", "-c",
-            "/usr/bin/systemctl --user is-active --quiet inir-wlsunset.service "
-            + "|| /usr/bin/pidof wlsunset >/dev/null"]
+        command: ["/usr/bin/systemctl", "--user", "is-active", "--quiet", "inir-wlsunset.service"]
         onExited: (exitCode, exitStatus) => {
             root.active = (exitCode === 0);
         }

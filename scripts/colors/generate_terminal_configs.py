@@ -2,7 +2,7 @@
 """
 Generate terminal color configuration files from material_colors.scss
 Supports: Kitty, Alacritty, Foot, WezTerm, Ghostty, Konsole
-Auto-integrates into existing terminal configs
+Preserves existing app preferences; setup integration requires explicit opt-in.
 """
 
 import argparse
@@ -11,6 +11,7 @@ import os
 import re
 import sys
 import tempfile
+import tomllib
 from datetime import datetime
 from pathlib import Path
 
@@ -448,9 +449,14 @@ white   = '{colors.get("term15", "#EBDBB2")}'
     with open(output_path, "w") as f:
         f.write(config)
 
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+
     # Auto-integrate into alacritty.toml and fix import order
     home = os.path.expanduser("~")
-    alacritty_conf = f"{home}/.config/alacritty/alacritty.toml"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    alacritty_conf = f"{config_home}/alacritty/alacritty.toml"
 
     # Fix import order and migrate to [general] import (Alacritty 0.15+)
     if os.path.exists(alacritty_conf):
@@ -512,7 +518,12 @@ urls={colors.get("term4", "#458588")[1:]}
 
     # Auto-integrate into foot.ini (add at the top to avoid section issues)
     home = os.path.expanduser("~")
-    foot_conf = f"{home}/.config/foot/foot.ini"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    foot_conf = f"{config_home}/foot/foot.ini"
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+
     if ensure_line_in_file(
         foot_conf,
         "include=~/.config/foot/colors.ini",
@@ -586,9 +597,14 @@ return {{
     with open(output_path, "w") as f:
         f.write(config)
 
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+
     # Auto-integrate into wezterm.lua
     home = os.path.expanduser("~")
-    wezterm_conf = f"{home}/.config/wezterm/wezterm.lua"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    wezterm_conf = f"{config_home}/wezterm/wezterm.lua"
     integration_code = """local wezterm = require('wezterm')
 local config = wezterm.config_builder()
 local colors = require('colors')
@@ -670,7 +686,12 @@ palette = 15={colors.get("term15", "#EBDBB2")}
 
     # Auto-integrate into ghostty config
     home = os.path.expanduser("~")
-    ghostty_conf = f"{home}/.config/ghostty/config"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    ghostty_conf = f"{config_home}/ghostty/config"
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+
     if ensure_line_in_file(ghostty_conf, "theme = ii-auto", r"theme\s*=\s*ii-auto"):
         print(f"✓ Generated Ghostty config and auto-integrated")
     else:
@@ -822,11 +843,34 @@ bright_white = '{colors.get("term15", "#EBDBB2")}'
 
     # Auto-integrate into starship.toml
     home = os.path.expanduser("~")
-    starship_conf = f"{home}/.config/starship.toml"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    starship_conf = f"{config_home}/starship.toml"
 
     # Check if starship.toml exists
     if os.path.exists(starship_conf):
         content = Path(starship_conf).read_text()
+
+        # Starship has no include mechanism. Refresh only an already selected
+        # managed palette; never choose one or append a new section implicitly.
+        if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+            try:
+                prompt = tomllib.loads(content)
+            except tomllib.TOMLDecodeError:
+                print("✓ Updated shared Starship palette file; preserved invalid prompt config")
+                return
+            if prompt.get("palette") != "ii" or "ii" not in prompt.get("palettes", {}):
+                print("✓ Updated shared Starship palette file; preserved prompt preferences")
+                return
+            # Keep user-defined palette entries and every prompt option.
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("shared_theme_config", Path(__file__).parent / "lib/shared-theme-config.py")
+            merger = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(merger)
+            updated = merger.merge_ini(content, config, "starship")
+            if updated != content:
+                Path(starship_conf).write_text(updated)
+            print("✓ Updated selected ii colors; preserved prompt preferences")
+            return
 
         # Check if palette_name is already set to ii
         if 'palette = "ii"' in content:
@@ -950,9 +994,14 @@ theme[process_end]="{primary_dim}"
     with open(output_path, "w") as f:
         f.write(config)
 
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+
     # Auto-integrate: set color_theme in btop.conf
     home = os.path.expanduser("~")
-    btop_conf = f"{home}/.config/btop/btop.conf"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    btop_conf = f"{config_home}/btop/btop.conf"
     btop_path = Path(btop_conf)
     if btop_path.exists():
         content = btop_path.read_text()
@@ -1112,7 +1161,8 @@ def generate_lazygit_config(colors, output_path):
 """
 
     home = os.path.expanduser("~")
-    config_path = f"{home}/.config/lazygit/config.yml"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    config_path = f"{config_home}/lazygit/config.yml"
     config_file = Path(config_path)
 
     # Also write standalone theme file for reference
@@ -1121,6 +1171,10 @@ def generate_lazygit_config(colors, output_path):
         f.write(f"# Auto-generated by ii wallpaper theming system\n")
         f.write(f"# This is the theme section for lazygit config.yml\n")
         f.write(f"gui:\n{theme_yaml}\n")
+
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
 
     if config_file.exists():
         content = config_file.read_text()
@@ -1265,9 +1319,14 @@ rules = [
     with open(output_path, "w") as f:
         f.write(config)
 
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+
     # Auto-integrate: set flavor in yazi's theme.toml
     home = os.path.expanduser("~")
-    theme_toml = f"{home}/.config/yazi/theme.toml"
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    theme_toml = f"{config_home}/yazi/theme.toml"
     theme_path = Path(theme_toml)
 
     flavor_line = 'use = "ii-auto"'
@@ -1446,6 +1505,8 @@ def main():
         sys.exit(1)
 
     home = os.path.expanduser("~")
+    config_home = os.environ.get("XDG_CONFIG_HOME") or f"{home}/.config"
+    data_home = os.environ.get("XDG_DATA_HOME") or f"{home}/.local/share"
     all_terminals = [
         "kitty",
         "alacritty",
@@ -1470,24 +1531,24 @@ def main():
         generate_kitty_config(colors, str(state_home / "quickshell/user/generated/terminal/kitty-theme.conf"))
 
     if "alacritty" in terminals:
-        generate_alacritty_config(colors, f"{home}/.config/alacritty/colors.toml")
+        generate_alacritty_config(colors, f"{config_home}/alacritty/colors.toml")
 
     if "foot" in terminals:
-        generate_foot_config(colors, f"{home}/.config/foot/colors.ini")
+        generate_foot_config(colors, f"{config_home}/foot/colors.ini")
 
     if "wezterm" in terminals:
-        generate_wezterm_config(colors, f"{home}/.config/wezterm/colors.lua")
+        generate_wezterm_config(colors, f"{config_home}/wezterm/colors.lua")
 
     if "ghostty" in terminals:
-        generate_ghostty_config(colors, f"{home}/.config/ghostty/themes/ii-auto")
+        generate_ghostty_config(colors, f"{config_home}/ghostty/themes/ii-auto")
 
     if "konsole" in terminals:
         generate_konsole_config(
-            colors, f"{home}/.local/share/konsole/ii-auto.colorscheme"
+            colors, f"{data_home}/konsole/ii-auto.colorscheme"
         )
 
     if "starship" in terminals:
-        generate_starship_config(colors, f"{home}/.config/starship/ii-palette.toml")
+        generate_starship_config(colors, f"{config_home}/starship/ii-palette.toml")
 
     if "omp" in terminals:
         colors_json_path = args.colors
@@ -1500,13 +1561,13 @@ def main():
                     with open(terminal_json_path, "r") as tf:
                         omp_colors.update(json.load(tf))
                 generate_omp_config(
-                    omp_colors, f"{home}/.config/oh-my-posh/ii-auto.json"
+                    omp_colors, f"{config_home}/oh-my-posh/ii-auto.json"
                 )
         except FileNotFoundError:
             print(
                 f"Warning: {colors_json_path} not found, oh-my-posh theme may be incomplete"
             )
-            generate_omp_config(colors, f"{home}/.config/oh-my-posh/ii-auto.json")
+            generate_omp_config(colors, f"{config_home}/oh-my-posh/ii-auto.json")
 
     if "btop" in terminals:
         # btop needs full M3 tokens from palette.json, not just terminal colors
@@ -1517,27 +1578,27 @@ def main():
                 # Merge M3 tokens with terminal colors
                 btop_colors = {**colors, **m3_colors}
                 generate_btop_config(
-                    btop_colors, f"{home}/.config/btop/themes/ii-auto.theme"
+                    btop_colors, f"{config_home}/btop/themes/ii-auto.theme"
                 )
         except FileNotFoundError:
             print(
                 f"Warning: {colors_json_path} not found, btop theme may be incomplete"
             )
-            generate_btop_config(colors, f"{home}/.config/btop/themes/ii-auto.theme")
+            generate_btop_config(colors, f"{config_home}/btop/themes/ii-auto.theme")
 
     if "lazygit" in terminals:
-        generate_lazygit_config(colors, f"{home}/.config/lazygit/ii-theme.yml")
+        generate_lazygit_config(colors, f"{config_home}/lazygit/ii-theme.yml")
 
     if "yazi" in terminals:
         generate_yazi_config(
-            colors, f"{home}/.config/yazi/flavors/ii-auto.yazi/flavor.toml"
+            colors, f"{config_home}/yazi/flavors/ii-auto.yazi/flavor.toml"
         )
 
     if args.zed:
         generate_zed_config(
             colors,
             args.scss,
-            f"{home}/.config/zed/themes/ii-theme.json",
+            f"{config_home}/zed/themes/ii-theme.json",
             args.colors,
             args.terminal_json,
         )

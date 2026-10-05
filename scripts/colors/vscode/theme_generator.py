@@ -889,7 +889,11 @@ def _ensure_extension_registered(fork_key: str, ext_dir: Path) -> None:
             with open(registry) as f:
                 entries = json.load(f)
         except (json.JSONDecodeError, OSError):
-            entries = []
+            print(f"Preserving unreadable extension registry: {registry}", file=sys.stderr)
+            return
+    if not isinstance(entries, list) or any(not isinstance(e, dict) for e in entries):
+        print(f"Preserving incompatible extension registry: {registry}", file=sys.stderr)
+        return
 
     ext_id = f"inir.{THEME_EXTENSION_ID}"
     for e in entries:
@@ -952,8 +956,8 @@ def generate_vscode_theme(colors_json_path, scss_path, settings_path, fork_key="
     syntax_rules = generate_vscode_syntax(colors, term_colors)
     semantic_rules = generate_vscode_semantic_tokens(colors, term_colors)
 
-    # Clean up legacy extensions from older iNiR versions
-    _clean_legacy_extensions(fork_key)
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") == "true":
+        _clean_legacy_extensions(fork_key)
 
     # Install extension (only write manifest once to avoid extension host errors)
     ext_dir = _get_ext_dir(fork_key) / THEME_EXTENSION_ID
@@ -967,6 +971,12 @@ def generate_vscode_theme(colors_json_path, scss_path, settings_path, fork_key="
     # Write theme file (atomic — _watch handles live reload)
     theme_path = ext_dir / "themes" / THEME_FILE_NAME
     _write_theme_file(theme_path, workbench_colors, syntax_rules, semantic_rules, colors)
+
+    # An existing selection can use the refreshed color file. Do not select
+    # our theme or remove user color customizations on a palette reload.
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print(f"Generated {THEME_NAME} colors; preserved editor preferences")
+        return True
 
     # Only touch settings.json when needed: first activation or legacy cleanup.
     # Once our theme is active, _watch:true handles reload — no settings changes needed.
@@ -1092,15 +1102,14 @@ def strip_vscode_theme(settings_path: str, fork_key: str = "") -> bool:
         changed = True
     settings.pop(PREV_THEME_KEY, None)
 
-    # Clean up all injection keys from any previous version
-    for key in [
-        "workbench.colorCustomizations",
-        "editor.tokenColorCustomizations",
-        "editor.semanticTokenColorCustomizations",
-    ]:
-        if key in settings:
-            del settings[key]
-            changed = True
+    # These keys can hold the user's own overrides. Legacy cleanup requires
+    # explicit setup opt-in; current palette generation no longer writes them.
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") == "true":
+        for key in ["workbench.colorCustomizations", "editor.tokenColorCustomizations",
+                    "editor.semanticTokenColorCustomizations"]:
+            if key in settings:
+                del settings[key]
+                changed = True
 
     if changed:
         try:

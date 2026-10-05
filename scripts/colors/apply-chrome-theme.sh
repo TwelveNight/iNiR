@@ -98,6 +98,10 @@ ensure_policy_dir_writable() {
     return 0
   fi
 
+  # Runtime color changes must not request privileges or relax system policy
+  # directory permissions. Preparing integration is an explicit setup action.
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || return 1
+
   log "$name: requesting writable policy dir: $policy_dir"
   if elevate mkdir -p "$policy_dir" && elevate chmod a+rw "$policy_dir"; then
     log "$name: policy dir ready: $policy_dir"
@@ -294,17 +298,24 @@ apply_to_browser() {
   fi
 
   # 1. Fix preferences first — ensures GM3 theme engine generates correct dark/light palette
-  fix_preferences "$prefs_dir" "$name" "$pref_cs2"
+  if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]]; then
+    fix_preferences "$prefs_dir" "$name" "$pref_cs2"
+  fi
 
   # 2. Write policy — BrowserThemeColor persists across restarts.
-  # BackgroundModeEnabled prevents Chromium-based browsers from staying resident
-  # after a headless policy refresh or after the last window closes.
   if ensure_policy_dir_writable "$policy_dir" "$name"; then
-    printf '{"BrowserThemeColor": "%s", "BackgroundModeEnabled": false}\n' "$theme_color" > "$policy_dir/ii-theme.json"
-    policy_written='true'
-    log "$name: policy written to $policy_dir/ii-theme.json"
+    local policy_file="$policy_dir/ii-theme.json" policy_status=0
+    # Preserve unrelated policies; malformed files must remain untouched.
+    printf '{"BrowserThemeColor":"%s"}\n' "$theme_color" \
+      | python3 "$SCRIPT_DIR/lib/shared-theme-config.py" chrome "$policy_file" || policy_status=$?
+    if [[ "$policy_status" -le 1 ]]; then
+      policy_written='true'
+      log "$name: policy written to $policy_file"
+    else
+      log "$name: invalid existing policy; preserving $policy_file"
+    fi
   else
-    log "$name: BrowserThemeColor policy unavailable; standard Chrome/Brave will only get dark/light frame prefs"
+    log "$name: BrowserThemeColor policy unavailable; preserving browser settings"
   fi
 
   # 3. Apply live, but only if the browser is already running. Calling Chromium

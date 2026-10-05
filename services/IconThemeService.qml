@@ -91,17 +91,11 @@ Singleton {
         listThemesProc.running = false
         listThemesProc.running = true
         
-        // Load system theme
-        const savedTheme = Config.ready ? (Config.options?.appearance?.iconTheme ?? "") : ""
-        if (savedTheme && String(savedTheme).trim().length > 0) {
-            root.currentTheme = String(savedTheme).trim()
-            _log("[IconThemeService] Restoring saved icon theme:", root.currentTheme)
-            root._apply(root.currentTheme, true)
-        } else {
-            currentThemeProc.running = false
-            currentThemeProc.running = true
-        }
-        
+        // The system icon theme is shared. Read it on startup rather than
+        // writing a stale private Shell preference back to all applications.
+        currentThemeProc.running = false
+        currentThemeProc.running = true
+
         // Load dock theme
         root.dockTheme = Config.options?.appearance?.dockIconTheme ?? ""
     }

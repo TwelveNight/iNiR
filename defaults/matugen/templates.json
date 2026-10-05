@@ -3,12 +3,12 @@
     {
       "name": "gtk4",
       "input": "gtk-4.0/gtk.css",
-      "output": "~/.config/gtk-4.0/gtk.css"
+      "output": "~/.local/state/quickshell/user/generated/gtk-4-rendered.css"
     },
     {
       "name": "gtk3",
       "input": "gtk-3.0/gtk.css",
-      "output": "~/.config/gtk-3.0/gtk.css"
+      "output": "~/.local/state/quickshell/user/generated/gtk-3-rendered.css"
     },
     {
       "name": "fuzzel",

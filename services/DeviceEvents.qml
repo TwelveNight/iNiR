@@ -213,16 +213,10 @@ Singleton {
     property bool udevAvailable: false
     property var _shownUsb: null
     property var _shownDrives: null
-    // A monitor left by a previous shell instance or a reload keeps running on its own.
-    Process {
-        id: udevCleanup
-        running: root.allows("usb") || root.allows("drives")
-        command: ["pkill", "-f", "^(/usr/bin/)?udevadm monitor --udev --subsystem-match=usb/usb_device --subsystem-match=block$"]
-        onExited: udevProbe.running = true
-    }
     Component.onDestruction: udevMonitor.running = false
     Process {
         id: udevProbe
+        running: root.allows("usb") || root.allows("drives")
         command: ["sh", "-c", "command -v udevadm >/dev/null && command -v lsblk >/dev/null"]
         onExited: code => {
             root.udevAvailable = code === 0
