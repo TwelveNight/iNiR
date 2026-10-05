@@ -437,7 +437,7 @@ Singleton {
     }
     FileView {
         id: themeMetaView
-        path: `${Directories.stateUserPath}/generated/theme-meta.json`
+        path: `${Directories.sharedGeneratedPath}/theme-meta.json`
         watchChanges: true
         printErrors: false
         onFileChanged: reload()

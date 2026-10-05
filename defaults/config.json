@@ -438,7 +438,7 @@
             "folder": ""
         },
         "backend": {
-            "provider": "awww",
+            "provider": "skwd-wall",
             "awww": {
                 "transitionFps": 60,
                 "simpleStep": 5,

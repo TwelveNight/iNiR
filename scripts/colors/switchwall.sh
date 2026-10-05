@@ -3,7 +3,7 @@
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
-CACHE_DIR="$XDG_CACHE_HOME/quickshell"
+CACHE_DIR="$XDG_CACHE_HOME/inir"
 STATE_DIR="$XDG_STATE_HOME/quickshell"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHELL_ROOT="$(cd "$SCRIPT_DIR/../.." 2>/dev/null && pwd)"
@@ -11,7 +11,7 @@ SHELL_ROOT="$(cd "$SCRIPT_DIR/../.." 2>/dev/null && pwd)"
 # shellcheck source=scripts/lib/config-path.sh
 source "$SCRIPT_DIR/../lib/config-path.sh"
 SHELL_CONFIG_FILE="$(inir_config_file)"
-TEMPLATE_DIR="$XDG_CONFIG_HOME/matugen"
+TEMPLATE_DIR="$(inir_config_dir)/matugen"
 terminalscheme="$SCRIPT_DIR/terminal/scheme-base.json"
 
 # Validate critical runtime dependencies early
@@ -153,7 +153,7 @@ check_and_prompt_upscale() {
     fi
 }
 
-CUSTOM_DIR="$XDG_CACHE_HOME/quickshell"
+CUSTOM_DIR="$XDG_CACHE_HOME/inir"
 RESTORE_SCRIPT_DIR="$CUSTOM_DIR/scripts"
 RESTORE_SCRIPT="$RESTORE_SCRIPT_DIR/__restore_video_wallpaper.sh"
 THUMBNAIL_DIR="$CUSTOM_DIR/video_thumbnails"
@@ -171,10 +171,6 @@ is_gif() {
 has_valid_file() {
     local path="$1"
     [[ -n "$path" && -f "$path" && -s "$path" ]]
-}
-
-kill_existing_mpvpaper() {
-    pkill -f -9 mpvpaper || true
 }
 
 # The mpvpaper restore-script machinery is gone: video wallpapers are played by
@@ -300,7 +296,7 @@ ensure_color_preview_for_media() {
 
     if is_gif "$media_path"; then
         if command -v magick >/dev/null 2>&1; then
-            magick "$media_path[0]" "$out_path" >/dev/null 2>&1
+            magick "${media_path}[0]" "$out_path" >/dev/null 2>&1
             return $?
         fi
         if command -v ffmpeg >/dev/null 2>&1; then
@@ -322,6 +318,21 @@ switch() {
     color="$5"
     skip_config_write="$6"
     noswitch_flag="${7:-}"
+
+    # Desktop requests go to skwd; --noswitch/--color remain palette-only operations.
+    if [[ -n "$imgpath" && -z "$noswitch_flag" && -z "$color_flag" ]]; then
+        skwd_args=(apply "$imgpath")
+        [[ -n "$monitor_name" ]] && skwd_args+=(-o "$monitor_name")
+        skwd-helm "${skwd_args[@]}" || return $?
+        if [[ "$skip_config_write" != 1 ]]; then
+            if [[ -n "$monitor_name" ]]; then
+                set_wallpaper_path_per_monitor "$imgpath" "$monitor_name" "$start_workspace" "$end_workspace"
+            else
+                set_wallpaper_path "$imgpath"
+            fi
+        fi
+        return
+    fi
 
     # Per-monitor wallpaper changes: only update config, skip color generation
     # Global theme colors should only change from global wallpaper changes
@@ -401,13 +412,13 @@ switch() {
         fi
 
         check_and_prompt_upscale "$imgpath" &
-        kill_existing_mpvpaper
+        # skwd-wall owns all desktop rendering in the personal overlay.
 
         if is_video "$imgpath"; then
             mkdir -p "$THUMBNAIL_DIR"
 
             # Only check for ffmpeg (needed for thumbnail generation)
-            # mpvpaper is no longer needed - Qt Multimedia handles video playback natively
+            # Desktop video playback is owned by skwd-wall; this only creates thumbnails.
             if ! command -v ffmpeg &> /dev/null; then
                 echo "Missing dependency: ffmpeg"
                 echo "Arch: sudo pacman -S ffmpeg"
@@ -576,10 +587,8 @@ switch() {
     # Generate colors and render templates in one unified Python pass
     if [[ -n "${INIR_VENV:-}" ]]; then
         _ii_venv="$(eval echo "$INIR_VENV")"
-    elif [[ -n "${ILLOGICAL_IMPULSE_VIRTUAL_ENV:-}" ]]; then
-        _ii_venv="$(eval echo "$ILLOGICAL_IMPULSE_VIRTUAL_ENV")"
     else
-        _ii_venv="$HOME/.local/state/quickshell/.venv"
+        _ii_venv="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/.venv"
     fi
     source "$_ii_venv/bin/activate" 2>/dev/null || true
     _ii_python="$_ii_venv/bin/python3"

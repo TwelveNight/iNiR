@@ -3,7 +3,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="${INIR_VENV:-${ILLOGICAL_IMPULSE_VIRTUAL_ENV:-$HOME/.local/state/quickshell/.venv}}"
+VENV_DIR="${INIR_VENV:-${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/.venv}"
 
 # Prefer iNiR's managed Python only when it actually has ytmusicapi. Arch,
 # Fedora and newer Ubuntu releases can keep using their distro package through

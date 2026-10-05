@@ -90,6 +90,7 @@ ContentPage {
         settingsTaskSection: "motion"
         expanded: false
         icon: "sync_alt"
+        visible: !Wallpapers.skwdBackendEnabled
         title: Translation.tr("Parallax")
 
         SettingsGroup {
@@ -246,6 +247,7 @@ ContentPage {
         settingsTaskSection: "screens"
         expanded: true
         icon: "fullscreen"
+        visible: !Wallpapers.skwdBackendEnabled
         title: Translation.tr("Fullscreen behavior")
 
         SettingsGroup {
@@ -318,7 +320,7 @@ ContentPage {
                 }
 
                 readonly property var selMonData: WallpaperListener.effectivePerMonitor[selectedMonitor] ?? { path: "", isVideo: false, isGif: false, isAnimated: false, hasCustomWallpaper: false }
-                readonly property string selMonPath: selMonData.path || (Config.options?.background?.wallpaperPath ?? "")
+                readonly property string selMonPath: Wallpapers.currentMainWallpaperPath(selectedMonitor)
                 property bool showBackdropView: false
 
                 readonly property string backdropPath: {
@@ -358,7 +360,7 @@ ContentPage {
 
                                 readonly property string monName: WallpaperListener.getMonitorName(modelData) ?? ""
                                 readonly property var wpData: WallpaperListener.effectivePerMonitor[monName] ?? { path: "" }
-                                readonly property string wpPath: wpData.path || (Config.options?.background?.wallpaperPath ?? "")
+                                readonly property string wpPath: Wallpapers.currentMainWallpaperPath(monName)
                                 readonly property bool isSelected: monName === bgMultiMonPanel.selectedMonitor
                                 readonly property real aspectRatio: modelData.width / Math.max(1, modelData.height)
                                 readonly property real cardHeight: parent.height - 16
@@ -1130,111 +1132,27 @@ ContentPage {
         title: Translation.tr("Wallpaper renderer")
 
         SettingsGroup {
-            ConfigSelectionArray {
-                currentValue: Config.options?.background?.backend?.provider ?? "awww"
-                options: [
-                    { displayName: Translation.tr("Standard"), icon: "image", value: "awww" },
-                    { displayName: Translation.tr("Interactive web"), icon: "language", value: "web" }
-                ]
-                onSelected: newValue => Config.setNestedValue("background.backend.provider", newValue)
-            }
-
             StyledText {
                 Layout.fillWidth: true
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "awww"
-                text: AwwwBackend.available
-                    ? (AwwwBackend.isInternalShaderTransitionType(
-                            Config.options?.background?.transition?.type ?? "crossfade")
-                        ? Translation.tr("awww remains the static wallpaper renderer. The selected shader runs briefly in-shell during each change, then hands the final image back to awww.")
-                        : Translation.tr("awww is active. Static wallpapers are rendered externally with awww-native transitions, while GIF/video and backdrop layers use the internal fallback renderer automatically."))
-                    : Translation.tr("awww is the default backend, but the `awww` / `awww-daemon` binaries were not found in PATH. Install them to enable hardware-accelerated wallpaper rendering and transitions. The internal renderer is used as fallback until then.")
-                color: !AwwwBackend.available
-                    ? Appearance.colors.colError
-                    : Appearance.colors.colSubtext
-                font.pixelSize: Appearance.font.pixelSize.small
-                wrapMode: Text.WordWrap
-                opacity: 0.9
-            }
-
-            ConfigSpinBox {
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "awww" && AwwwBackend.available
-                icon: "speed"
-                text: Translation.tr("awww transition FPS")
-                value: Config.options?.background?.backend?.awww?.transitionFps ?? 60
-                from: 10
-                to: 240
-                stepSize: 5
-                onValueChanged: Config.setNestedValue("background.backend.awww.transitionFps", value)
-            }
-
-            ConfigRow {
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "awww" && AwwwBackend.available
-                uniform: true
-
-                ConfigSpinBox {
-                    icon: "blur_on"
-                    text: Translation.tr("Simple step")
-                    value: Config.options?.background?.backend?.awww?.simpleStep ?? 5
-                    from: 1
-                    to: 64
-                    stepSize: 1
-                    onValueChanged: Config.setNestedValue("background.backend.awww.simpleStep", value)
-                }
-
-                ConfigSpinBox {
-                    icon: "swipe"
-                    text: Translation.tr("Spatial step")
-                    value: Config.options?.background?.backend?.awww?.spatialStep ?? 30
-                    from: 1
-                    to: 128
-                    stepSize: 1
-                    onValueChanged: Config.setNestedValue("background.backend.awww.spatialStep", value)
-                }
-            }
-
-            StyledText {
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web" && !WebWallpaper.available
-                Layout.fillWidth: true
-                text: WebWallpaper.lastError.length > 0
-                    ? Translation.tr("Interactive web wallpapers need Qt 6 WebEngine, LayerShellQt and the Qt QML runner. The standard wallpaper stays available until the web renderer is ready.") + "\n" + WebWallpaper.lastError
-                    : Translation.tr("Checking interactive web wallpaper support…")
-                color: Appearance.colors.colError
-                font.pixelSize: Appearance.font.pixelSize.small
-                wrapMode: Text.WordWrap
-            }
-
-            ContentSubsection {
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web"
-                title: Translation.tr("Web wallpaper")
-                tooltip: Translation.tr("Load a local HTML file or a web URL with JavaScript, WebGL and browser media support")
-
-                MaterialTextField {
-                    Layout.fillWidth: true
-                    placeholderText: "/path/to/index.html  ·  https://example.com"
-                    text: Config.options?.background?.backend?.web?.source ?? ""
-                    onEditingFinished: Config.setNestedValue("background.backend.web.source", text.trim())
-                }
-            }
-
-            SettingsSwitch {
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web"
-                buttonIcon: "sports_esports"
-                text: Translation.tr("Interactive mode")
-                checked: Config.options?.background?.backend?.web?.interactive ?? false
-                onCheckedChanged: Config.setNestedValue("background.backend.web.interactive", checked)
-                StyledToolTip {
-                    text: Translation.tr("When enabled, the web wallpaper moves to the desktop input layer so games and interactive pages can receive pointer and keyboard input")
-                }
-            }
-
-            StyledText {
-                visible: (Config.options?.background?.backend?.provider ?? "awww") === "web"
-                Layout.fillWidth: true
-                text: Translation.tr("Passive mode stays behind desktop widgets. Interactive mode takes over the desktop surface while the bar and dock remain above it. The normal wallpaper remains available as a fallback for lock screen, overview and theme colors.")
+                text: Translation.tr("skwd-wall renders desktop wallpapers in both sessions. Use its controls for scaling, transitions and playback.")
                 color: Appearance.colors.colSubtext
                 font.pixelSize: Appearance.font.pixelSize.small
                 wrapMode: Text.WordWrap
             }
+            RippleButtonWithIcon {
+                materialIcon: "open_in_new"
+                mainText: Translation.tr("Open skwd-wall controls")
+                onClicked: Wallpapers.openFallbackPicker()
+            }
+            StyledText {
+                Layout.fillWidth: true
+                text: SkwdBackend.available ? Translation.tr("skwd-wall is connected")
+                    : (SkwdBackend.lastError || Translation.tr("Connecting to skwd-wall…"))
+                color: SkwdBackend.available ? Appearance.colors.colSubtext : Appearance.colors.colError
+                font.pixelSize: Appearance.font.pixelSize.small
+                wrapMode: Text.WordWrap
+            }
+
         }
     }
         }
@@ -1335,6 +1253,7 @@ ContentPage {
         settingsTaskSection: "motion"
         expanded: true
         icon: "transition_fade"
+        visible: !Wallpapers.skwdBackendEnabled
         title: Translation.tr("Wallpaper transitions")
 
         SettingsGroup {
@@ -1533,6 +1452,7 @@ ContentPage {
         settingsTaskSection: "screens"
         expanded: false
         icon: "aspect_ratio"
+        visible: !Wallpapers.skwdBackendEnabled
         title: Translation.tr("Wallpaper scaling")
 
         SettingsGroup {

@@ -106,6 +106,7 @@ WSettingsPage {
         icon: "image"
         
         WSettingsSwitch {
+            visible: !Wallpapers.skwdBackendEnabled
             label: Translation.tr("Use Material wallpaper")
             icon: "link"
             description: Translation.tr("Adopt the same wallpaper used by Material ii")
@@ -132,6 +133,7 @@ WSettingsPage {
         }
 
         WSettingsSwitch {
+            visible: !Wallpapers.skwdBackendEnabled
             label: Translation.tr("Hide main wallpaper in fullscreen")
             icon: "eye-off"
             description: Translation.tr("Hide the main wallpaper while a fullscreen window is active. The Task View backdrop stays available.")
@@ -1090,6 +1092,7 @@ WSettingsPage {
     }
 
     WSettingsCard {
+        visible: !Wallpapers.skwdBackendEnabled
         title: Translation.tr("Wallpaper transitions")
         icon: "arrow-sync"
 
@@ -1181,6 +1184,7 @@ WSettingsPage {
                 icon: "wand"
 
                 WSettingsSwitch {
+                    enabled: !Wallpapers.skwdBackendEnabled
                     label: Translation.tr("Enable animated wallpapers (videos/GIFs)")
                     icon: "play"
                     description: Translation.tr("Play videos and GIFs as wallpaper. When disabled, shows a frozen frame")
@@ -1190,6 +1194,7 @@ WSettingsPage {
 
                 WSettingsSwitch {
                     visible: root.wBg.enableAnimation ?? true
+                    enabled: !Wallpapers.skwdBackendEnabled
                     label: Translation.tr("Pause animated wallpapers on battery")
                     icon: "battery-saver"
                     description: Translation.tr("Freeze videos and GIFs while on battery power to save energy")
@@ -1207,6 +1212,7 @@ WSettingsPage {
 
                 WSettingsSwitch {
                     visible: root.wBg.enableAnimation ?? true
+                    enabled: !Wallpapers.skwdBackendEnabled
                     label: Translation.tr("Blur animated wallpapers (videos/GIFs)")
                     icon: "pulse"
                     description: Translation.tr("Apply blur to animated wallpapers. Independent from window blur. May significantly impact performance.")

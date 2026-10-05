@@ -778,14 +778,16 @@ Scope {
 
         // Wallpaper — use per-monitor path when multi-monitor enabled, otherwise direct config
         readonly property string wallpaperPathRaw: {
-            const configuredPath = (_multiMonEnabled && wallpaperData.path)
+            const configuredPath = Wallpapers.skwdBackendEnabled ? Wallpapers.currentMainWallpaperPath(monitorName) : (_multiMonEnabled && wallpaperData.path)
                 ? wallpaperData.path
                 : (bgRoot.backgroundOptions.wallpaperPath ?? "")
             // Supplies the preview path only. awww eligibility is untouched, so
             // whichever engine already owns this wallpaper keeps owning it.
             return Wallpapers.internalPreviewFor(monitorName, configuredPath)
         }
-        readonly property string wallpaperThumbnailPath: bgRoot.backgroundOptions.thumbnailPath ?? bgRoot.wallpaperPathRaw
+        readonly property string wallpaperThumbnailPath: Wallpapers.skwdBackendEnabled
+            ? Wallpapers.getExpectedThumbnailPath(wallpaperPathRaw, "large")
+            : (bgRoot.backgroundOptions.thumbnailPath ?? bgRoot.wallpaperPathRaw)
         readonly property bool enableAnimation: bgRoot.backgroundOptions.enableAnimation ?? true
         // True while ii is the family actually painting the screen. The family
         // LazyLoader can retain the inactive tree, so every heavy source in here
@@ -819,7 +821,7 @@ Scope {
         readonly property real parallaxWidgetDepth: ParallaxMath.resolveWidgetDepth(bgRoot.parallaxOptions, 1.2)
         readonly property bool pauseParallaxDuringTransitions: bgRoot.parallaxOptions.pauseDuringTransitions ?? true
         readonly property int parallaxTransitionSettleMs: ParallaxMath.resolveTransitionSettle(bgRoot.parallaxOptions, 220)
-        readonly property bool externalMainWallpaperEligible: !wallpaperSafetyTriggered
+        readonly property bool externalMainWallpaperEligible: Wallpapers.skwdBackendEnabled || (!wallpaperSafetyTriggered
             && !bgRoot.webWallpaperActive
             && !((bgRoot.backgroundOptions.backdrop?.enable ?? false) && (bgRoot.backgroundOptions.backdrop?.hideWallpaper ?? false))
             && AwwwBackend.supportsVisibleMainWallpaper(
@@ -827,7 +829,7 @@ Scope {
                 bgRoot.fillMode,
                 bgRoot.dynamicParallaxRequested,
                 bgRoot.effectsOptions.enableAnimatedBlur ?? false
-            )
+            ))
         readonly property bool effectiveHasPan: bgRoot.hasPan
             && (!bgRoot.externalMainWallpaperEligible || bgRoot._panReadyWallpaperPath === bgRoot.wallpaperPath)
         // Internal shader transitions are rendered by the QML background. Keep
@@ -835,7 +837,7 @@ Scope {
         // lifecycle instead of handing ownership AWWW -> QML -> AWWW around
         // every transition. A transient ownership handoff can expose the AWWW
         // wallpaper underneath for one or more compositor frames.
-        readonly property bool externalMainWallpaperActive: bgRoot.externalMainWallpaperEligible
+        readonly property bool externalMainWallpaperActive: Wallpapers.skwdBackendEnabled || bgRoot.externalMainWallpaperEligible
             && !bgRoot.effectiveHasPan
             && !bgRoot.internalShaderTransitionRequested
         property real preferredWallpaperScale: ParallaxMath.resolveZoom(bgRoot.parallaxOptions, 1.0)
@@ -871,6 +873,7 @@ Scope {
         readonly property bool backdropActive: (bgRoot.backgroundOptions.backdrop?.enable ?? false) && (bgRoot.backgroundOptions.backdrop?.hideWallpaper ?? false)
 
         readonly property bool internalShaderTransitionRequested:
+            !Wallpapers.skwdBackendEnabled &&
             (Config.options?.background?.transition?.enable ?? true)
             && Appearance.animationsEnabled
             && !bgRoot.webWallpaperActive
@@ -1589,7 +1592,7 @@ Scope {
                     playing: visible && bgRoot.enableAnimation && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
                         && Wallpapers.videoMotionAllowedOn(bgRoot.screenName)
                     asynchronous: true
-                    source: (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsGif || bgRoot.backdropActive) ? "" : bgRoot.wallpaperPathRaw
+                    source: (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsGif || bgRoot.backdropActive || Wallpapers.skwdBackendEnabled) ? "" : bgRoot.wallpaperPathRaw
                     fillMode: Image.PreserveAspectCrop
                     // No sourceSize for GIFs - let Qt handle native size for performance
 
@@ -1612,7 +1615,7 @@ Scope {
                 VideoCrossfader {
                     id: videoWallpaper
                     anchors.fill: parent
-                    visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive && bgRoot.wallpaperIsVideo
+                    visible: opacity > 0 && !blurLoader.active && !bgRoot.backdropActive && bgRoot.wallpaperIsVideo && !Wallpapers.skwdBackendEnabled
                     opacity: bgRoot.wallpaperIsVideo ? 1 : 0
                     Behavior on opacity {
                         enabled: Appearance.animationsEnabled
@@ -1625,7 +1628,7 @@ Scope {
                     // the source releases the decoder outright instead of only
                     // pausing it; the transition overlay covers the swap.
                     source: {
-                        if (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsVideo || bgRoot.backdropActive) return "";
+                        if (bgRoot.webWallpaperActive || bgRoot.wallpaperSafetyTriggered || !bgRoot.wallpaperIsVideo || bgRoot.backdropActive || Wallpapers.skwdBackendEnabled) return "";
                         if (!bgRoot._familyOwnsScreen) return "";
                         return bgRoot.wallpaperPathRaw;
                     }

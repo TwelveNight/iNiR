@@ -11,19 +11,7 @@ resolve_bootstrap_repo_root() {
     fi
 
     local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-    local config_new="${xdg_config_home}/inir"
-    local config_legacy="${xdg_config_home}/illogical-impulse"
-    local config_dir=""
-
-    if [[ -L "$config_legacy" && -d "$config_new" ]]; then
-        config_dir="$config_new"
-    elif [[ -d "$config_legacy" ]]; then
-        config_dir="$config_legacy"
-    elif [[ -d "$config_new" ]]; then
-        config_dir="$config_new"
-    else
-        config_dir="$config_new"
-    fi
+    local config_dir="${INIR_CONFIG_DIR:-${xdg_config_home}/inir}"
 
     local version_file="${config_dir}/version.json"
     local stored_repo=""
@@ -58,6 +46,9 @@ fi
 
 INVOKED_FROM="$PWD"
 cd "$REPO_ROOT"
+
+# Personal branch: the standard install command owns all isolation safeguards.
+source "$REPO_ROOT/scripts/personal/setup-entry.sh" "$@"
 
 # Handle Ctrl+C gracefully
 cleanup() {
@@ -441,16 +432,19 @@ setup_remote_state_summary() {
         return
     fi
 
-    local rc=0
-    check_remote_updates || rc=$?
-    case "$rc" in
-        0) printf '%s' "update available" ;;
-        1) printf '%s' "up to date" ;;
-        2) printf '%s' "offline or missing remote" ;;
-        3) printf '%s' "ahead of remote" ;;
-        4) printf '%s' "diverged" ;;
-        *) printf '%s' "unknown" ;;
-    esac
+    # Status is a local observation; explicit update commands fetch the remote.
+    local branch counts local_only remote_only
+    branch="$(get_update_tracking_branch)"
+    counts="$(git -C "$REPO_ROOT" rev-list --left-right --count "HEAD...origin/$branch" 2>/dev/null)" || {
+        printf '%s' "no cached remote branch"
+        return
+    }
+    read -r local_only remote_only <<< "$counts"
+    if (( local_only > 0 && remote_only > 0 )); then printf '%s' "diverged"
+    elif (( local_only > 0 )); then printf '%s' "ahead of remote"
+    elif (( remote_only > 0 )); then printf '%s' "update available"
+    else printf '%s' "up to date"
+    fi
 }
 
 setup_runtime_change_summary() {
@@ -557,7 +551,8 @@ show_help() {
         "Use inir for everyday control. Use ./setup for installation, recovery and maintenance."
 
     tui_key_value "Usage:" "./setup [command] [options]"
-    show_setup_context_card "Setup Overview"
+    # Help is local: the full context card fetches origin to report remote state.
+    tui_key_value "Branch:" "$(setup_current_branch)"
 
     tui_section_start "What setup owns"
     tui_list_item "Install flow, runtime sync, migrations, snapshots, and service refresh"
@@ -567,7 +562,7 @@ show_help() {
 
     tui_section_start "Everyday maintenance"
     tui_list_item "(none)      Interactive menu"
-    tui_list_item "install     Full installation (deps + config + files)"
+    tui_list_item "install     Personal overlay installation (preflight + backup + files)"
     tui_list_item "update      Check remote, pull, sync, restart shell"
     tui_list_item "doctor      Diagnose and fix common breakage"
     tui_list_item "status      Show install mode, update strategy, and health"
@@ -602,6 +597,7 @@ show_help() {
 
     tui_section_start "Good defaults"
     tui_list_item "./setup install      Install iNiR once"
+    tui_list_item "./setup install --check  Read-only personal overlay preflight"
     tui_list_item "./setup update       Pull, sync, and restart"
     tui_list_item "./setup doctor       Diagnose weird runtime breakage"
     tui_list_item "./setup status       See what is installed and what is drifting"
@@ -900,7 +896,7 @@ show_status_environment() {
 
     # Panel family
     local panel_family="ii"
-    local user_cfg="$HOME/.config/illogical-impulse/config.json"
+    local user_cfg="${DOTS_CORE_CONFDIR}/config.json"
     if [[ -r "$user_cfg" ]] && command -v jq >/dev/null 2>&1; then
         local pf
         pf="$(jq -r '.panelFamily // "ii"' "$user_cfg" 2>/dev/null)"
@@ -1496,7 +1492,7 @@ run_theme() {
             fi
 
             if [[ -n "$switchwall" && -n "$regen_wallpaper" && -f "$regen_wallpaper" ]]; then
-                bash "$switchwall" "$regen_wallpaper" 2>/dev/null &
+                bash "$switchwall" --noswitch --image "$regen_wallpaper" 2>/dev/null &
                 disown
                 tui_success "Color regeneration started"
             else
@@ -2128,7 +2124,7 @@ restore_single_user_mod() {
 # status file so ShellUpdates.qml can show live progress in the bar indicator.
 # Format: progress:STEP:TOTAL:MESSAGE
 # Called only during automated updates (setup -y -q update from ShellUpdates).
-_update_status_file="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user/update-status"
+_update_status_file="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/user/update-status"
 _update_total_steps=7
 
 _write_update_status() {
@@ -2265,32 +2261,7 @@ run_update_simulated() {
 }
 
 refresh_sddm_theme_on_update() {
-    local ask_mode="${1:-true}"
-
-    if ! command -v sddm >/dev/null 2>&1; then
-        return 0
-    fi
-    # SDDM installed but not the login screen: the person chose another display manager. An update
-    # leaves it alone (re-enabling SDDM here put some machines on a black screen at every update).
-    if command -v systemctl >/dev/null 2>&1 && [[ -d /run/systemd/system ]] \
-            && ! systemctl is-enabled sddm.service >/dev/null 2>&1; then
-        return 0
-    fi
-
-    # Always refresh on update — settings like InputMethod may have changed
-    local auto_apply_mode="yes"
-    if [[ "$ask_mode" == "true" ]]; then
-        # Interactive: let installer ask if switching from another theme
-        auto_apply_mode="ask"
-    fi
-
-    echo ""
-    tui_info "Refreshing ii-pixel SDDM theme..."
-
-    if ! extras_install_sddm_theme "$auto_apply_mode" no keep; then
-        tui_warn "SDDM theme refresh failed — you may need to run manually:"
-        tui_dim "  sudo bash ${REPO_ROOT}/scripts/sddm/install-pixel-sddm.sh"
-    fi
+    log_info "Personal overlay preserves GDM; skipping SDDM theme refresh"
 }
 
 run_update() {
@@ -2558,7 +2529,6 @@ run_update() {
 
     II_SOURCE="${REPO_ROOT}"
     II_TARGET="${XDG_CONFIG_HOME}/quickshell/inir"
-    local legacy_runtime_dir="${XDG_CONFIG_HOME}/quickshell/ii"
 
     for dir in "$XDG_BIN_HOME" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$II_TARGET"; do
         [[ -n "$dir" ]] && mkdir -p "$dir"
@@ -2571,13 +2541,6 @@ run_update() {
     if [[ "$src_real" != "$tgt_real" ]]; then
         local runtime_compare_dir="$II_TARGET"
         local runtime_manifest=""
-        local legacy_transition=false
-
-        if [[ ! -f "${II_TARGET}/shell.qml" ]] && [[ -f "${legacy_runtime_dir}/shell.qml" ]]; then
-            runtime_compare_dir="$legacy_runtime_dir"
-            legacy_transition=true
-            tui_info "Detected legacy quickshell/ii runtime"
-        fi
 
         PRESERVED_MODS_DIR=""
         runtime_manifest=$(find_runtime_manifest_file "$runtime_compare_dir" 2>/dev/null || true)
@@ -2603,11 +2566,6 @@ run_update() {
             else
                 tui_success "No local modifications detected"
             fi
-        elif [[ "$legacy_transition" == "true" ]]; then
-            echo ""
-            tui_info "Preserving legacy quickshell/ii runtime..."
-            PRESERVED_MODS_DIR=$(preserve_runtime_tree "$runtime_compare_dir" "legacy-runtime")
-            tui_success "Legacy runtime preserved"
         elif [[ -f "${runtime_compare_dir}/shell.qml" ]]; then
             # No checksum manifest (v1 or missing) — compare installed files
             # directly against repo to catch user modifications before first v2 update

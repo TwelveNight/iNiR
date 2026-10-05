@@ -7,15 +7,13 @@ Usage: ytmusic_rate.py like <videoId>
 import sys
 import json
 import os
+from lib.paths import config_dir
 import time
 import urllib.request
 import urllib.parse
 import urllib.error
 
-OAUTH_PATH = os.path.join(
-    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
-    "illogical-impulse", "ytmusic_oauth.json"
-)
+OAUTH_PATH = str(config_dir() / "ytmusic_oauth.json")
 
 def load_oauth():
     if not os.path.exists(OAUTH_PATH):

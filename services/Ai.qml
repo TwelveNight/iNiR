@@ -956,7 +956,7 @@ Singleton {
         }
     }
 
-    property string requestScriptFilePath: "/tmp/quickshell/ai/request.sh"
+    property string requestScriptFilePath: `${Directories.tempPath}/ai/request.sh`
     property string pendingFilePath: ""
 
     function ensureInitialized(): void {

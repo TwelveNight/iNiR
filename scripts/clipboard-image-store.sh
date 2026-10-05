@@ -20,4 +20,4 @@ if [[ -r "$marker" ]]; then
   rm -f -- "$marker" 2>/dev/null || true
 fi
 
-exec cliphist store
+exec "$(dirname "${BASH_SOURCE[0]}")/cliphist-inir.sh" store

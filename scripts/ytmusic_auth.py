@@ -10,6 +10,7 @@ import sys
 import json
 import subprocess
 import os
+from lib.paths import config_dir as shell_config_dir
 import shutil
 import glob
 import time
@@ -25,8 +26,8 @@ def get_cookie_output_path():
     xdg_config = os.environ.get("XDG_CONFIG_HOME")
     if not xdg_config:
         xdg_config = os.path.expanduser("~/.config")
-    # Use illogical-impulse directory as per project convention
-    config_dir = os.path.join(xdg_config, "illogical-impulse")
+    # Use inir directory as per project convention
+    config_dir = str(shell_config_dir())
     os.makedirs(config_dir, exist_ok=True)
     return os.path.join(config_dir, "yt-cookies.txt")
 

@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import qs
 import qs.modules.common
+import qs.modules.common.functions
 import qs.services.deferred
 
 Singleton {
@@ -449,7 +450,7 @@ Singleton {
     
     Process {
         id: _ipcQueryProc
-        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"time-pos\"] }' | socat - " + root.ipcSocket + " 2>/dev/null"]
+        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"time-pos\"] }' | socat - " + root.ipcSocketShell + " 2>/dev/null"]
         stdout: SplitParser {
             onRead: line => {
                 try {
@@ -462,7 +463,7 @@ Singleton {
     
     Process {
         id: _ipcDurationQueryProc
-        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"duration\"] }' | socat - " + root.ipcSocket + " 2>/dev/null"]
+        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"duration\"] }' | socat - " + root.ipcSocketShell + " 2>/dev/null"]
         stdout: SplitParser {
             onRead: line => {
                 try {
@@ -475,7 +476,7 @@ Singleton {
 
     Process {
         id: _ipcPauseQueryProc
-        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"pause\"] }' | socat - " + root.ipcSocket + " 2>/dev/null"]
+        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"pause\"] }' | socat - " + root.ipcSocketShell + " 2>/dev/null"]
         stdout: SplitParser {
             onRead: line => {
                 try {
@@ -488,7 +489,7 @@ Singleton {
 
     Process {
         id: _ipcEofQueryProc
-        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"eof-reached\"] }' | socat - " + root.ipcSocket + " 2>/dev/null"]
+        command: ["/bin/sh", "-c", "echo '{ \"command\": [\"get_property\", \"eof-reached\"] }' | socat - " + root.ipcSocketShell + " 2>/dev/null"]
         stdout: SplitParser {
             onRead: line => {
                 try {
@@ -817,7 +818,7 @@ Singleton {
     Process {
         id: _ipcProc
         property string commandData
-        command: ["/bin/sh", "-c", "echo '" + commandData + "' | socat - " + root.ipcSocket + " 2>/dev/null"]
+        command: ["/bin/sh", "-c", "echo '" + commandData + "' | socat - " + root.ipcSocketShell + " 2>/dev/null"]
     }
     
     function _sendIpc(cmd): void {
@@ -1230,7 +1231,7 @@ Singleton {
 
     Process {
         id: _oauthDeleteProc
-        command: ["/bin/sh", "-c", "rm -f \"${XDG_CONFIG_HOME:-$HOME/.config}/illogical-impulse/ytmusic_oauth.json\""]
+        command: ["/bin/sh", "-c", "rm -f \"${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/ytmusic_oauth.json\""]
     }
 
     function playPlaylist(playlistIndex, shuffle): void {
@@ -2039,19 +2040,21 @@ print("")
         }
     }
 
-    // Use a short, guaranteed-existing path for the mpv IPC socket to avoid unix socket length issues
-    property string ipcSocket: "/tmp/qs-ytmusic-mpv.sock"
+    // Private to iNiR: cleanup must never target II's player.
+    property string ipcSocket: Directories.tempPath + "/ytmusic-mpv.sock"
+    readonly property string ipcSocketShell: "'" + StringUtils.shellSingleQuoteEscape(ipcSocket) + "'"
 
     Process {
         id: _stopProc
-        command: ["/bin/sh", "-c", "rm -f " + root.ipcSocket]
+        command: ["rm", "-f", root.ipcSocket]
     }
 
     // Kill any orphaned mpv instances that use our IPC socket.
     // Handles processes that survived across inir restart or weren't cleaned up properly.
     Process {
         id: _killOrphanedMpvProc
-        command: ["/bin/sh", "-c", "pkill -f 'mpv.*qs-ytmusic-mpv\\.sock' 2>/dev/null; true"]
+        command: ["pkill", "-f", "--", "mpv.*--input-ipc-server="
+            + root.ipcSocket.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "( |$)"]
     }
 
     function _stopMpv(): void {

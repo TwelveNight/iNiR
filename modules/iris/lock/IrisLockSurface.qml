@@ -47,7 +47,7 @@ Item {
     }
     readonly property string source: String(root.scene?.source ?? "desktop")
     readonly property string wallpaperPath: root.source === "custom" && String(root.scene?.path ?? "").length > 0
-        ? String(root.scene.path) : (Config.options?.background?.wallpaperPath ?? "")
+        ? String(root.scene.path) : (Wallpapers.currentMainWallpaperPath())
     readonly property bool videoWallpaper: Wallpapers.isVideoFile(root.wallpaperPath.toLowerCase())
     readonly property bool gifWallpaper: root.wallpaperPath.toLowerCase().endsWith(".gif")
     readonly property string wallpaperSource: Wallpapers.stillUrlFor(root.wallpaperPath)

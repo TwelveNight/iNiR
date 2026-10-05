@@ -40,7 +40,7 @@ Singleton {
         panelFamily: root.panelFamily,
         waffleUsesMainWallpaper: root.waffleUsesMainWallpaper,
         paletteType: Config.options?.appearance?.palette?.type ?? "auto",
-        themingWallpaperPath: Wallpapers.effectiveWallpaperPath ?? "",
+        themingWallpaperPath: Wallpapers.skwdBackendEnabled ? "" : (Wallpapers.effectiveWallpaperPath ?? ""),
         enableAppsAndShell: wallpaperThemingCfg?.enableAppsAndShell ?? true,
         enableTerminal: wallpaperThemingCfg?.enableTerminal ?? true,
         enableVesktop: wallpaperThemingCfg?.enableVesktop ?? true,

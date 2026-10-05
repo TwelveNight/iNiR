@@ -11,7 +11,8 @@ import qs.services
 Singleton {
     id: root
     // property string cliphistBinary: FileUtils.trimFileProtocol(`${Directories.home}/.cargo/bin/stash`)
-    property string cliphistBinary: "cliphist"
+    property string cliphistBinary: Directories.scriptsPath + "/cliphist-inir.sh"
+    readonly property string cliphistCommand: "'" + StringUtils.shellSingleQuoteEscape(cliphistBinary) + "'"
     // Limit how many entries we keep/read to avoid huge models and heavy fuzzy search
     property int maxEntries: 400
     property real pasteDelay: 0.05
@@ -71,12 +72,12 @@ Singleton {
         if (root.cliphistBinary.includes("cliphist")) {
             const id = root.entryId(entry)
             if (id.length > 0)
-                return `${root.cliphistBinary} decode ${id} | ${root._markupFilter}`
-            return `printf '%s\n' '${StringUtils.shellSingleQuoteEscape(entry)}' | ${root.cliphistBinary} decode | ${root._markupFilter}`
+                return `${root.cliphistCommand} decode ${id} | ${root._markupFilter}`
+            return `printf '%s\n' '${StringUtils.shellSingleQuoteEscape(entry)}' | ${root.cliphistCommand} decode | ${root._markupFilter}`
         }
 
         const entryNumber = String(entry ?? "").split("\t")[0]
-        return `${root.cliphistBinary} decode ${entryNumber} | ${root._markupFilter}`
+        return `${root.cliphistCommand} decode ${entryNumber} | ${root._markupFilter}`
     }
 
     function refresh() {

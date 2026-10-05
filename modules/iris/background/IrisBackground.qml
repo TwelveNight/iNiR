@@ -28,7 +28,7 @@ Variants {
         readonly property bool motion: (Config.options?.background?.enableAnimation ?? true)
             && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
             && Wallpapers.videoMotionAllowedOn(panel.monitorName)
-        readonly property bool externalWallpaper: AwwwBackend.supportsVisibleMainWallpaper(
+        readonly property bool externalWallpaper: Wallpapers.skwdBackendEnabled || AwwwBackend.supportsVisibleMainWallpaper(
             panel.configuredPath, "fill", false, false)
             && !Wallpapers.internalPreviewActive
         readonly property bool desktopMenuOpen: desktopMenu.active
@@ -65,7 +65,7 @@ Variants {
         AnimatedImage {
             anchors.fill: parent
             visible: panel.gif && status === AnimatedImage.Ready
-            source: panel.gif ? "file://" + FileUtils.trimFileProtocol(panel.previewPath) : ""
+            source: panel.gif && !panel.externalWallpaper ? "file://" + FileUtils.trimFileProtocol(panel.previewPath) : ""
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             cache: false
@@ -75,7 +75,7 @@ Variants {
         VideoCrossfader {
             anchors.fill: parent
             visible: panel.video
-            source: panel.video ? panel.previewPath : ""
+            source: panel.video && !panel.externalWallpaper ? panel.previewPath : ""
             fillMode: VideoOutput.PreserveAspectCrop
             enableTransitions: Config.options?.background?.transition?.enable ?? true
             transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800

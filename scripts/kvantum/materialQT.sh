@@ -6,8 +6,6 @@ XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Derive CONFIG_DIR from script location (scripts/kvantum/ is inside the shell root)
 CONFIG_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-CACHE_DIR="$XDG_CACHE_HOME/quickshell"
-STATE_DIR="$XDG_STATE_HOME/quickshell"
 
 get_light_dark() {
 	current_mode=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null | tr -d "'")

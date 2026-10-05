@@ -3964,7 +3964,7 @@ Singleton {
     }
 
     function _doWriteGeneratedFiles(colorsJson, paletteJson, appPaletteJson, terminalJson, themeMeta, scss, chromiumRgb) {
-        const genDir = Directories.stateUserPath + "/generated";
+        const genDir = Directories.sharedGeneratedPath;
         // Build a single bash script that writes all files atomically.
         // JSON uses double quotes only, so single-quoting is safe.
         let script = `set -e; mkdir -p '${genDir}'\n`;

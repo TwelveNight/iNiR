@@ -153,7 +153,7 @@ depends=(
   #--- Media / image processing ---
   imagemagick
   ffmpeg
-  awww
+  # Wallpaper renderer: use the existing skwd-wall installation.
   songrec
   mission-center
   tesseract

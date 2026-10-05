@@ -5,11 +5,11 @@
 MIGRATION_ID="011-gtk4-nautilus-css"
 MIGRATION_TITLE="GTK4/GTK3 Nautilus sidebar styling"
 MIGRATION_DESCRIPTION="Adds Nautilus-specific CSS rules to GTK4 matugen template for cleaner file manager appearance (sidebar, headerbar, view colors)."
-MIGRATION_TARGET_FILE="~/.config/matugen/templates/gtk-4.0/gtk.css"
+MIGRATION_TARGET_FILE="~/.config/inir/matugen/templates/gtk-4.0/gtk.css"
 MIGRATION_REQUIRED=true
 
 migration_check() {
-  local gtk4_template="${XDG_CONFIG_HOME:-$HOME/.config}/matugen/templates/gtk-4.0/gtk.css"
+  local gtk4_template="${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/matugen/templates/gtk-4.0/gtk.css"
   [[ -f "$gtk4_template" ]] || return 1
 
   # Already has Nautilus sidebar rules?
@@ -43,9 +43,9 @@ migration_apply() {
   ii_dir="$(get_runtime_shell_dir)"
   ii_dir="${ii_dir:-${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/inir}"
   local gtk4_src="${ii_dir}/dots/.config/matugen/templates/gtk-4.0/gtk.css"
-  local gtk4_dst="${XDG_CONFIG_HOME:-$HOME/.config}/matugen/templates/gtk-4.0/gtk.css"
+  local gtk4_dst="${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/matugen/templates/gtk-4.0/gtk.css"
   local gtk3_src="${ii_dir}/dots/.config/matugen/templates/gtk-3.0/gtk.css"
-  local gtk3_dst="${XDG_CONFIG_HOME:-$HOME/.config}/matugen/templates/gtk-3.0/gtk.css"
+  local gtk3_dst="${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/matugen/templates/gtk-3.0/gtk.css"
 
   # Copy updated templates from the synced dots/ directory
   if [[ -f "$gtk4_src" ]]; then

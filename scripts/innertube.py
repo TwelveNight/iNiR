@@ -24,6 +24,7 @@ Usage:
 import sys
 import json
 import os
+from lib.paths import config_dir
 import signal
 import time
 import hashlib
@@ -34,8 +35,7 @@ try:
 except (AttributeError, ValueError):
     pass
 
-_CFG_DIR = os.path.join(
-    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "illogical-impulse")
+_CFG_DIR = str(config_dir())
 # iNiR's existing YouTube Data API OAuth (reused if present).
 OAUTH_PATH = os.path.join(_CFG_DIR, "ytmusic_oauth.json")
 # Native ytmusicapi OAuth token written by our own one-tap device flow.

@@ -537,7 +537,7 @@ ContentPage {
                             materialIcon: "folder_open"
                             mainText: Translation.tr("Current folder")
                             onClicked: {
-                                const currentPath = Config.options?.background?.wallpaperPath ?? "";
+                                const currentPath = Wallpapers.currentMainWallpaperPath();
                                 if (currentPath && currentPath.length) {
                                     Wallpapers.setDirectory(FileUtils.parentDirectory(currentPath));
                                 } else {
@@ -770,7 +770,7 @@ ContentPage {
                                                     return delegateItem.filePath === previewPath
                                                 }
                                                 const multiMon = (Config.options?.background?.multiMonitor?.enable ?? false) && multiMonitorPanel.selectedMonitor
-                                                const currentWallpaperPath = Config.options?.background?.wallpaperPath ?? ""
+                                                const currentWallpaperPath = Wallpapers.currentMainWallpaperPath()
                                                 return delegateItem.filePath === (multiMon
                                                     ? (WallpaperListener.effectivePerMonitor[multiMonitorPanel.selectedMonitor]?.path ?? currentWallpaperPath)
                                                     : currentWallpaperPath)
@@ -853,7 +853,7 @@ ContentPage {
                 }
 
                 readonly property var selMonData: WallpaperListener.effectivePerMonitor[selectedMonitor] ?? { path: "", isVideo: false, isGif: false, isAnimated: false, hasCustomWallpaper: false }
-                readonly property string selMonPath: selMonData.path || (Config.options?.background?.wallpaperPath ?? "")
+                readonly property string selMonPath: Wallpapers.currentMainWallpaperPath(selectedMonitor)
                 property bool backdropViewActive: false
 
                 // Backdrop wallpaper data for stacked preview
@@ -914,7 +914,7 @@ ContentPage {
 
                                 readonly property string monName: WallpaperListener.getMonitorName(modelData) ?? ""
                                 readonly property var wpData: WallpaperListener.effectivePerMonitor[monName] ?? { path: "" }
-                                readonly property string wpPath: wpData.path || (Config.options?.background?.wallpaperPath ?? "")
+                                readonly property string wpPath: Wallpapers.currentMainWallpaperPath(monName)
                                 readonly property bool isSelected: monName === multiMonitorPanel.selectedMonitor
                                 readonly property bool isGif: WallpaperListener.isGifPath(wpPath)
                                 readonly property bool isVideo: WallpaperListener.isVideoPath(wpPath)
@@ -1316,7 +1316,7 @@ ContentPage {
 
                                         readonly property string monName: WallpaperListener.getMonitorName(modelData) ?? ""
                                         readonly property var wpData: WallpaperListener.effectivePerMonitor[monName] ?? { path: "" }
-                                        readonly property string wpPath: wpData.path || (Config.options?.background?.wallpaperPath ?? "")
+                                        readonly property string wpPath: Wallpapers.currentMainWallpaperPath(monName)
                                         readonly property bool isSelected: monName === multiMonitorPanel.selectedMonitor
                                         readonly property bool isGif: WallpaperListener.isGifPath(wpPath)
                                         readonly property bool isVideo: WallpaperListener.isVideoPath(wpPath)
@@ -2518,7 +2518,7 @@ ContentPage {
                     buttonRadius: Appearance.zzzEverywhere ? Appearance.zzz.controlRadius : Appearance.rounding.small
                     materialIcon: "terminal"
                     mainText: Translation.tr("Open config")
-                    onClicked: Qt.openUrlExternally(`${Directories.config}/illogical-impulse/config.json`)
+                    onClicked: Qt.openUrlExternally(`${Directories.shellConfigPath}`)
                 }
 
                 RippleButtonWithIcon {

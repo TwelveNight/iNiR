@@ -8,23 +8,7 @@
 # Migration System Configuration
 #####################################################################################
 MIGRATIONS_DIR="${REPO_ROOT}/sdata/migrations"
-if declare -F resolve_inir_config_dir >/dev/null; then
-    _inir_config_dir="$(resolve_inir_config_dir)"
-else
-    _xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-    _config_new="${_xdg_config_home}/inir"
-    _config_legacy="${_xdg_config_home}/illogical-impulse"
-
-    if [[ -L "$_config_legacy" && -d "$_config_new" ]]; then
-        _inir_config_dir="$_config_new"
-    elif [[ -d "$_config_legacy" ]]; then
-        _inir_config_dir="$_config_legacy"
-    elif [[ -d "$_config_new" ]]; then
-        _inir_config_dir="$_config_new"
-    else
-        _inir_config_dir="$_config_new"
-    fi
-fi
+_inir_config_dir="${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}"
 
 MIGRATIONS_STATE_FILE="${_inir_config_dir}/migrations.json"
 MIGRATIONS_BACKUP_DIR="${_inir_config_dir}/backups"
@@ -41,6 +25,11 @@ SESSION_IMPACT_NOTICE_ACTIONS=()
 # Historical migrations that no longer own current upgrade state.
 # Keep their files for history, but repair current state through present owners.
 RETIRED_MIGRATIONS=(
+    # Shared profiles and SDDM belong to the existing desktop installation.
+    "020-rename-venv-env-var"
+    "025-sddm-dropin-rename"
+    "039-sddm-preserve-greeter-backend"
+    "019-config-dir-rename-compat"
     "001-gamemode-animation-toggle"
     "002-backdrop-layer-rules"
     "003-qt-theming-kde"

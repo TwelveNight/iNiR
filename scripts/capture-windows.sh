@@ -19,7 +19,7 @@ resolve_bin() {
 
 niri_bin="$(resolve_bin niri)" || exit $?
 jq_bin="$(resolve_bin jq)" || exit $?
-cliphist_bin="$(resolve_bin cliphist)" || exit $?
+cliphist_bin="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/cliphist-inir.sh"
 head_bin="$(resolve_bin head)" || exit $?
 grep_bin="$(resolve_bin grep)" || exit $?
 wl_paste_bin="$(resolve_bin wl-paste)" || exit $?

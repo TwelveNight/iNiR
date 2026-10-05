@@ -49,7 +49,7 @@ MouseArea {
     }
     
     // Wallpaper path resolution
-    readonly property string _wallpaperSource: Config.options?.background?.wallpaperPath ?? ""
+    readonly property string _wallpaperSource: Wallpapers.currentMainWallpaperPath()
     readonly property string _wallpaperThumbnail: Config.options?.background?.thumbnailPath ?? ""
     readonly property bool wallpaperIsVideo: {
         const lp = _wallpaperSource.toLowerCase();

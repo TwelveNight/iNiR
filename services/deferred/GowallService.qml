@@ -43,7 +43,7 @@ Singleton {
     property string _pendingSourceBasename: ""  // Track source for smart naming
 
     readonly property string _gowallBin: "gowall"
-    readonly property string _runtimeDir: FileUtils.trimFileProtocol(`${Directories.state}/user/generated/gowall`)
+    readonly property string _runtimeDir: FileUtils.trimFileProtocol(`file://${Directories.sharedGeneratedPath}/gowall`)
     readonly property string _customThemePath: FileUtils.trimFileProtocol(`${_runtimeDir}/custom-theme.json`)
     readonly property string _outputDir: FileUtils.trimFileProtocol(`${Directories.pictures}/Wallpapers/Gowall`)
     readonly property string _generatedThemePath: Directories.generatedMaterialThemePath

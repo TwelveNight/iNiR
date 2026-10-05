@@ -1,3 +1,5 @@
+> **Night 个人分支：** 在当前仓库直接运行 `./setup install` 或 `./setup install -y`，会自动包含个人预检、备份、GDM/会话配置。`./setup install --check` 只检查不安装。详情见 [PERSONAL_OVERLAY.md](../../PERSONAL_OVERLAY.md)。重新 clone `snowarch/inir` 下载的是上游，不包含本地定制。
+
 <p align="center">
   <img src="../images/iris-2.32-principal.webp" alt="iNiR iRiS desktop" width="900">
 </p>

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/config-path.sh"
 # Record audio from microphone for voice search
 
 DURATION="${1:-8}"
-TMP_PATH="/tmp/quickshell/media/voicesearch"
+TMP_PATH="$(inir_temp_dir)/media/voicesearch"
 TMP_WAV="$TMP_PATH/recording.wav"
 
 mkdir -p "$TMP_PATH"

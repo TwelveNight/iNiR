@@ -25,8 +25,19 @@ Singleton {
     property string _queuedApplyPath: ""
     property bool _queuedApplyDarkMode: Appearance.m3colors.darkmode
     property bool _queuedApplyNoSwitch: false
-    readonly property string backendProvider: "awww"
-    readonly property bool awwwBackendEnabled: true
+    readonly property string backendProvider: "skwd-wall"
+    readonly property bool awwwBackendEnabled: false
+    readonly property bool skwdBackendEnabled: true
+    readonly property string activeWallpaperPath: SkwdBackend.wallpaperPath()
+
+    Connections {
+        target: SkwdBackend
+        function onApplied(path, monitor) {
+            if (monitor) root.updatePerMonitorConfig(path, monitor)
+            else Config.setNestedValue("background.wallpaperPath", path)
+            root.changed()
+        }
+    }
 
     // Single gate for all animated wallpaper surfaces (background, backdrops, lock):
     // freeze video/GIF playback while discharging to save power.
@@ -49,6 +60,8 @@ Singleton {
     readonly property bool internalPreviewActive: internalPreviewPath.length > 0
 
     function previewWallpaper(path: string, monitorName = ""): void {
+        // Picker cards provide previews; skwd keeps the desktop until Apply.
+        if (root.skwdBackendEnabled) return
         const normalizedPath = FileUtils.trimFileProtocol(String(path ?? ""))
         if (!normalizedPath) {
             root.cancelWallpaperPreview()
@@ -177,6 +190,7 @@ Singleton {
     // When multi-monitor is enabled, uses the focused monitor's wallpaper
     // so Aurora blur/glass on all panels matches what's actually on screen.
     readonly property string _resolvedMainWallpaperPath: {
+        if (root.skwdBackendEnabled) return root.currentMainWallpaperPath()
         if (WallpaperListener.multiMonitorEnabled) {
             const focused = WallpaperListener.getFocusedMonitor()
             if (focused) {
@@ -184,7 +198,7 @@ Singleton {
                 if (data && data.path) return data.path
             }
         }
-        return Config.options?.background?.wallpaperPath ?? ""
+        return root.currentMainWallpaperPath()
     }
 
     readonly property bool useBackdropForColors: Config.options?.appearance?.wallpaperTheming?.useBackdropForColors ?? false
@@ -607,6 +621,7 @@ Singleton {
 
     function currentMainWallpaperPath(monitorName = ""): string {
         const targetMonitor = monitorName || (WallpaperListener.multiMonitorEnabled ? WallpaperListener.getFocusedMonitor() : "")
+        if (SkwdBackend.available) return SkwdBackend.wallpaperPath(targetMonitor)
         if (WallpaperListener.multiMonitorEnabled && targetMonitor) {
             const data = WallpaperListener.effectivePerMonitor[targetMonitor] ?? null
             if (data && data.path)
@@ -617,6 +632,7 @@ Singleton {
 
     function currentWaffleWallpaperPath(monitorName = ""): string {
         const mainPath = currentMainWallpaperPath(monitorName)
+        if (root.skwdBackendEnabled) return mainPath
         const waffleBackground = Config.options?.waffles?.background ?? {}
         return (waffleBackground.useMainWallpaper ?? true) ? mainPath : (waffleBackground.wallpaperPath || mainPath)
     }
@@ -788,7 +804,7 @@ Singleton {
     }
 
     function openFallbackPicker(darkMode = Appearance.m3colors.darkmode) {
-        applyProc.exec([Directories.wallpaperSwitchScriptPath, "--mode", (darkMode ? "dark" : "light")])
+        Quickshell.execDetached(["skwd-helm", "ui", "show"])
     }
 
     function applySelectionTarget(path, target = "main", darkMode = Appearance.m3colors.darkmode, monitorName = "") {
@@ -815,6 +831,10 @@ Singleton {
             root.changed()
             return
         case "waffle":
+            if (root.skwdBackendEnabled) {
+                root.apply(normalizedPath, darkMode, monitorName)
+                return
+            }
             const waffleVisible = (Config.options?.panelFamily ?? "ii") === "waffle"
             const adoptedWafflePreview = waffleVisible
                 ? root._adoptVisiblePreview(normalizedPath, monitorName)
@@ -858,43 +878,9 @@ Singleton {
 
     function apply(path, darkMode = Appearance.m3colors.darkmode, monitorName = "") {
         const normalizedPath = FileUtils.trimFileProtocol(String(path ?? ""))
-        if (!normalizedPath || normalizedPath.length === 0) return
-
-        const adoptedPreview = root._adoptVisiblePreview(normalizedPath, monitorName)
-        if (!adoptedPreview)
-            root.requestWallpaperBlurTransition(monitorName)
-
-        if (monitorName !== "") {
-            // Per-monitor: update config directly in QML to avoid race condition
-            // (switchwall.sh and QML both write config.json — the 50ms write timer causes data loss)
-            updatePerMonitorConfig(normalizedPath, monitorName)
-            if (adoptedPreview)
-                root._clearInternalPreview()
-            root.changed()
-            return
-        }
-
-        // Suppress ThemeService duplicate regeneration while switchwall.sh runs
-        root._applyInProgress = true
-        _applySuppressTimer.restart()
-
-        if (root.awwwBackendEnabled && AwwwBackend.supportsMainWallpaper(normalizedPath)) {
-            Config.setNestedValue("background.wallpaperPath", normalizedPath)
-            Config.setNestedValue("background.thumbnailPath", "")
-            if (adoptedPreview)
-                root._clearInternalPreview()
-            root._queueWallpaperScript(normalizedPath, darkMode, false)
-            root.changed()
-            return
-        }
-
-        // Always set wallpaper path from QML to avoid race condition with Config write timer
-        Config.setNestedValue("background.wallpaperPath", normalizedPath)
-        Config.setNestedValue("background.thumbnailPath", "")
-        if (adoptedPreview)
-            root._clearInternalPreview()
-        root._queueWallpaperScript(normalizedPath, darkMode, false)
-        root.changed()
+        if (!normalizedPath) return
+        root.cancelWallpaperPreview()
+        SkwdBackend.apply(normalizedPath, monitorName)
     }
 
     // Apply only the color scheme from an image without changing the active wallpaper
@@ -1178,7 +1164,7 @@ Singleton {
     function videoStillPath(filePath: string): string {
         const clean = FileUtils.trimFileProtocol(String(filePath ?? ""))
         if (!clean) return ""
-        return `${Directories.stateUserPath}/generated/wallpaper/still-${MD5.hash(clean)}.png`
+        return `${Directories.sharedGeneratedPath}/wallpaper/still-${MD5.hash(clean)}.png`
     }
 
     function ensureVideoStill(filePath: string, replace = false): void {
@@ -1264,8 +1250,8 @@ Singleton {
         property string directory
         property string _size: ""
         environment: ({
-            "INIR_VENV": Quickshell.env("INIR_VENV") || Quickshell.env("HOME") + "/.local/state/quickshell/.venv",
-            "ILLOGICAL_IMPULSE_VIRTUAL_ENV": Quickshell.env("INIR_VENV") || Quickshell.env("HOME") + "/.local/state/quickshell/.venv"
+            "INIR_VENV": Quickshell.env("INIR_VENV") || Directories.statePath + "/.venv",
+            "ILLOGICAL_IMPULSE_VIRTUAL_ENV": Quickshell.env("INIR_VENV") || Directories.statePath + "/.venv"
         })
         stdout: SplitParser {
             onRead: data => {
@@ -1375,8 +1361,8 @@ Singleton {
         if (root.autoWallpaperGenerateColors) {
             root.select(filePath, Appearance.m3colors.darkmode)
         } else {
-            // Just change wallpaper path without running color generation
-            Config.setNestedValue("background.wallpaperPath", filePath)
+            // Rendering remains owned by skwd, including playlist selections.
+            root.apply(filePath)
         }
     }
     // ── End auto wallpaper cycling ──────────────────────────────────────

@@ -1261,6 +1261,8 @@ QtObject {
             const lookRank = spec => String(spec.path ?? "").startsWith("iris.appearance.surfaces.") ? 1 : 0
             own.map((spec, at) => ({ spec: spec, at: at })).sort((a, b) => rank(a.spec) - rank(b.spec) || lookRank(a.spec) - lookRank(b.spec) || a.at - b.at).forEach(item => out.push(item.spec))
         }
-        return out.map((spec, index) => Object.assign({}, spec, { modelKey: "settings:" + index }))
+        return out.filter(spec => !Wallpapers.skwdBackendEnabled || ![
+            "background.enableAnimation", "background.videoPause", "background.pauseAnimationOnBattery"
+        ].includes(spec.path)).map((spec, index) => Object.assign({}, spec, { modelKey: "settings:" + index }))
     }
 }

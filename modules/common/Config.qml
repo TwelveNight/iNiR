@@ -2373,7 +2373,7 @@ Singleton {
                     property real zoom: 1.0 // Extra zoom on top of fill-crop (1.0 = standard fill, 2.0 = 2× zoom, max 3.0)
                 }
                 property JsonObject backend: JsonObject {
-                    property string provider: "awww"
+                    property string provider: "skwd-wall"
                     property JsonObject awww: JsonObject {
                         property int transitionFps: 60
                         property int simpleStep: 5

@@ -101,6 +101,7 @@ ContentPage {
 
             SettingsSwitch {
                 buttonIcon: "fullscreen_exit"
+                visible: !Wallpapers.skwdBackendEnabled
                 text: Translation.tr("Hide main wallpaper in fullscreen")
                 checked: Config.options?.waffles?.background?.hideWhenFullscreen ?? true
                 onCheckedChanged: Config.setNestedValue("waffles.background.hideWhenFullscreen", checked)
@@ -111,6 +112,7 @@ ContentPage {
             
             SettingsSwitch {
                 buttonIcon: "play_circle"
+                visible: !Wallpapers.skwdBackendEnabled
                 text: Translation.tr("Enable animated wallpapers (videos/GIFs)")
                 checked: Config.options?.waffles?.background?.enableAnimation ?? true
                 onCheckedChanged: {
@@ -200,6 +202,7 @@ ContentPage {
             SettingsSwitch {
                 visible: Config.options?.waffles?.background?.backdrop?.enable ?? true
                 buttonIcon: "play_circle"
+                visible: !Wallpapers.skwdBackendEnabled
                 text: Translation.tr("Enable animated wallpapers (videos/GIFs)")
                 checked: Config.options?.waffles?.background?.backdrop?.enableAnimation ?? false
                 onCheckedChanged: {

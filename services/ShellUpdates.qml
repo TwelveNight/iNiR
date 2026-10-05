@@ -615,14 +615,14 @@ Singleton {
             "if [[ -d \"" + root.configDir + "/.git\" ]]; then echo \"" + root.configDir + "\"; exit 0; fi; " +
             // Search for a git repo containing setup + shell.qml (our repo signature)
             // Check common locations first, then broader search
-            "for dir in ~/illogical-impulse ~/inir ~/iNiR " +
-            "~/.local/src/illogical-impulse ~/.local/src/inir " +
-            "~/Projects/illogical-impulse ~/Projects/inir " +
-            "~/Downloads/illogical-impulse ~/Downloads/inir " +
-            "~/src/illogical-impulse ~/src/inir; do " +
+            "for dir in ~/inir ~/iNiR " +
+            "~/.local/src/inir " +
+            "~/Projects/inir " +
+            "~/Downloads/inir " +
+            "~/src/inir; do " +
             "if [[ -d \"$dir/.git\" && -f \"$dir/setup\" && -f \"$dir/shell.qml\" ]]; then echo \"$dir\"; exit 0; fi; done; " +
             // Last resort: find in home (max depth 3, timeout 2s)
-            "timeout 2 find \"$HOME\" -maxdepth 3 -name setup \\( -path '*/inir/setup' -o -path '*/illogical-impulse/setup' -o -path '*/ii/setup' \\) 2>/dev/null | while read -r f; do [[ -f \"$(dirname \"$f\")/shell.qml\" ]] && dirname \"$f\" && break; done; "
+            "timeout 2 find \"$HOME\" -maxdepth 3 -name setup \\( -path '*/inir/setup' -o -path '*/iNiR/setup' \\) 2>/dev/null | while read -r f; do [[ -f \"$(dirname \"$f\")/shell.qml\" ]] && dirname \"$f\" && break; done; "
         ]
         stdout: StdioCollector {
             onStreamFinished: {

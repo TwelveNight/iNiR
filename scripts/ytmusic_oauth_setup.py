@@ -8,16 +8,14 @@ Usage: python3 ytmusic_oauth_setup.py
 """
 import json
 import os
+from lib.paths import config_dir
 import sys
 import time
 import urllib.request
 import urllib.parse
 import urllib.error
 
-OAUTH_PATH = os.path.join(
-    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
-    "illogical-impulse", "ytmusic_oauth.json"
-)
+OAUTH_PATH = str(config_dir() / "ytmusic_oauth.json")
 
 SCOPES = "https://www.googleapis.com/auth/youtube"
 

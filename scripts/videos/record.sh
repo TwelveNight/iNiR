@@ -721,7 +721,7 @@ start_recording_command() {
 }
 
 # Try to get save path from config, fallback to XDG Videos
-CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/illogical-impulse/config.json"
+CONFIG_FILE="${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/config.json"
 if [[ ! -f "$CONFIG_FILE" ]]; then
     CONFIG_FILE="$(inir_config_file)"
 fi

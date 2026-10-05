@@ -9,7 +9,7 @@ depends=(
   niri
   
   # Wallpaper daemon
-  awww
+  # Wallpaper renderer: use the existing skwd-wall installation.
   
   # Basic utilities
   bc

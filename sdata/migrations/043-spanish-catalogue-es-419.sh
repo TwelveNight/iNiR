@@ -8,14 +8,7 @@ MIGRATION_TARGET_FILE="~/.config/inir/config.json"
 MIGRATION_REQUIRED=false
 
 _config_path() {
-  local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-  local config_new="${xdg_config_home}/inir/config.json"
-  local config_legacy="${xdg_config_home}/illogical-impulse/config.json"
-  if [[ -f "$config_legacy" ]]; then
-    printf '%s\n' "$config_legacy"
-    return
-  fi
-  printf '%s\n' "$config_new"
+  printf '%s\n' "${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/config.json"
 }
 
 migration_check() {

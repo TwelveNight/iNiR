@@ -85,37 +85,8 @@ function setup_systemd_services(){
     v pkg_sudo systemctl enable bluetooth --now
   fi
 
-  # SDDM display manager. A machine without a login screen gets SDDM. One that already has another
-  # (GDM, plasmalogin...) keeps it: only a first install asks, and the answer defaults to keeping it.
-  if command -v sddm &>/dev/null && ! systemctl is-enabled sddm.service &>/dev/null; then
-    local current_dm="" take_over=false
-    if [[ -L /etc/systemd/system/display-manager.service ]]; then
-      current_dm=$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null | xargs basename 2>/dev/null || true)
-    fi
-    if [[ -z "$current_dm" || "$current_dm" == "sddm.service" ]]; then
-      take_over=true
-    elif [[ "$ask" != "false" && ! -f "${FIRSTRUN_FILE}" ]] \
-        && tui_confirm "Use SDDM as your login screen instead of ${current_dm%.service}?" "no"; then
-      take_over=true
-    else
-      log_info "Keeping ${current_dm%.service} as your login screen (SDDM can be chosen later in ./setup extras)"
-    fi
-
-    if [[ "$take_over" == true ]]; then
-      if [[ -n "$current_dm" && "$current_dm" != "sddm.service" ]]; then
-        log_info "Removing conflicting display-manager.service -> ${current_dm}"
-        elevate rm -f /etc/systemd/system/display-manager.service 2>/dev/null || true
-      fi
-      for dm in gdm lightdm lxdm greetd plasmalogin; do
-        if systemctl is-enabled "${dm}.service" &>/dev/null; then
-          log_info "Disabling conflicting display manager: ${dm}"
-          elevate systemctl disable "${dm}.service" 2>/dev/null || true
-        fi
-      done
-      elevate systemctl enable sddm.service 2>/dev/null && log_success "SDDM service enabled" \
-        && INIR_REBOOT_REASONS+=("SDDM is your login screen now${current_dm:+, instead of ${current_dm%.service}}")
-    fi
-  fi
+  # Personal overlay uses the installed GDM Niri session.
+  log_info "Preserving the existing display manager; no SDDM enablement"
 
   log_success "Services configured"
 }

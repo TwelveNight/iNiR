@@ -7,7 +7,7 @@
 # Configuration
 #####################################################################################
 II_TARGET="${XDG_CONFIG_HOME}/quickshell/inir"
-II_BACKUP_DIR="${XDG_STATE_HOME}/quickshell/backups"
+II_BACKUP_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/backups"
 II_MANIFEST_FILE="${II_TARGET}/.inir-manifest"
 
 #####################################################################################

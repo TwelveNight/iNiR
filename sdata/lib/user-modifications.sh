@@ -4,7 +4,7 @@
 
 # shellcheck shell=bash
 
-USER_MODS_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user-mods"
+USER_MODS_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/user-mods"
 MAX_USER_MODS=5
 
 # File patterns to track for modifications (code files only)

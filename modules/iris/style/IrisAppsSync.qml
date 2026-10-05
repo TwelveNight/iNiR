@@ -11,7 +11,7 @@ Item {
     id: root
     visible: false
 
-    readonly property string path: `${Directories.stateUserPath}/generated/iris-surface.json`
+    readonly property string path: `${Directories.sharedGeneratedPath}/iris-surface.json`
     // The wallpaper colour theme only: a preset is its own palette, and the Theme material reads colors.json back.
     readonly property bool wanted: ThemeService.irisMaterialApps && ThemeService.isAutoTheme && IrisStyle.materialName !== "theme"
     readonly property string seed: root.wanted ? root.hex(IrisStyle.appsSurface) : ""

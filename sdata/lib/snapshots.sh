@@ -4,16 +4,16 @@
 
 # shellcheck shell=bash
 
-SNAPSHOTS_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/snapshots"
+SNAPSHOTS_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/snapshots"
 MAX_SNAPSHOTS=10
-INIR_CONFIG_DIR="${DOTS_CORE_CONFDIR:-${XDG_CONFIG_HOME}/illogical-impulse}"
+INIR_CONFIG_DIR="${DOTS_CORE_CONFDIR:-${XDG_CONFIG_HOME}/inir}"
 
 # Paths to snapshot
 SNAPSHOT_PATHS=(
     "${XDG_CONFIG_HOME}/quickshell/inir"
     "${INIR_CONFIG_DIR}/config.json"
     "${XDG_CONFIG_HOME}/niri/config.kdl"
-    "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user/desktop-items.json"
+    "${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/user/desktop-items.json"
 )
 
 ###############################################################################
@@ -37,9 +37,6 @@ create_snapshot() {
         rsync -a --exclude='.inir-manifest' "${XDG_CONFIG_HOME}/quickshell/inir/" "${snapshot_dir}/inir/"
     fi
 
-    if [[ -d "${XDG_CONFIG_HOME}/quickshell/ii" ]]; then
-        rsync -a --exclude='.ii-manifest' "${XDG_CONFIG_HOME}/quickshell/ii/" "${snapshot_dir}/ii/"
-    fi
     
     # Copy user config
     if [[ -f "${INIR_CONFIG_DIR}/config.json" ]]; then
@@ -58,7 +55,7 @@ create_snapshot() {
 
     # Copy managed desktop-item state. It lives in XDG state, not the config
     # tree, so include it explicitly in snapshots and restores.
-    local desktop_items_state="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user/desktop-items.json"
+    local desktop_items_state="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/user/desktop-items.json"
     if [[ -f "$desktop_items_state" ]]; then
         cp "$desktop_items_state" "${snapshot_dir}/desktop-items.json"
     fi
@@ -161,9 +158,6 @@ restore_snapshot() {
     if [[ -d "${snapshot_dir}/inir" ]]; then
         log_info "Restoring QML code..."
         rsync -a --delete "${snapshot_dir}/inir/" "${XDG_CONFIG_HOME}/quickshell/inir/"
-    elif [[ -d "${snapshot_dir}/ii" ]]; then
-        log_info "Restoring QML code..."
-        rsync -a --delete "${snapshot_dir}/ii/" "${XDG_CONFIG_HOME}/quickshell/inir/"
     fi
     
     # Restore user config
@@ -187,9 +181,9 @@ restore_snapshot() {
 
     if [[ -f "${snapshot_dir}/desktop-items.json" ]]; then
         log_info "Restoring managed desktop items..."
-        mkdir -p "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user"
+        mkdir -p "${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/user"
         cp "${snapshot_dir}/desktop-items.json" \
-            "${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/user/desktop-items.json"
+            "${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/user/desktop-items.json"
     fi
     
     # Checkout git to that commit (stay on branch if possible)

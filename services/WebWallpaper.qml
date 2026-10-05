@@ -13,7 +13,7 @@ Singleton {
     readonly property var options: Config.options?.background?.backend?.web ?? ({})
     readonly property string source: String(options.source ?? "").trim()
     readonly property bool interactive: options.interactive ?? false
-    readonly property bool requested: provider === "web" && source.length > 0
+    readonly property bool requested: false // skwd-wall owns the desktop in this overlay
     readonly property bool active: requested && available
 
     property bool available: false
@@ -64,7 +64,7 @@ Singleton {
     }
 
     Variants {
-        model: Quickshell.screens
+        model: root.requested ? Quickshell.screens : []
 
         Scope {
             id: screenScope
@@ -72,7 +72,7 @@ Singleton {
 
             readonly property string screenName: modelData?.name ?? ""
             readonly property string hostPath: Quickshell.shellPath("modules/background/WebWallpaperHost.qml")
-            readonly property string pidFile: "/tmp/quickshell/web-wallpaper-" + screenName.replace(/[^A-Za-z0-9_.-]/g, "_") + ".pid"
+            readonly property string pidFile: Directories.tempPath + "/web-wallpaper-" + screenName.replace(/[^A-Za-z0-9_.-]/g, "_") + ".pid"
             property bool wantStart: false
             property bool restarting: false
 
@@ -184,5 +184,5 @@ Singleton {
         }
     }
 
-    Component.onCompleted: runnerProbeProc.running = true
+    Component.onCompleted: if (root.requested) runnerProbeProc.running = true
 }

@@ -25,7 +25,7 @@ CHROMA_SPREAD = {"normal": 8.0, "bright": 12.0}
 
 
 def python() -> str | None:
-    venv = os.environ.get("INIR_VENV") or os.environ.get("ILLOGICAL_IMPULSE_VIRTUAL_ENV") or "~/.local/state/quickshell/.venv"
+    venv = os.environ.get("INIR_VENV") or str(pathlib.Path(os.environ.get("INIR_STATE_DIR") or pathlib.Path(os.environ.get("XDG_STATE_HOME") or pathlib.Path.home() / ".local/state") / "inir") / ".venv")
     exe = pathlib.Path(os.path.expanduser(os.path.expandvars(venv))) / "bin" / "python3"
     return str(exe) if exe.exists() else None
 

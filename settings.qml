@@ -1362,9 +1362,9 @@ ApplicationWindow {
                         colBackground: "transparent"
                         colBackgroundHover: Appearance.colors.colLayer1Hover
 
-                        onClicked: Qt.openUrlExternally(`${Directories.config}/illogical-impulse/config.json`)
+                        onClicked: Qt.openUrlExternally(`${Directories.shellConfigPath}`)
                         altAction: () => {
-                            Quickshell.clipboardText = CF.FileUtils.trimFileProtocol(`${Directories.config}/illogical-impulse/config.json`);
+                            Quickshell.clipboardText = CF.FileUtils.trimFileProtocol(`${Directories.shellConfigPath}`);
                             configFileBtn.justCopied = true;
                             revertTextTimer.restart();
                         }

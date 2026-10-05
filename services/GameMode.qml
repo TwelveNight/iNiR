@@ -80,7 +80,7 @@ Singleton {
     readonly property string _discoverOverlayServiceName: "discover-overlay.service"
 
     // State file path
-    readonly property string _stateFile: Quickshell.env("HOME") + "/.local/state/quickshell/user/gamemode_active"
+    readonly property string _stateFile: Directories.stateUserPath + "/gamemode_active"
 
     // IPC handler for external control
     IpcHandler {
@@ -219,8 +219,8 @@ Singleton {
         command: [
             "/usr/bin/bash",
             "-c",
-            "mkdir -p ~/.local/state/quickshell/user\n" +
-            "echo " + (root._manualActive ? "1" : "0") + " > " + root._stateFile
+            "mkdir -p \"$1\"; printf '%s\\n' \"$2\" > \"$3\"",
+            "inir-gamemode", Directories.stateUserPath, root._manualActive ? "1" : "0", root._stateFile
         ]
         onExited: root._log("[GameMode] State saved:", root._manualActive)
     }
@@ -228,7 +228,7 @@ Singleton {
     // Initial setup
     Component.onCompleted: {
         root._log("[GameMode] Service starting...")
-        Quickshell.execDetached(["/usr/bin/mkdir", "-p", Quickshell.env("HOME") + "/.local/state/quickshell/user"])
+        Quickshell.execDetached(["/usr/bin/mkdir", "-p", Directories.stateUserPath])
         initTimer.restart()
     }
 

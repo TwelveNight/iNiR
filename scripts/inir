@@ -38,6 +38,10 @@ source_config_path_helper() {
 
 source_config_path_helper
 
+export INIR_CONFIG_DIR="$(inir_config_dir)"
+export INIR_STATE_DIR="$(inir_state_dir)"
+export INIR_VENV="${INIR_VENV:-${INIR_STATE_DIR}/.venv}"
+
 source_niri_session_env_helper() {
     local helper_candidates=(
         "$script_dir/lib/niri-session-env.sh"
@@ -2082,69 +2086,8 @@ kill_wrapper() {
 # Called by ExecStopPost in inir.service after crashes where KillMode=process
 # only terminated the main PID, leaving child processes and runtime artifacts.
 cleanup_orphans() {
-    local qs_runtime_dir="/run/user/$(id -u)/quickshell"
-
-    [[ -d "$qs_runtime_dir" ]] || return 0
-
-    # Phase 1: Prune stale by-pid entries (PIDs that no longer exist).
-    # by-pid/PID is a symlink to by-id/INSTANCE_ID.
-    if [[ -d "$qs_runtime_dir/by-pid" ]]; then
-        for pidfile in "$qs_runtime_dir/by-pid"/*; do
-            [[ -e "$pidfile" || -L "$pidfile" ]] || continue
-            local pid
-            pid="$(basename "$pidfile")"
-            if ! kill -0 "$pid" 2>/dev/null; then
-                rm -rf "$pidfile" 2>/dev/null || true
-            fi
-        done
-    fi
-
-    # Phase 2: Prune orphaned by-id instance directories.
-    # An instance dir is orphaned if no by-pid symlink points to it.
-    if [[ -d "$qs_runtime_dir/by-id" ]]; then
-        local live_targets=()
-        # Collect targets of surviving by-pid symlinks
-        for pidfile in "$qs_runtime_dir/by-pid"/*; do
-            [[ -L "$pidfile" ]] || continue
-            local target
-            target="$(readlink -f "$pidfile" 2>/dev/null || true)"
-            [[ -n "$target" ]] && live_targets+=("$target")
-        done
-
-        for iddir in "$qs_runtime_dir/by-id"/*/; do
-            [[ -d "$iddir" ]] || continue
-            local idpath
-            idpath="$(realpath "$iddir" 2>/dev/null || true)"
-            # Keep if referenced by a live by-pid symlink
-            local is_live=false
-            for t in "${live_targets[@]}"; do
-                if [[ "$t" == "$idpath" ]]; then
-                    is_live=true
-                    break
-                fi
-            done
-            if [[ "$is_live" == false ]]; then
-                rm -rf "$iddir" 2>/dev/null || true
-            fi
-        done
-    fi
-
-    # Phase 3: Prune stale by-shell entries (dangling symlinks or empty dirs)
-    if [[ -d "$qs_runtime_dir/by-shell" ]]; then
-        for shelldir in "$qs_runtime_dir/by-shell"/*; do
-            [[ -d "$shelldir" ]] || continue
-            for entry in "$shelldir"/*; do
-                [[ -e "$entry" || -L "$entry" ]] || continue
-                # Remove dangling symlinks
-                if [[ -L "$entry" && ! -e "$entry" ]]; then
-                    rm -f "$entry" 2>/dev/null || true
-                fi
-            done
-            # Remove shelldir if empty
-            rmdir "$shelldir" 2>/dev/null || true
-        done
-    fi
-
+    # The Quickshell runtime index is shared with II. Its by-id/by-pid/by-shell
+    # trees have no reliable per-config ownership here, so leave pruning to QS.
     # Phase 4: Kill only orphaned Quickshell processes that still belong to
     # inir.service. A foreground `qs -p ...` or another Quickshell config is not
     # owned by this service and must survive its ExecStopPost cleanup.
@@ -2188,6 +2131,8 @@ cleanup_orphans() {
     local _thumb_pids=()
     while IFS= read -r _pid; do
         [[ -n "$_pid" ]] || continue
+        _cgroup="$(cat "/proc/$_pid/cgroup" 2>/dev/null || true)"
+        [[ "$_cgroup" == *"/inir.service"* ]] || continue
         _thumb_pids+=("$_pid")
         kill "$_pid" 2>/dev/null || true
     done < <(pgrep -f "$_thumb_pattern" 2>/dev/null || true)
@@ -2195,6 +2140,8 @@ cleanup_orphans() {
     if (( ${#_thumb_pids[@]} > 0 )); then
         sleep 0.2
         for _pid in "${_thumb_pids[@]}"; do
+            _cgroup="$(cat "/proc/$_pid/cgroup" 2>/dev/null || true)"
+            [[ "$_cgroup" == *"/inir.service"* ]] || continue
             kill -0 "$_pid" 2>/dev/null || continue
             kill -KILL "$_pid" 2>/dev/null || true
         done

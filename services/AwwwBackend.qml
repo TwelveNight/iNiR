@@ -13,7 +13,7 @@ Singleton {
     id: root
 
     readonly property string provider: "awww"
-    readonly property bool enabled: (Config.options?.background?.backend?.provider ?? "awww") === provider
+    readonly property bool enabled: false // skwd-walld is the sole desktop renderer in this overlay.
     readonly property int transitionFps: Config.options?.background?.backend?.awww?.transitionFps ?? 60
     readonly property int simpleStep: Config.options?.background?.backend?.awww?.simpleStep ?? 5
     readonly property int spatialStep: Config.options?.background?.backend?.awww?.spatialStep ?? 30
@@ -22,7 +22,7 @@ Singleton {
     readonly property bool transitionsEnabled: Config.options?.background?.transition?.enable ?? true
     readonly property string transitionType: Config.options?.background?.transition?.type ?? "crossfade"
     readonly property string transitionDirection: Config.options?.background?.transition?.direction ?? "right"
-    readonly property bool internalShaderTransitionActive: transitionsEnabled
+    readonly property bool internalShaderTransitionActive: enabled && transitionsEnabled
         && Appearance.animationsEnabled
         && root.isInternalShaderTransitionType(transitionType)
     readonly property string fillMode: Config.options?.background?.fillMode ?? "fill"
@@ -85,6 +85,7 @@ Singleton {
     }
 
     function _startPreviewScript(script: string, signature: string): void {
+        if (!enabled) return
         root._clearPreviewQueue()
         root.stoppedForNoOutputs = false
         previewProc.activeSignature = signature
@@ -400,7 +401,7 @@ Singleton {
     }
 
     function _probe(): void {
-        if (probeProc.running)
+        if (!enabled || probeProc.running)
             return
         probing = true
         probeProc.running = true
@@ -444,14 +445,8 @@ Singleton {
     }
 
     function _syncNow(): void {
-        if (!enabled) {
-            if (stopProc.running)
-                return
-            if (available)
-                stopProc.running = true
-            lastSyncSignature = ""
-            return
-        }
+        // Disabled means no process ownership, including no kill of another session's daemon.
+        if (!enabled) return
 
         if (!available) {
             _probe()

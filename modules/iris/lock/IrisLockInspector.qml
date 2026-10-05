@@ -36,7 +36,7 @@ Item {
         Config.revision
         const scene = IrisLockOptions.scene
         const path = String(scene?.source ?? "desktop") === "custom" && String(scene?.path ?? "").length > 0
-            ? String(scene.path) : String(Config.options?.background?.wallpaperPath ?? "")
+            ? String(scene.path) : String(Wallpapers.currentMainWallpaperPath())
         return String(scene?.source ?? "desktop") === "colour" ? "" : Wallpapers.stillUrlFor(path)
     }
     readonly property string group: {

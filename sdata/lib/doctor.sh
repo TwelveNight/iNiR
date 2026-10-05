@@ -15,6 +15,7 @@ XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 XDG_BIN_HOME="${XDG_BIN_HOME:-$HOME/.local/bin}"
+INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}"
 
 doctor_pass() {
     tui_success "$1"
@@ -72,8 +73,7 @@ check_dependencies() {
         "wl-copy:wl-clipboard"
         "wl-paste:wl-clipboard"
         "fuzzel:fuzzel"
-        "awww:awww"
-        "awww-daemon:awww"
+        "skwd-helm:skwd-wall"
         "hyprpicker:hyprpicker"
         "playerctl:playerctl"
         "notify-send:libnotify"
@@ -490,7 +490,7 @@ check_user_config() {
 }
 
 check_state_directories() {
-    local dirs=("${XDG_STATE_HOME}/quickshell/user" "${XDG_CACHE_HOME}/quickshell" "${DOTS_CORE_CONFDIR}")
+    local dirs=("${INIR_STATE_DIR}/user" "${XDG_CACHE_HOME}/inir" "${DOTS_CORE_CONFDIR}")
     local created=0
     
     for dir in "${dirs[@]}"; do
@@ -501,7 +501,7 @@ check_state_directories() {
 }
 
 check_python_packages() {
-    local venv="${XDG_STATE_HOME}/quickshell/.venv"
+    local venv="${INIR_VENV:-${INIR_STATE_DIR}/.venv}"
     local req=""
     local runtime_dir
     local repo_root
@@ -881,17 +881,11 @@ check_niri_running() {
 
 check_version_tracking() {
     local version_file="${DOTS_CORE_CONFDIR}/version.json"
-    local legacy_version_file="${XDG_CONFIG_HOME}/illogical-impulse/version.json"
     local runtime_version_file
     local installed_marker="${DOTS_CORE_CONFDIR}/installed_true"
     local repair_source=""
     runtime_version_file="$(get_runtime_version_file)"
 
-    if [[ ! -f "$version_file" && -f "$legacy_version_file" ]]; then
-        mkdir -p "${DOTS_CORE_CONFDIR}"
-        cp "$legacy_version_file" "$version_file"
-        doctor_fix "Migrated version tracking to active config directory"
-    fi
     
     if [[ -f "$installed_marker" && -f "$version_file" ]] && ! version_file_has_core_metadata "$version_file"; then
         repair_source="incomplete"
@@ -1403,7 +1397,7 @@ check_matugen_colors() {
         fi
         
         if [[ -n "$wallpaper" && -f "$wallpaper" && -s "$wallpaper" ]]; then
-            local template_dir="${XDG_CONFIG_HOME}/matugen"
+            local template_dir="${DOTS_CORE_CONFDIR}/matugen"
 
             local runtime_dir
             runtime_dir="$(doctor_runtime_dir)"
@@ -1420,7 +1414,7 @@ check_matugen_colors() {
 
             if [[ -n "$gen_material_script" ]]; then
                 local python_cmd=""
-                local venv_python="${XDG_STATE_HOME}/quickshell/.venv/bin/python3"
+                local venv_python="${INIR_VENV:-${INIR_STATE_DIR}/.venv}/bin/python3"
                 if [[ -x "$venv_python" ]]; then
                     python_cmd="$venv_python"
                 elif command -v python3 &>/dev/null; then
@@ -1591,7 +1585,8 @@ check_wallpaper_health() {
 }
 
 check_environment_vars() {
-    local venv_path="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/.venv"
+    [[ "${INIR_INSTALL_SHELL_PROFILES:-false}" == true ]] || { doctor_pass "Shared shell profiles preserved"; return 0; }
+    local venv_path="${INIR_VENV:-${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/.venv}"
     local fixed=0
     local legacy_malloc_repaired=0
 

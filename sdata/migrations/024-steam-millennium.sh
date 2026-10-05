@@ -3,20 +3,11 @@
 MIGRATION_ID="024-steam-millennium"
 MIGRATION_TITLE="Move Steam theming to Millennium"
 MIGRATION_DESCRIPTION="Renames the Steam wallpaper theming toggle and configures Millennium Material-Theme Matugen for users who had Steam theming enabled."
-MIGRATION_TARGET_FILE="~/.config/illogical-impulse/config.json"
+MIGRATION_TARGET_FILE="~/.config/inir/config.json"
 MIGRATION_REQUIRED=true
 
 _steam_migration_config_file() {
-  local xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-  if [[ -L "$xdg_config_home/illogical-impulse" && -f "$xdg_config_home/inir/config.json" ]]; then
-    printf '%s\n' "$xdg_config_home/inir/config.json"
-  elif [[ -d "$xdg_config_home/illogical-impulse" || -f "$xdg_config_home/illogical-impulse/config.json" ]]; then
-    printf '%s\n' "$xdg_config_home/illogical-impulse/config.json"
-  elif [[ -f "$xdg_config_home/inir/config.json" ]]; then
-    printf '%s\n' "$xdg_config_home/inir/config.json"
-  else
-    printf '%s\n' "$xdg_config_home/inir/config.json"
-  fi
+  printf '%s\n' "${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/config.json"
 }
 
 _steam_migration_needs_config() {

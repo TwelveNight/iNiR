@@ -27,6 +27,7 @@ import html
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 # Firefox-style: a content-type meta tag prepended to the payload.
 HTML_PAYLOAD_PREFIX = b'<meta http-equiv="content-type" content="text/html'
@@ -76,7 +77,7 @@ def main() -> int:
         sys.stdout.buffer.write(payload)
         return 0
 
-    return subprocess.run(["cliphist", "store"], input=payload).returncode
+    return subprocess.run([str(Path(__file__).resolve().with_name("cliphist-inir.sh")), "store"], input=payload).returncode
 
 
 if __name__ == "__main__":

@@ -6,7 +6,11 @@ import json
 import numpy as np
 import sys
 
-DEFAULT_IMAGE_PATH = '/tmp/quickshell/media/screenshot/image'
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from paths import temp_dir
+
+DEFAULT_IMAGE_PATH = str(temp_dir() / "media/screenshot/image")
 
 def iou(boxA, boxB):
     # Compute intersection over union for two boxes

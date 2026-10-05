@@ -420,9 +420,7 @@ PanelWindow {
 
     // ── Export ────────────────────────────────────────────────────────────────
     // Stable per-session temp path keeps Process.command binding simple.
-    readonly property string _tempDir: (Quickshell.env("XDG_RUNTIME_DIR") && Quickshell.env("XDG_RUNTIME_DIR").length > 0)
-        ? Quickshell.env("XDG_RUNTIME_DIR") + "/quickshell"
-        : "/tmp/quickshell"
+    readonly property string _tempDir: Directories.tempPath
     property string _outPath: _tempDir + "/annotated.png"
 
     function exportImage() {

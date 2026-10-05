@@ -40,6 +40,7 @@ Variants {
 
         // Wallpaper source — per-monitor when multi-monitor enabled, otherwise waffle/main per setting
         readonly property string wallpaperSourceRaw: {
+            if (Wallpapers.skwdBackendEnabled) return Wallpapers.currentMainWallpaperPath(_monitorName);
             let configuredPath = "";
             if (_multiMonEnabled && _perMonitorData.path)
                 configuredPath = _perMonitorData.path;
@@ -53,6 +54,7 @@ Variants {
         }
 
         readonly property string wallpaperThumbnail: {
+            if (Wallpapers.skwdBackendEnabled) return Wallpapers.getExpectedThumbnailPath(wallpaperSourceRaw, "large")
             if (wBg.useMainWallpaper ?? true) return Config.options?.background?.thumbnailPath ?? ""
             return wBg.thumbnailPath ?? (Config.options?.background?.thumbnailPath ?? "")
         }
@@ -70,7 +72,7 @@ Variants {
                 enableAnimatedBlur
             )
         readonly property bool internalShaderTransitionRequested:
-            (Config.options?.background?.transition?.enable ?? true)
+            !Wallpapers.skwdBackendEnabled && (Config.options?.background?.transition?.enable ?? true)
             && Looks.transition.enabled
             && !panelRoot.webWallpaperActive
             && AwwwBackend.isInternalShaderTransitionType(
@@ -81,7 +83,7 @@ Variants {
         // the visible static-wallpaper owner while that mode is selected so the
         // compositor never has to hand the desktop between AWWW and QML during
         // a transition.
-        readonly property bool externalMainWallpaperActive: panelRoot.externalMainWallpaperEligible
+        readonly property bool externalMainWallpaperActive: Wallpapers.skwdBackendEnabled || panelRoot.externalMainWallpaperEligible
             && !panelRoot.internalShaderTransitionRequested
         readonly property bool showInternalStaticWallpaper: !externalMainWallpaperActive
         readonly property bool internalShaderPreviewActive: panelRoot.internalShaderTransitionRequested
@@ -276,7 +278,7 @@ Variants {
                     id: gifWallpaper
                     anchors.fill: parent
                     fillMode: Image.PreserveAspectCrop
-                    source: panelRoot.wallpaperIsGif && !panelRoot.webWallpaperActive
+                    source: panelRoot.wallpaperIsGif && !Wallpapers.skwdBackendEnabled && !panelRoot.webWallpaperActive
                         ? (panelRoot.wallpaperSourceRaw.startsWith("file://")
                             ? panelRoot.wallpaperSourceRaw
                             : "file://" + panelRoot.wallpaperSourceRaw)
@@ -306,7 +308,7 @@ Variants {
                     id: videoWallpaper
                     anchors.fill: parent
                     visible: panelRoot.wallpaperIsVideo && !blurEffect.visible
-                    source: (panelRoot.wallpaperIsVideo && panelRoot._familyOwnsScreen && !panelRoot.webWallpaperActive)
+                    source: (panelRoot.wallpaperIsVideo && panelRoot._familyOwnsScreen && !panelRoot.webWallpaperActive && !Wallpapers.skwdBackendEnabled)
                         ? panelRoot.wallpaperSourceRaw : ""
                     fillMode: VideoOutput.PreserveAspectCrop
                     enableTransitions: Config.options?.background?.transition?.enable ?? true

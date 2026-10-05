@@ -12,7 +12,9 @@ case "$1" in
         ;;
 esac
 
-OUTPUT_FILE="${1:-/tmp/cava_config.txt}"
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/config-path.sh"
+OUTPUT_FILE="${1:-$(inir_temp_dir)/cava_config.txt}"
+mkdir -p "$(dirname "$OUTPUT_FILE")"
 FRAMERATE="${2:-60}"
 SENSITIVITY="${3:-100}"
 BARS="${4:-50}"

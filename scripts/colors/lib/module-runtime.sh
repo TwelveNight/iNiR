@@ -110,10 +110,8 @@ venv_python() {
   local venv_path
   if [[ -n "${INIR_VENV:-}" ]]; then
     venv_path="$(eval echo "$INIR_VENV")"
-  elif [[ -n "${ILLOGICAL_IMPULSE_VIRTUAL_ENV:-}" ]]; then
-    venv_path="$(eval echo "$ILLOGICAL_IMPULSE_VIRTUAL_ENV")"
   else
-    venv_path="$HOME/.local/state/quickshell/.venv"
+    venv_path="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/.venv"
   fi
 
   local candidate="$venv_path/bin/python3"

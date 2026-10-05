@@ -2,7 +2,7 @@
 
 set -u
 
-venv_dir="${INIR_VENV:-${ILLOGICAL_IMPULSE_VIRTUAL_ENV:-$HOME/.local/state/quickshell/.venv}}"
+venv_dir="${INIR_VENV:-${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/.venv}"
 
 # Setup-managed installs own a current yt-dlp in iNiR's venv. Prefer it so
 # Debian/Ubuntu repository age cannot silently select an incompatible binary.

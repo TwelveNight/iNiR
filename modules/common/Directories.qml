@@ -14,8 +14,8 @@ Singleton {
     // XDG Dirs, with "file://"
     readonly property string home: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
     readonly property string config: StandardPaths.standardLocations(StandardPaths.ConfigLocation)[0]
-    readonly property string state: StandardPaths.standardLocations(StandardPaths.StateLocation)[0]
-    readonly property string cache: StandardPaths.standardLocations(StandardPaths.CacheLocation)[0]
+    readonly property string state: "file://" + (Quickshell.env("INIR_STATE_DIR") || `${Quickshell.env("XDG_STATE_HOME") || (homePath + "/.local/state")}/inir`)
+    readonly property string cache: "file://" + (Quickshell.env("XDG_CACHE_HOME") || (homePath + "/.cache")) + "/inir"
     readonly property string genericCache: StandardPaths.standardLocations(StandardPaths.GenericCacheLocation)[0]
     readonly property string documents: StandardPaths.standardLocations(StandardPaths.DocumentsLocation)[0]
     readonly property string downloads: StandardPaths.standardLocations(StandardPaths.DownloadLocation)[0]
@@ -26,6 +26,9 @@ Singleton {
     readonly property string configPath: FileUtils.trimFileProtocol(config)
     readonly property string statePath: FileUtils.trimFileProtocol(state)
     readonly property string cachePath: FileUtils.trimFileProtocol(cache)
+    // Runtime files must not collide with II (fallback remains private to this user).
+    readonly property string tempPath: Quickshell.env("XDG_RUNTIME_DIR")
+        ? Quickshell.env("XDG_RUNTIME_DIR") + "/inir" : cachePath + "/tmp"
     readonly property string genericCachePath: FileUtils.trimFileProtocol(genericCache)
     readonly property string documentsPath: FileUtils.trimFileProtocol(documents)
     readonly property string downloadsPath: FileUtils.trimFileProtocol(downloads)
@@ -38,12 +41,14 @@ Singleton {
     property string scriptPath: Quickshell.shellPath("scripts")
     property string scriptsPath: FileUtils.trimFileProtocol(scriptPath)
     property string stateUserPath: `${Directories.statePath}/user`
+    // Palette files are intentionally shared with Hyprland + II.
+    readonly property string sharedGeneratedPath: `${Quickshell.env("XDG_STATE_HOME") || (homePath + "/.local/state")}/quickshell/user/generated`
     property string wallpapersPath: Config.options?.wallpapers?.directory || `${Directories.picturesPath}/Wallpapers`
     property string screenshotsPath: Config.options?.regionSelector?.savePath || `${Directories.picturesPath}/Screenshots`
     property string persistentStatesPath: `${Directories.statePath}/states.json`
     property string eventsPath: `${Directories.stateUserPath}/events.json`
     property string screenTimePath: `${Directories.stateUserPath}/screentime`
-    property string generatedMaterialScssPath: `${Directories.stateUserPath}/generated/material_colors.scss`
+    property string generatedMaterialScssPath: `${Directories.sharedGeneratedPath}/material_colors.scss`
     property string favicons: `${Directories.cachePath}/media/favicons`
     // User avatar paths
     property string userAvatarPathAccountsService: FileUtils.trimFileProtocol(`/var/lib/AccountsService/icons/${SystemInfo.username}`)
@@ -63,12 +68,12 @@ Singleton {
         onFileChanged: root.userAvatarRevision++
     }
     property string coverArt: `${Directories.cachePath}/media/coverart`
-    property string tempImages: "/tmp/quickshell/media/images"
+    property string tempImages: `${Directories.tempPath}/media/images`
     property string booruPreviews: `${Directories.cachePath}/media/boorus`
     property string booruDownloads: Config.options?.sidebar?.booru?.downloadPath?.sfw || Directories.wallpapersPath
     property string booruDownloadsNsfw: Config.options?.sidebar?.booru?.downloadPath?.nsfw || `${Directories.wallpapersPath}/🌶️`
     property string latexOutput: `${Directories.cachePath}/media/latex`
-    property string shellConfig: `${Directories.configPath}/illogical-impulse`
+    property string shellConfig: Quickshell.env("INIR_CONFIG_DIR") || `${Directories.configPath}/inir`
     property string shellConfigName: "config.json"
     property string shellConfigPath: `${Directories.shellConfig}/${Directories.shellConfigName}`
     property string updateLogPath: `${Directories.stateUserPath}/update.log`
@@ -81,15 +86,15 @@ Singleton {
     property string notificationsPath: `${Directories.stateUserPath}/notifications.json`
     property string calendarSyncCachePath: `${Directories.stateUserPath}/calendar-sync-cache.json`
     property string weatherCachePath: `${Directories.stateUserPath}/weather-cache.json`
-    property string generatedMaterialThemePath: `${Directories.stateUserPath}/generated/colors.json`
-    property string generatedPalettePath: `${Directories.stateUserPath}/generated/palette.json`
-    property string generatedAppPalettePath: `${Directories.stateUserPath}/generated/app-palette.json`
-    property string generatedTerminalPalettePath: `${Directories.stateUserPath}/generated/terminal.json`
-    property string generatedThemeMetaPath: `${Directories.stateUserPath}/generated/theme-meta.json`
-    property string generatedChromiumThemePath: `${Directories.stateUserPath}/generated/chromium.theme`
-    property string generatedWallpaperCategoryPath: `${Directories.stateUserPath}/generated/wallpaper/category.txt`
-    property string cliphistDecode: FileUtils.trimFileProtocol(`/tmp/quickshell/media/cliphist`)
-    property string screenshotTemp: "/tmp/quickshell/media/screenshot"
+    property string generatedMaterialThemePath: `${Directories.sharedGeneratedPath}/colors.json`
+    property string generatedPalettePath: `${Directories.sharedGeneratedPath}/palette.json`
+    property string generatedAppPalettePath: `${Directories.sharedGeneratedPath}/app-palette.json`
+    property string generatedTerminalPalettePath: `${Directories.sharedGeneratedPath}/terminal.json`
+    property string generatedThemeMetaPath: `${Directories.sharedGeneratedPath}/theme-meta.json`
+    property string generatedChromiumThemePath: `${Directories.sharedGeneratedPath}/chromium.theme`
+    property string generatedWallpaperCategoryPath: `${Directories.sharedGeneratedPath}/wallpaper/category.txt`
+    property string cliphistDecode: `${Directories.tempPath}/media/cliphist`
+    property string screenshotTemp: `${Directories.tempPath}/media/screenshot`
     property string wallpaperSwitchScriptPath: `${Directories.scriptsPath}/colors/switchwall.sh`
     property string defaultAiPrompts: Quickshell.shellPath("defaults/ai/prompts")
     property string userAiPrompts: FileUtils.trimFileProtocol(`${Directories.shellConfig}/ai/prompts`)
@@ -129,6 +134,7 @@ Singleton {
     }
     // Cleanup on init
     Component.onCompleted: {
+        Quickshell.execDetached(["mkdir", "-p", tempPath])
         Quickshell.execDetached(["mkdir", "-p", `${shellConfig}`])
         Quickshell.execDetached(["mkdir", "-p", `${stateUserPath}`])
         Quickshell.execDetached(["mkdir", "-p", `${favicons}`])

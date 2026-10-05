@@ -16,18 +16,11 @@ import urllib.parse
 import urllib.request
 
 
-def resolve_shell_config_dir() -> str:
-    xdg_config = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
-    new_dir = os.path.join(xdg_config, "inir")
-    legacy_dir = os.path.join(xdg_config, "illogical-impulse")
+from lib.paths import config_dir
 
-    if os.path.islink(legacy_dir) and os.path.isdir(new_dir):
-        return new_dir
-    if os.path.isdir(legacy_dir):
-        return legacy_dir
-    if os.path.isdir(new_dir):
-        return new_dir
-    return new_dir
+
+def resolve_shell_config_dir() -> str:
+    return str(config_dir())
 
 
 PLUGINS_DIR = os.path.join(resolve_shell_config_dir(), "plugins")

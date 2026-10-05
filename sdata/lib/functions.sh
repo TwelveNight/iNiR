@@ -273,6 +273,7 @@ function install_dir__skip_existed(){
 }
 
 function ensure_launcher_path_in_shells(){
+  [[ "${INIR_INSTALL_SHELL_PROFILES:-false}" == true ]] || return 0
   local launcher_dir="$1"
   [[ -n "$launcher_dir" ]] || return 0
 
@@ -483,6 +484,9 @@ inir_user_service_is_masked() {
 }
 
 repair_legacy_quickshell_malloc_environment() {
+  INIR_LEGACY_MALLOC_ENV_REPAIRED=0
+  INIR_LEGACY_MALLOC_ENV_CURRENT_PROCESS=0
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || return 0
   local conf="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/quickshell-mem.conf"
   local repaired=0
 

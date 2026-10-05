@@ -221,7 +221,7 @@ ensure_aur_helper(){
 install-python-packages(){
   tui_info "Setting up Python virtual environment..."
 
-  local venv_dir="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell/.venv"
+  local venv_dir="${INIR_VENV:-${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/.venv}"
 
   if ! command -v uv &>/dev/null; then
     log_warning "uv not installed, skipping Python venv setup"
@@ -704,6 +704,7 @@ PY
 #####################################################################################
 
 setup-gtk-config(){
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || { log_info "Preserving existing gtk configuration"; return 0; }
   local cursor_theme="${1:-Bibata-Modern-Classic}"
   local icon_theme="${2:-WhiteSur-dark}"
   local gtk_theme="${3:-adw-gtk3-dark}"
@@ -751,6 +752,7 @@ EOF
 }
 
 setup-kvantum-config(){
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || { log_info "Preserving existing kvantum configuration"; return 0; }
   local theme="${1:-MaterialAdw}"
 
   log_info "Setting up Kvantum configuration..."
@@ -765,6 +767,7 @@ EOF
 }
 
 setup-environment-config(){
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || { log_info "Preserving existing environment configuration"; return 0; }
   local cursor_theme="${1:-Bibata-Modern-Classic}"
 
   log_info "Setting up environment variables..."
@@ -796,14 +799,15 @@ QT_QPA_PLATFORMTHEME=${qt_theme}
 QT_STYLE_OVERRIDE=Darkly
 GTK_THEME=adw-gtk3-dark
 ELECTRON_OZONE_PLATFORM_HINT=auto
-ILLOGICAL_IMPULSE_VIRTUAL_ENV=\$HOME/.local/state/quickshell/.venv
-INIR_VENV=\$HOME/.local/state/quickshell/.venv
+ILLOGICAL_IMPULSE_VIRTUAL_ENV=\$HOME/.local/state/inir/.venv
+INIR_VENV=\$HOME/.local/state/inir/.venv
 EOF
 
   log_success "Environment configuration set"
 }
 
 setup-foot-config(){
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || { log_info "Preserving existing foot configuration"; return 0; }
   log_info "Setting up Foot terminal configuration..."
 
   mkdir -p ~/.config/foot
@@ -867,6 +871,7 @@ EOF
 }
 
 setup-kitty-config(){
+  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || { log_info "Preserving existing kitty configuration"; return 0; }
   log_info "Setting up Kitty terminal configuration..."
 
   mkdir -p ~/.config/kitty
@@ -946,6 +951,7 @@ EOF
 }
 
 setup-fish-config(){
+  [[ "${INIR_INSTALL_SHELL_PROFILES:-false}" == true ]] || { log_info "Preserving existing fish configuration"; return 0; }
   log_info "Setting up Fish shell configuration..."
 
   mkdir -p ~/.config/fish
@@ -991,6 +997,7 @@ EOF
 }
 
 setup-bash-config(){
+  [[ "${INIR_INSTALL_SHELL_PROFILES:-false}" == true ]] || { log_info "Preserving existing bash configuration"; return 0; }
   log_info "Setting up Bash shell configuration..."
 
   local bashrc="$HOME/.bashrc"
@@ -1046,6 +1053,7 @@ EOF
 }
 
 setup-zsh-config(){
+  [[ "${INIR_INSTALL_SHELL_PROFILES:-false}" == true ]] || { log_info "Preserving existing zsh configuration"; return 0; }
   log_info "Setting up Zsh shell configuration..."
 
   local zshrc="$HOME/.zshrc"

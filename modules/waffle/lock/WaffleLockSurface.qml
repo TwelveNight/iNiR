@@ -68,8 +68,8 @@ MouseArea {
     // Resolve wallpaper path: waffle-specific if configured, otherwise main
     readonly property string _wallpaperSource: {
         const wBg = Config.options?.waffles?.background
-        if (wBg?.useMainWallpaper ?? true) return Config.options?.background?.wallpaperPath ?? ""
-        return wBg?.wallpaperPath ?? Config.options?.background?.wallpaperPath ?? ""
+        if (wBg?.useMainWallpaper ?? true) return Wallpapers.currentMainWallpaperPath()
+        return wBg?.wallpaperPath ?? Wallpapers.currentMainWallpaperPath()
     }
     
     // Detect if it's a video or gif and use thumbnail

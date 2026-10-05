@@ -4,7 +4,8 @@
 pillow>=10.0.0
 opencv-contrib-python>=4.8.0
 material-color-utilities>=0.2.0
-materialyoucolor>=2.0.0
+# prerelease uses TonalPalette.tone returning ARGB, introduced in v3.
+materialyoucolor>=3.0.4,<4
 numpy>=1.24.0
 psutil>=5.9.0
 tqdm>=4.65.0
