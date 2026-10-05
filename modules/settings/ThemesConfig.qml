@@ -486,7 +486,7 @@ ContentPage {
                 Layout.fillWidth: true
                 Layout.topMargin: 8
                 spacing: 6
-                visible: Config.options?.background?.wallpaperPath?.length > 0
+                visible: Wallpapers.currentMainWallpaperPath().length > 0
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -512,9 +512,9 @@ ContentPage {
 
                 ColorQuantizer {
                     id: wallpaperQuantizer
-                    property string wallpaperPath: Config.options?.background?.wallpaperPath ?? ""
+                    property string wallpaperPath: Wallpapers.currentMainWallpaperPath()
                     property bool isVideo: wallpaperPath.endsWith(".mp4") || wallpaperPath.endsWith(".webm")
-                    source: wallpaperPath.length > 0 ? Qt.resolvedUrl(isVideo ? Config.options?.background?.thumbnailPath : wallpaperPath) : ""
+                    source: Wallpapers.stillUrlFor(wallpaperPath)
                     depth: 3  // 2^3 = 8 colors
                     rescaleSize: 64
                 }

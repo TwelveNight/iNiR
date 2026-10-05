@@ -245,23 +245,19 @@ get_focused_monitor_name() {
  }
 
  resolve_effective_theming_wallpaper() {
-    jq -r --arg focused_monitor "$(get_focused_monitor_name)" '
-        def monitor_entry: if ((.background.multiMonitor.enable // false) and ($focused_monitor != ""))
-            then ((.background.wallpapersByMonitor // []) | map(select(.monitor == $focused_monitor)) | .[0])
-            else null end;
-        def main_path: (monitor_entry.path // .background.wallpaperPath // "");
-        def monitor_backdrop: (monitor_entry.backdropPath // "");
-        def waffle_main: (if (.waffles.background.useMainWallpaper // "true") == true then main_path else (.waffles.background.wallpaperPath // main_path) end);
-        if (.appearance.wallpaperTheming.useBackdropForColors // false) then
-            if (.panelFamily // "ii") == "waffle" then
-                (if (.waffles.background.backdrop.useMainWallpaper // "true") == true then waffle_main else (.waffles.background.backdrop.wallpaperPath // waffle_main) end)
-            else
-                (if monitor_backdrop != "" then monitor_backdrop else (if (.background.backdrop.useMainWallpaper // "true") == true then main_path else (.background.backdrop.wallpaperPath // main_path) end) end)
-            end
-        else
-            if (.panelFamily // "ii") == "waffle" then waffle_main else main_path end
-        end // ""
-    ' "$SHELL_CONFIG_FILE" 2>/dev/null || echo ""
+    # The daemon is authoritative even when the wallpaper was changed outside
+    # iNiR. Never fall back to a stale config path on a failed state query.
+    local current focused
+    current="$(skwd-helm current --json)" || return 1
+    focused="$(get_focused_monitor_name)"
+    printf '%s' "$current" | jq -er --arg focused "$focused" --arg cache "$XDG_CACHE_HOME" '
+        .outputs | if type == "object" then to_entries | map(.value + {name: .key}) else . end
+        | map(select(.connected != false))
+        | (map(select((.name // .output // .output_name) == $focused))[0] // .[0])
+        | if .type == "we" then
+            (.thumbnailPath // .thumb // (if (.we_id // "") != "" then $cache + "/skwd-wall-v2/we-thumbs/" + .we_id + ".webp" else "" end))
+          else (.path // .current // "") end
+        | select(type == "string" and length > 0)'
  }
 
  # Wallpaper loops routinely open on black or a fade-in, so frame 0 produces a
@@ -398,10 +394,10 @@ switch() {
     else
         if [[ -z "$imgpath" ]]; then
             if [[ -n "$noswitch_flag" ]]; then
-                # --noswitch without --image: read current wallpaper from config for color regeneration
-                imgpath=$(resolve_effective_theming_wallpaper)
+                # --noswitch without --image: query the active skwd wallpaper
+                imgpath=$(resolve_effective_theming_wallpaper) || return 1
                 if [[ -z "$imgpath" || ! -f "$imgpath" ]]; then
-                    echo "[switchwall.sh] --noswitch: No valid wallpaper path in config"
+                    echo "[switchwall.sh] --noswitch: No valid active skwd wallpaper"
                     exit 0
                 fi
                 echo "[switchwall.sh] --noswitch: Using current wallpaper for color regeneration: $imgpath"
@@ -844,7 +840,7 @@ main() {
     # If accentColor is set in config, use it for static themes only.
     # For auto themes, colors must come from the wallpaper — a stale accentColor
     # from a previous static-theme variant would override wallpaper extraction.
-    if [[ -z "$color_flag" ]]; then
+    if [[ -z "$color_flag" && ( -z "$imgpath" || -n "$noswitch_flag" ) ]]; then
         if [[ "$cfg_theme" != "auto" ]]; then
             if [[ "$cfg_accent_color" =~ ^#?[A-Fa-f0-9]{6}$ ]]; then
                 color_flag="1"
@@ -874,10 +870,12 @@ main() {
     fi
 
     # --noswitch should regenerate from the current effective theming source.
-    # If no explicit image was passed, force resolution now so family-specific
-    # wallpapers (e.g. waffle.background.wallpaperPath) are honored.
+    # Without an explicit image, query skwd rather than a saved Shell path.
     if [[ -z "$imgpath" && -n "$noswitch_flag" && -z "$color_flag" ]]; then
-        imgpath="$(resolve_effective_theming_wallpaper)"
+        imgpath="$(resolve_effective_theming_wallpaper)" || {
+            echo "[switchwall.sh] Cannot read active skwd wallpaper; keeping existing colors" >&2
+            return 1
+        }
     fi
 
     # type_flag "auto" is passed directly to generate_colors_material.py which

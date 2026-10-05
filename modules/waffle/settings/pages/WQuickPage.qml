@@ -952,9 +952,10 @@ WSettingsPage {
             checked: root.multiMonitorEnabled
 
             onCheckedChanged: {
+                if (checked === (Config.options?.background?.multiMonitor?.enable ?? false)) return
                 Config.setNestedValue("background.multiMonitor.enable", checked)
                 if (!checked) {
-                    const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                    const globalPath = Wallpapers.currentMainWallpaperPath()
                     if (globalPath)
                         Wallpapers.apply(globalPath, Appearance.m3colors.darkmode)
                 }

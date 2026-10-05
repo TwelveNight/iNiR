@@ -67,6 +67,7 @@ MouseArea {
 
     // Resolve wallpaper path: waffle-specific if configured, otherwise main
     readonly property string _wallpaperSource: {
+        if (Wallpapers.skwdBackendEnabled) return Wallpapers.currentMainWallpaperPath()
         const wBg = Config.options?.waffles?.background
         if (wBg?.useMainWallpaper ?? true) return Wallpapers.currentMainWallpaperPath()
         return wBg?.wallpaperPath ?? Wallpapers.currentMainWallpaperPath()
@@ -76,6 +77,7 @@ MouseArea {
     readonly property string _wallpaperPath: {
         const path = _wallpaperSource;
         if (!path) return "";
+        if (Wallpapers.skwdBackendEnabled) return Wallpapers.stillUrlFor(path)
         
         const lowerPath = path.toLowerCase();
         const isVideo = lowerPath.endsWith(".mp4") || lowerPath.endsWith(".webm") || lowerPath.endsWith(".mkv") || lowerPath.endsWith(".avi") || lowerPath.endsWith(".mov");

@@ -87,6 +87,7 @@ python3 scripts/test-shared-data-boundaries.py
 python3 scripts/test-shared-app-colors.py
 python3 scripts/test-skwd-backend.py
 python3 scripts/test-disabled-wallpaper-backends.py
+python3 scripts/test-wallpaper-authority.py
 python3 scripts/test-runtime-payload.py
 python3 scripts/test-safety-boundaries.py
 niri validate --config defaults/niri/config.kdl
@@ -201,3 +202,11 @@ sudo pacman -S --needed swaylock
 可选缺项包括 `mission-center`（默认任务管理器）、`lsp-plugins-lv2`（EasyEffects 均衡器）、`mpv-mpris`、`ttf-oxanium` 及部分 OCR 语言模型。英语和简体中文 OCR 模型已安装。按需要单独补齐，安装器会明确列出，不把可选功能缺项当成 Shell 无法启动。
 
 系统包安装会作用于两边桌面，先查看包管理器事务；配置隔离不保证系统包永远不变。iNiR 的 Python 依赖仍由安装器装入私有环境。增加了依赖分类与替代 provider 回归，安全回归共 16 项；本轮没有执行系统包安装。
+
+## 已安装后的壁纸状态复审
+
+桌面静态图、视频和 GIF 的应用请求统一交给 `skwd-helm apply`。设置页取色、每屏预览、概览、Waffle 任务视图、欢迎页和随机壁纸目录统一读取 `skwd-helm current --json` 的活动输出；外部壁纸切换通过 watch 更新，不依赖 iNiR 保存的旧路径。多屏预览按屏幕选择，通用取色使用当前聚焦屏幕。
+
+旧 Material/Waffle 的持久 backdrop 窗口在 skwd 模式下不创建，避免旧开关启用第二层桌面壁纸；桌面取色也不采用单独 backdrop 路径。锁屏、概览缩略图和选择器预览仍是 Shell UI，可从 skwd 视频生成静态预览，不是第二个桌面渲染后端。显式“仅从此图片取色”仍遵从用户选择，默认重新取色则查询 skwd；查询失败保留现有颜色。
+
+离屏回归覆盖静态图、视频、GIF、外部切换、多屏聚焦切换、断连保留最近状态及 CLI 查询失败。测试用模拟客户端，不实际切换桌面壁纸。本机只读状态确认两块连接的输出由 skwd 播放视频；真实 Niri 会话切换后的可视验收仍待完成。

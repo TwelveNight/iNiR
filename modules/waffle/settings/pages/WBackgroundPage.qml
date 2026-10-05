@@ -122,9 +122,10 @@ WSettingsPage {
             onCheckedChanged: {
                 if (!root.settingsHandlersReady)
                     return
+                if (checked === (Config.options?.background?.multiMonitor?.enable ?? false)) return
                 Config.setNestedValue("background.multiMonitor.enable", checked)
                 if (!checked) {
-                    const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                    const globalPath = Wallpapers.currentMainWallpaperPath()
                     if (globalPath) {
                         Wallpapers.apply(globalPath, Appearance.m3colors.darkmode)
                     }
@@ -887,7 +888,7 @@ WSettingsPage {
 
                         // Derive theme colors from backdrop
                         WSettingsSwitch {
-                            visible: root.wBackdrop.enable ?? true
+                            visible: !Wallpapers.skwdBackendEnabled && (root.wBackdrop.enable ?? true)
                             label: Translation.tr("Derive theme colors from backdrop")
                             icon: "eyedropper"
                             checked: Config.options?.appearance?.wallpaperTheming?.useBackdropForColors ?? false
@@ -1264,6 +1265,7 @@ WSettingsPage {
 
             WSettingsCard {
                 title: Translation.tr("Backdrop (Overview)")
+                visible: !Wallpapers.skwdBackendEnabled
                 icon: "library"
 
                 WSettingsSwitch {
@@ -1313,7 +1315,7 @@ WSettingsPage {
                 }
 
                 WSettingsSwitch {
-                    visible: root.wBackdrop.enable ?? true
+                    visible: !Wallpapers.skwdBackendEnabled && (root.wBackdrop.enable ?? true)
                     label: Translation.tr("Derive theme colors from backdrop")
                     icon: "eyedropper"
                     description: Translation.tr("Generate theme colors from the backdrop wallpaper instead of the main wallpaper")

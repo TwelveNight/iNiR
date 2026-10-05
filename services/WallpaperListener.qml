@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import qs.modules.common
 import qs.modules.common.functions
 import qs.services
+import "skwdState.js" as State
 
 Singleton {
     id: root
@@ -18,7 +19,7 @@ Singleton {
     // Reactive properties that trigger refresh
     readonly property bool multiMonitorEnabled: Config.options?.background?.multiMonitor?.enable ?? false
     readonly property var wallpapersByMonitorRef: Config.options?.background?.wallpapersByMonitor ?? []
-    readonly property string globalWallpaperPath: Config.options?.background?.wallpaperPath ?? ""
+    readonly property string globalWallpaperPath: SkwdBackend.wallpaperPath(getFocusedMonitor())
     readonly property bool globalAnimationEnabled: Config.options?.background?.enableAnimation ?? true
     readonly property string globalFillMode: Config.options?.background?.fillMode ?? "fill"
 
@@ -69,6 +70,8 @@ Singleton {
     // Resolve the effective wallpaper URL for a screen (for Aurora blur, etc.)
     // Returns file:// URL suitable for Image.source; uses thumbnail for videos.
     function wallpaperUrlForScreen(screen): string {
+        if (Wallpapers.skwdBackendEnabled)
+            return Wallpapers.stillUrlFor(SkwdBackend.wallpaperPath(screen ? getMonitorName(screen) : getFocusedMonitor()))
         if (multiMonitorEnabled && screen) {
             const monName = getMonitorName(screen)
             const data = effectivePerMonitor[monName]
@@ -96,7 +99,20 @@ Singleton {
         const result = {}
         const screens = Quickshell.screens
 
-        if (!multiMonitorEnabled) {
+        if (Wallpapers.skwdBackendEnabled) {
+            for (const output of State.outputs(SkwdBackend.current)) {
+                const monitorName = output.name || output.output || output.output_name
+                if (!monitorName) continue
+                const path = SkwdBackend.wallpaperPath(monitorName)
+                result[monitorName] = {
+                    path: path,
+                    isVideo: isVideoPath(path),
+                    isGif: isGifPath(path),
+                    isAnimated: isAnimatedPath(path),
+                    hasCustomWallpaper: true
+                }
+            }
+        } else if (!multiMonitorEnabled) {
             for (const screen of screens) {
                 const monitorName = getMonitorName(screen)
                 if (monitorName) {
@@ -179,6 +195,11 @@ Singleton {
     onGlobalWallpaperPathChanged: {
         _log("[WallpaperListener] Global wallpaper path changed:", globalWallpaperPath)
         refresh()
+    }
+
+    Connections {
+        target: SkwdBackend
+        function onCurrentChanged() { root.refresh() }
     }
 
     Connections {

@@ -288,9 +288,10 @@ ContentPage {
                 text: Translation.tr("Per-monitor wallpapers")
                 checked: Config.options?.background?.multiMonitor?.enable ?? false
                 onCheckedChanged: {
+                    if (checked === (Config.options?.background?.multiMonitor?.enable ?? false)) return
                     Config.setNestedValue("background.multiMonitor.enable", checked)
                     if (!checked) {
-                        const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                        const globalPath = Wallpapers.currentMainWallpaperPath()
                         if (globalPath) {
                             Wallpapers.apply(globalPath, Appearance.m3colors.darkmode)
                         }
@@ -1039,7 +1040,7 @@ ContentPage {
                                     onClicked: {
                                         const mon = bgMultiMonPanel.selectedMonitor
                                         if (!mon) return
-                                        const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                                        const globalPath = Wallpapers.currentMainWallpaperPath()
                                         if (globalPath) {
                                             Wallpapers.select(globalPath, Appearance.m3colors.darkmode, mon)
                                         }
@@ -1054,7 +1055,7 @@ ContentPage {
                                     materialIcon: "select_all"
                                     mainText: Translation.tr("Apply to all")
                                     onClicked: {
-                                        const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                                        const globalPath = Wallpapers.currentMainWallpaperPath()
                                         if (globalPath) {
                                             Wallpapers.apply(globalPath, Appearance.m3colors.darkmode)
                                         }
@@ -1080,7 +1081,7 @@ ContentPage {
 
                             // Derive theme colors from backdrop
                             ConfigSwitch {
-                                visible: Config.options?.background?.backdrop?.enable ?? true
+                                visible: !Wallpapers.skwdBackendEnabled && (Config.options?.background?.backdrop?.enable ?? true)
                                 buttonIcon: "palette"
                                 text: Translation.tr("Derive theme colors from backdrop")
                                 checked: Config.options?.appearance?.wallpaperTheming?.useBackdropForColors ?? false
@@ -1590,7 +1591,7 @@ ContentPage {
                                     const _monData = WallpaperListener.effectivePerMonitor[_monName]
                                     if (_monData && _monData.path) return _monData.path
                                 }
-                                return Config.options?.background?.wallpaperPath ?? ""
+                                return Wallpapers.currentMainWallpaperPath()
                             }
                             readonly property bool isVideo: WallpaperListener.isVideoPath(wpPath)
                             readonly property string previewPath: isVideo
@@ -2055,6 +2056,7 @@ ContentPage {
 
             ContentSubsection {
                 title: Translation.tr("Backdrop (overview)")
+                visible: !Wallpapers.skwdBackendEnabled
 
                 SettingsSwitch {
                     buttonIcon: "texture"
@@ -2069,7 +2071,7 @@ ContentPage {
                 }
 
                 SettingsSwitch {
-                    visible: Config.options?.background?.backdrop?.enable ?? true
+                    visible: !Wallpapers.skwdBackendEnabled && (Config.options?.background?.backdrop?.enable ?? true)
                     buttonIcon: "palette"
                     text: Translation.tr("Derive theme colors from backdrop")
                     checked: Config.options?.appearance?.wallpaperTheming?.useBackdropForColors ?? false

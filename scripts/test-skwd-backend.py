@@ -44,9 +44,9 @@ ShellRoot {
     SkwdBackend.apply("/fail.png"); root.stage=1
    } else if (root.stage === 1 && SkwdBackend.lastError.includes("(7)")) {
     if (root.successes.length !== 0) { console.error("FAIL failed apply emitted success"); Qt.quit(); return }
-    SkwdBackend.apply("/first.png"); SkwdBackend.apply("/discarded.png"); SkwdBackend.apply("/latest.png"); root.stage=2
+    SkwdBackend.apply("/first.mp4"); SkwdBackend.apply("/discarded.png"); SkwdBackend.apply("/latest.gif"); root.stage=2
    } else if (root.stage === 2 && root.successes.length >= 2 && SkwdBackend.wallpaperPath("eDP-2") === "/external.png") {
-    if (JSON.stringify(root.successes) !== '["/first.png","/latest.png"]') console.error("FAIL queue "+JSON.stringify(root.successes))
+    if (JSON.stringify(root.successes) !== '["/first.mp4","/latest.gif"]') console.error("FAIL queue "+JSON.stringify(root.successes))
     else console.log("PASS state query, failure, latest request queue, watch event")
     Qt.quit()
    }
@@ -58,4 +58,4 @@ ShellRoot {
  print(result.stdout)
  assert 'PASS state query' in result.stdout
  assert 'FAIL' not in result.stdout
- assert (p/'applies').read_text().splitlines()==['/first.png','/latest.png']
+ assert (p/'applies').read_text().splitlines()==['/first.mp4','/latest.gif']

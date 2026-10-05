@@ -16,7 +16,8 @@ import Quickshell.Wayland
 
 Variants {
     id: root
-    model: Quickshell.screens
+    // skwd owns the desktop; do not create a second persistent wallpaper layer.
+    model: Wallpapers.skwdBackendEnabled ? [] : Quickshell.screens
 
     PanelWindow {
         id: backdropWindow
@@ -79,7 +80,7 @@ Variants {
                 const data = WallpaperListener.effectivePerMonitor[monName]
                 if (data && data.path) return data.path
             }
-            return Config.options?.background?.wallpaperPath ?? ""
+            return Wallpapers.currentMainWallpaperPath()
         }
 
         // Per-monitor backdrop path (if multi-monitor enabled and monitor has custom backdrop)

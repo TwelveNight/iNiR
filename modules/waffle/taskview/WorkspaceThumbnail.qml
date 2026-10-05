@@ -105,12 +105,7 @@ Item {
         }
     }
 
-    readonly property string wallpaperPath: {
-        const wBg = Config.options?.waffles?.background ?? {}
-        if (wBg.useMainWallpaper ?? true)
-            return Config.options?.background?.wallpaperPath ?? ""
-        return wBg.wallpaperPath ?? Config.options?.background?.wallpaperPath ?? ""
-    }
+    readonly property string wallpaperPath: Wallpapers.currentMainWallpaperPath(root.workspace?.output ?? "")
 
     readonly property string workspaceName: {
         if (root.isLastEmpty) return Translation.tr("New desktop")
@@ -290,7 +285,7 @@ Item {
                 id: wallpaperSource
                 anchors.fill: parent
                 anchors.margins: 1
-                source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
+                source: Wallpapers.stillUrlFor(root.wallpaperPath)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 visible: false

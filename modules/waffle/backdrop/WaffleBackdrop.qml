@@ -14,7 +14,7 @@ import Quickshell.Wayland
 Variants {
     id: root
     // Only create backdrop windows if enabled
-    model: (Config.options?.waffles?.background?.backdrop?.enable ?? true) ? Quickshell.screens : []
+    model: !Wallpapers.skwdBackendEnabled && (Config.options?.waffles?.background?.backdrop?.enable ?? true) ? Quickshell.screens : []
 
     PanelWindow {
         id: backdropWindow
@@ -41,7 +41,7 @@ Variants {
                 const data = WallpaperListener.effectivePerMonitor[monName]
                 if (data && data.path) return data.path
             }
-            return Config.options?.background?.wallpaperPath ?? ""
+            return Wallpapers.currentMainWallpaperPath()
         }
 
         // Waffle backdrop config

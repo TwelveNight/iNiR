@@ -870,7 +870,7 @@ Scope {
         readonly property bool verticalParallax: bgRoot.parallaxAxis === "vertical"
         
         // Backdrop mode
-        readonly property bool backdropActive: (bgRoot.backgroundOptions.backdrop?.enable ?? false) && (bgRoot.backgroundOptions.backdrop?.hideWallpaper ?? false)
+        readonly property bool backdropActive: !Wallpapers.skwdBackendEnabled && (bgRoot.backgroundOptions.backdrop?.enable ?? false) && (bgRoot.backgroundOptions.backdrop?.hideWallpaper ?? false)
 
         readonly property bool internalShaderTransitionRequested:
             !Wallpapers.skwdBackendEnabled &&

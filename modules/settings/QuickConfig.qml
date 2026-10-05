@@ -824,9 +824,10 @@ ContentPage {
                 text: Translation.tr("Per-monitor wallpapers")
                 checked: Config.options?.background?.multiMonitor?.enable ?? false
                 onCheckedChanged: {
+                    if (checked === (Config.options?.background?.multiMonitor?.enable ?? false)) return
                     Config.setNestedValue("background.multiMonitor.enable", checked)
                     if (!checked) {
-                        const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                        const globalPath = Wallpapers.currentMainWallpaperPath()
                         if (globalPath) {
                             Wallpapers.apply(globalPath, Appearance.m3colors.darkmode)
                         }
@@ -1602,7 +1603,7 @@ ContentPage {
                                     onClicked: {
                                         const mon = multiMonitorPanel.selectedMonitor
                                         if (!mon) return
-                                        const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                                        const globalPath = Wallpapers.currentMainWallpaperPath()
                                         if (globalPath) {
                                             Wallpapers.select(globalPath, Appearance.m3colors.darkmode, mon)
                                         }
@@ -1625,7 +1626,7 @@ ContentPage {
                                     materialIcon: "select_all"
                                     mainText: Translation.tr("Apply to all")
                                     onClicked: {
-                                        const globalPath = Config.options?.background?.wallpaperPath ?? ""
+                                        const globalPath = Wallpapers.currentMainWallpaperPath()
                                         if (globalPath) {
                                             Wallpapers.apply(globalPath, Appearance.m3colors.darkmode)
                                         }
@@ -1653,7 +1654,7 @@ ContentPage {
 
                             // Derive theme colors from backdrop
                             ConfigSwitch {
-                                visible: multiMonitorPanel.backdropEnabled
+                                visible: !Wallpapers.skwdBackendEnabled && (multiMonitorPanel.backdropEnabled)
                                 buttonIcon: "palette"
                                 text: Translation.tr("Derive theme colors from backdrop")
                                 checked: Config.options?.appearance?.wallpaperTheming?.useBackdropForColors ?? false

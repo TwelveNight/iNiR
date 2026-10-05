@@ -50,7 +50,7 @@ MouseArea {
     
     // Wallpaper path resolution
     readonly property string _wallpaperSource: Wallpapers.currentMainWallpaperPath()
-    readonly property string _wallpaperThumbnail: Config.options?.background?.thumbnailPath ?? ""
+    readonly property string _wallpaperThumbnail: Wallpapers.stillUrlFor(_wallpaperSource)
     readonly property bool wallpaperIsVideo: {
         const lp = _wallpaperSource.toLowerCase();
         return lp.endsWith(".mp4") || lp.endsWith(".webm") || lp.endsWith(".mkv") || lp.endsWith(".avi") || lp.endsWith(".mov");
@@ -59,7 +59,7 @@ MouseArea {
     // Static image source: use raw path for normal wallpapers, thumbnail for video/gif
     readonly property string _staticWallpaperPath: {
         if (!_wallpaperSource) return "";
-        if (wallpaperIsVideo || wallpaperIsGif) return _wallpaperThumbnail || _wallpaperSource;
+        if (wallpaperIsVideo || wallpaperIsGif) return _wallpaperThumbnail;
         return _wallpaperSource;
     }
     

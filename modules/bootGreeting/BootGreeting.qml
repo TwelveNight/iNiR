@@ -30,16 +30,9 @@ Scope {
     }
 
     // Wallpaper
-    readonly property string wallpaperPath: Config.options?.background?.wallpaperPath ?? ""
+    readonly property string wallpaperPath: Wallpapers.currentMainWallpaperPath()
     readonly property bool wallpaperIsVideo: WallpaperListener.isVideoPath(wallpaperPath)
-    readonly property string wallpaperPreviewPath: {
-        if (!wallpaperIsVideo)
-            return wallpaperPath
-        const cachedFrame = Wallpapers.getVideoFirstFramePath(wallpaperPath)
-        if (cachedFrame.length > 0)
-            return cachedFrame
-        return Config.options?.background?.thumbnailPath ?? ""
-    }
+    readonly property string wallpaperPreviewPath: Wallpapers.stillUrlFor(wallpaperPath)
 
     Component.onCompleted: {
         if (wallpaperIsVideo)

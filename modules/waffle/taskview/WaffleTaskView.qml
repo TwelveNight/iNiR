@@ -45,13 +45,7 @@ Scope {
             Image {
                 id: wallpaperSource
                 anchors.fill: parent
-                source: {
-                    const wBg = Config.options?.waffles?.background ?? {}
-                    const path = (wBg.useMainWallpaper ?? true)
-                        ? Config.options?.background?.wallpaperPath ?? ""
-                        : wBg.wallpaperPath ?? Config.options?.background?.wallpaperPath ?? ""
-                    return path ? "file://" + path : ""
-                }
+                source: WallpaperListener.wallpaperUrlForScreen(panelWindow.screen)
                 fillMode: Image.PreserveAspectCrop
                 visible: false
             }

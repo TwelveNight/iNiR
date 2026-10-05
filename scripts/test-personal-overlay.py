@@ -280,6 +280,12 @@ uninstall_handle_quickshell_shared
         subprocess.run(["bash", str(script), "--image", path], env=self.env, check=True, capture_output=True)
         self.assertEqual((self.base / "apply.log").read_text().splitlines(), ["apply", path])
         self.assertEqual(json.loads(config.read_text())["background"]["wallpaperPath"], path)
+        data = json.loads(config.read_text())
+        data["appearance"] = {"theme": "custom", "palette": {"accentColor": "#abcdef"}}
+        config.write_text(json.dumps(data))
+        for path in ["/static.png", "/animated.mp4", "/animated.gif"]:
+            subprocess.run(["bash", str(script), "--image", path], env=self.env, check=True, capture_output=True)
+            self.assertEqual((self.base / "apply.log").read_text().splitlines(), ["apply", path])
 
     def test_python_installer_never_recreates_ii_environment(self):
         shared = self.state / "quickshell/.venv"

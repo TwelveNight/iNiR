@@ -1,6 +1,6 @@
 .pragma library
 
-// skwd-walld owns the desktop. A Shell config is only a fallback before its first reply.
+// skwd-walld owns the desktop; no private Shell path substitutes for its reply.
 function outputs(value) {
     if (!value || !value.outputs) return [];
     if (Array.isArray(value.outputs)) return value.outputs.filter(o => o && o.connected !== false);
@@ -20,7 +20,7 @@ function wallpaperPath(value, monitor, cacheHome) {
         return output.thumbnailPath || output.thumb || (output.we_id
             ? cacheHome + "/skwd-wall-v2/we-thumbs/" + output.we_id + ".webp" : "");
     }
-    return String(output.path || "");
+    return String(output.path || output.current || "");
 }
 
 function applyCommand(path, monitor) {

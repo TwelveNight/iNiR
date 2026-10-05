@@ -160,7 +160,7 @@ Variants {
         }
 
         // Hide wallpaper (show only backdrop for overview)
-        readonly property bool backdropOnly: (wBg.backdrop?.enable ?? false) && (wBg.backdrop?.hideWallpaper ?? false)
+        readonly property bool backdropOnly: !Wallpapers.skwdBackendEnabled && (wBg.backdrop?.enable ?? false) && (wBg.backdrop?.hideWallpaper ?? false)
 
         visible: !backdropOnly && (GlobalStates.screenLocked
             || !hasFullscreenWindow || !(wBg.hideWhenFullscreen ?? true))

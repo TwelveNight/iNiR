@@ -68,8 +68,8 @@ Item {
         ? (orbitOptions.showWorkspaceNumbers ?? true)
         : (overviewOptions.showWorkspaceNumbers ?? true)
 
-    readonly property string wallpaperPathRaw: Config.options?.background?.wallpaperPath ?? ""
-    readonly property string wallpaperThumbnailPath: Config.options?.background?.thumbnailPath ?? wallpaperPathRaw
+    readonly property string wallpaperPathRaw: Wallpapers.currentMainWallpaperPath(root.outputName)
+    readonly property string wallpaperThumbnailPath: Wallpapers.stillUrlFor(wallpaperPathRaw)
 
     readonly property int workspacesShown: root.overviewRows * root.overviewColumns
     readonly property string outputName: panelWindow?.screen?.name ?? ""

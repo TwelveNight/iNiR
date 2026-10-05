@@ -24,7 +24,7 @@ Rectangle {
 
     StyledImage {
         anchors.fill: parent
-        source: Config.options?.background?.wallpaperPath ?? ""
+        source: Wallpapers.stillUrlFor(Wallpapers.currentMainWallpaperPath())
         fillMode: Image.PreserveAspectCrop
 
         Rectangle {

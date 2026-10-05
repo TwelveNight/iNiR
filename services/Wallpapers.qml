@@ -133,9 +133,9 @@ Singleton {
 
     // Wallpaper path resolution for aurora/backdrop
     readonly property bool isWaffleFamily: (Config.options?.panelFamily ?? "ii") === "waffle"
-    readonly property bool useBackdropWallpaper: isWaffleFamily
+    readonly property bool useBackdropWallpaper: !root.skwdBackendEnabled && (isWaffleFamily
         ? ((Config.options?.waffles?.background?.backdrop?.enable ?? false) && (Config.options?.waffles?.background?.backdrop?.hideWallpaper ?? false))
-        : ((Config.options?.background?.backdrop?.enable ?? false) && (Config.options?.background?.backdrop?.hideWallpaper ?? false))
+        : ((Config.options?.background?.backdrop?.enable ?? false) && (Config.options?.background?.backdrop?.hideWallpaper ?? false)))
     readonly property bool backdropOnlyShadowOverrideWanted: Config.ready && CompositorService.isNiri && useBackdropWallpaper
     property bool _backdropShadowSyncQueued: false
 
@@ -204,6 +204,7 @@ Singleton {
     readonly property bool useBackdropForColors: Config.options?.appearance?.wallpaperTheming?.useBackdropForColors ?? false
 
     function currentThemingWallpaperPath(monitorName = ""): string {
+        if (root.skwdBackendEnabled) return root.currentMainWallpaperPath(monitorName)
         const targetMonitor = monitorName || (WallpaperListener.multiMonitorEnabled ? WallpaperListener.getFocusedMonitor() : "")
         const mainPath = currentMainWallpaperPath(targetMonitor)
         const waffleMainPath = currentWaffleWallpaperPath(targetMonitor)
@@ -620,7 +621,10 @@ Singleton {
     }
 
     function currentMainWallpaperPath(monitorName = ""): string {
-        const targetMonitor = monitorName || (WallpaperListener.multiMonitorEnabled ? WallpaperListener.getFocusedMonitor() : "")
+        const targetMonitor = monitorName || WallpaperListener.getFocusedMonitor()
+        // Read the last successful daemon reply even during a reconnect. A
+        // private config path is never evidence of what skwd currently displays.
+        if (root.skwdBackendEnabled) return SkwdBackend.wallpaperPath(targetMonitor)
         if (SkwdBackend.available) return SkwdBackend.wallpaperPath(targetMonitor)
         if (WallpaperListener.multiMonitorEnabled && targetMonitor) {
             const data = WallpaperListener.effectivePerMonitor[targetMonitor] ?? null
@@ -654,6 +658,7 @@ Singleton {
     function currentWallpaperPathForTarget(target = "main", monitorName = ""): string {
         const normalizedTarget = target && target.length > 0 ? target : "main"
         const mainPath = currentMainWallpaperPath(monitorName)
+        if (root.skwdBackendEnabled) return mainPath
 
         switch (normalizedTarget) {
         case "backdrop": {
@@ -946,7 +951,7 @@ Singleton {
             }
             newArray.push({
                 monitor: monitorName,
-                path: Config.options?.background?.wallpaperPath ?? "",
+                path: root.currentMainWallpaperPath(monitorName),
                 workspaceFirst: wsFirst,
                 workspaceLast: wsLast,
                 backdropPath: backdropPath
@@ -992,6 +997,7 @@ Singleton {
     }
 
     function currentSelectionTarget(): string {
+        if (root.skwdBackendEnabled) return "main"
         const configTarget = Config.options?.wallpaperSelector?.selectionTarget ?? "main"
         if (configTarget && configTarget !== "main")
             return configTarget
@@ -1012,7 +1018,7 @@ Singleton {
     }
 
     function randomFromCurrentFolder(darkMode = Appearance.m3colors.darkmode, monitorName = "", target = "") {
-        const currentPath = Config.options?.background?.wallpaperPath ?? ""
+        const currentPath = root.currentMainWallpaperPath()
         const files = []
         for (let i = 0; i < folderModel.count; ++i) {
             if (folderModel.get(i, "fileIsDir")) continue
@@ -1305,7 +1311,7 @@ Singleton {
     readonly property string shuffleFolder: {
         const own = FileUtils.trimFileProtocol(root.autoWallpaperFolder).replace(/^~(?=\/|$)/, Directories.homePath)
         if (own.length > 0) return own
-        const current = FileUtils.trimFileProtocol(Config.options?.background?.wallpaperPath ?? "")
+        const current = FileUtils.trimFileProtocol(root.currentMainWallpaperPath())
         return current.length > 0 ? FileUtils.parentDirectory(current) : root.effectiveDirectory
     }
 
@@ -1344,7 +1350,7 @@ Singleton {
 
     function _pickShuffleFile(): string {
         if (shuffleModel.count === 0) return ""
-        const currentPath = Config.options?.background?.wallpaperPath ?? ""
+        const currentPath = root.currentMainWallpaperPath()
         let attempts = 0
         let filePath
         do {
