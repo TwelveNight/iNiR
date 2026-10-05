@@ -149,11 +149,17 @@ Singleton {
         // must keep the flag so the poll timer can retry.
         root._forceApply = false
 
+        // Auto palettes own colors only. Transparency belongs to the local
+        // preset; reset it when leaving a transparent preset for auto.
+        if (root.isAutoTheme)
+            Appearance.m3colors.transparent = false
+
         _log("[MaterialThemeLoader] Applying", Object.keys(json).length, "color keys, bg:", json.background, "primary:", json.primary)
         for (const key in json) {
             if (json.hasOwnProperty(key)) {
+                if (key === "transparent") continue
                 const camelCaseKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase())
-                const noPrefix = camelCaseKey.startsWith("term") || camelCaseKey === "darkmode" || camelCaseKey === "transparent"
+                const noPrefix = camelCaseKey.startsWith("term") || camelCaseKey === "darkmode"
                 const m3Key = noPrefix ? camelCaseKey : `m3${camelCaseKey}`
                 if (Appearance.m3colors[m3Key] === undefined)
                     continue

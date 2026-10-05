@@ -1,4 +1,4 @@
-> **Night personal overlay:** use `./setup install` or `./setup install -y` in this checkout. Both automatically run the personal preflight, backup and GDM/session setup. `./setup install --check` checks prerequisites without installing. See [PERSONAL_OVERLAY.md](PERSONAL_OVERLAY.md). Cloning `snowarch/inir` again fetches upstream, not these local customizations.
+> **Night personal overlay:** use `./setup install` or `./setup install -y` in this checkout. Install, reinstall and the TUI install actions run the personal preflight, backup and GDM/session setup. `./setup install --check` checks prerequisites without installing. Shell styles and task data stay private; colors, skwd-wall, compatible notification history, clipboard and common keyring data are shared. See [PERSONAL_OVERLAY.md](PERSONAL_OVERLAY.md). Cloning `snowarch/inir` again fetches upstream, not these local customizations.
 
 <p align="center">
   <img src="docs/images/iris-2.32-principal.webp" alt="iNiR iRiS desktop" width="900">

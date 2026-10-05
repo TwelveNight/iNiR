@@ -35,7 +35,7 @@ Singleton {
     readonly property string gtkFontString: `${mainFont} ${fontSize}`
 
     // Enable/disable sync (user preference)
-    readonly property bool syncEnabled: Config.options?.appearance?.typography?.syncWithSystem ?? true
+    readonly property bool syncEnabled: Config.options?.appearance?.typography?.syncWithSystem ?? false
 
     // Debounce timer to avoid rapid updates
     property bool _pendingSync: false

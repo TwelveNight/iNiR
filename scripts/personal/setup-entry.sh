@@ -8,7 +8,7 @@ inir_personal_install_entry() {
     for arg in "$@"; do
         case "$arg" in
             -h|--help) return 0 ;;
-            install)
+            install|reinstall)
                 [[ -z "$command" ]] || return 0
                 command=install
                 ;;

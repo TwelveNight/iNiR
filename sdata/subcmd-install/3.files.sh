@@ -39,22 +39,9 @@ if [[ ! -f "${INIR_STATE_DIR}/user/todo.json" ]]; then
   echo "[]" > "${INIR_STATE_DIR}/user/todo.json" 2>/dev/null || true
 fi
 
-# Notifications persistence setup
-OLD_NOTIF_PATH="${XDG_CACHE_HOME}/inir/notifications/notifications.json"
-NEW_NOTIF_PATH="${INIR_STATE_DIR}/user/notifications.json"
-
-# Migrate from old cache location if exists
-if [[ -f "$OLD_NOTIF_PATH" && ! -f "$NEW_NOTIF_PATH" ]]; then
-  tui_info "Migrating notifications to persistent storage..."
-  mv "$OLD_NOTIF_PATH" "$NEW_NOTIF_PATH"
-  rmdir "${XDG_CACHE_HOME}/inir/notifications" 2>/dev/null || true
-  log_success "Notifications migrated to state directory"
-fi
-
-# Create empty notifications file if it doesn't exist (fresh install)
-if [[ ! -f "$NEW_NOTIF_PATH" ]]; then
-  echo "[]" > "$NEW_NOTIF_PATH"
-fi
+# Notification history is shared with II in its native cache location.
+# Runtime creates it on first use. Never migrate or seed over shared history.
+v mkdir -p "${XDG_CACHE_HOME}/quickshell/notifications"
 
 #####################################################################################
 # Determine first run

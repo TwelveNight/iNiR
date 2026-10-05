@@ -83,7 +83,8 @@ Singleton {
     property string notepadPath: `${Directories.stateUserPath}/notepad.txt`
     property string notesPath: `${Directories.stateUserPath}/notes.txt`
     property string conflictCachePath: `${Directories.cachePath}/conflict-killer`
-    property string notificationsPath: `${Directories.stateUserPath}/notifications.json`
+    // Both shells serialize the same notification-history fields.
+    property string notificationsPath: `${Quickshell.env("XDG_CACHE_HOME") || (homePath + "/.cache")}/quickshell/notifications/notifications.json`
     property string calendarSyncCachePath: `${Directories.stateUserPath}/calendar-sync-cache.json`
     property string weatherCachePath: `${Directories.stateUserPath}/weather-cache.json`
     property string generatedMaterialThemePath: `${Directories.sharedGeneratedPath}/colors.json`

@@ -1738,6 +1738,13 @@ show_update_completion() {
 # Install
 ###############################################################################
 run_install() {
+    # TUI install/reinstall must use the same preflight and backup as the CLI.
+    if [[ "${INIR_PERSONAL_INSTALL_STAGE:-}" != files ]]; then
+        local -a personal_options=()
+        $ask || personal_options+=(-y)
+        ${quiet:-false} && personal_options+=(--quiet)
+        exec "$REPO_ROOT/scripts/personal/install.sh" "${personal_options[@]}"
+    fi
     detect_distro
     # Filled by the install steps with what only a fresh login or a reboot applies.
     INIR_REBOOT_REASONS=()
@@ -2650,7 +2657,7 @@ run_update() {
     extras_refresh_mascot_pack_on_update
 
     # Update Vesktop themes (themes live outside quickshell/ii tree)
-    if [[ -d "${REPO_ROOT}/dots/.config/vesktop/themes" ]]; then
+    if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true && -d "${REPO_ROOT}/dots/.config/vesktop/themes" ]]; then
         echo ""
         tui_info "Updating Vesktop themes..."
 

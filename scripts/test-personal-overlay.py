@@ -366,20 +366,20 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.assertEqual((self.base / "setup.log").read_text().splitlines(),
                          ["install", "--skip-deps", "--skip-setups", "--quiet"])
 
-    def test_cliphist_wipe_preserves_ii_database(self):
-        shared = self.base / "II-clipboard.db"
-        config = self.base / "cliphist-config"
-        subprocess.run(["cliphist", "-config-path", str(config), "-db-path", str(shared), "store"],
-                       input="II clipboard sentinel", text=True, check=True, env=self.env)
+    def test_cliphist_shares_the_native_database(self):
+        # Both commands use only temporary XDG roots; never the live clipboard.
+        subprocess.run(["cliphist", "store"], input="II clipboard sentinel", text=True,
+                       check=True, env=self.env)
         wrapper = str(ROOT / "scripts/cliphist-inir.sh")
-        subprocess.run([wrapper, "store"], input="iNiR private clipboard", text=True, env=self.env, check=True)
+        subprocess.run([wrapper, "store"], input="iNiR clipboard sentinel", text=True,
+                       env=self.env, check=True)
         result = subprocess.check_output([wrapper, "list"], text=True, env=self.env)
-        self.assertIn("iNiR private clipboard", result)
-        self.assertNotIn("II clipboard sentinel", result)
+        self.assertIn("iNiR clipboard sentinel", result)
+        self.assertIn("II clipboard sentinel", result)
+        self.assertEqual(result, subprocess.check_output(["cliphist", "list"], text=True, env=self.env))
         subprocess.run([wrapper, "wipe"], env=self.env, check=True)
-        shared_result = subprocess.check_output(["cliphist", "-config-path", str(config), "-db-path", str(shared), "list"],
-                                                text=True, env=self.env)
-        self.assertIn("II clipboard sentinel", shared_result)
+        self.assertEqual(subprocess.check_output(["cliphist", "list"], text=True, env=self.env), "")
+        self.assertFalse((self.state / "inir/cliphist").exists())
 
     def test_session_paths_are_concrete_and_niri_config_valid(self):
         import importlib.util
@@ -439,13 +439,52 @@ cleanup_orphans
         self.env["MOCK_SETUP_LOG"] = str(log)
         for options, expected in [(["install"], []), (["install", "-y"], ["-y"]),
                                   (["-y", "install", "-q"], ["-y", "-q"]),
-                                  (["install", "--check"], ["--check"])]:
+                                  (["install", "--check"], ["--check"]),
+                                  (["reinstall", "-y"], ["-y"]),
+                                  (["reinstall", "--check"], ["--check"])]:
             subprocess.run(["bash", str(entry), *options], env=self.env, check=True, capture_output=True)
             self.assertEqual(log.read_text().strip().splitlines(), expected)
         log.unlink()
         self.env["INIR_PERSONAL_INSTALL_STAGE"] = "files"
         self.bash(f'source "{personal}/setup-entry.sh" install --skip-deps --skip-setups')
         self.assertFalse(log.exists(), "internal files stage must not recurse into wrapper")
+
+    def test_menu_install_cannot_bypass_personal_wrapper(self):
+        source = (ROOT / "setup").read_text()
+        body = source[source.index("run_install() {"):source.index("    detect_distro", source.index("run_install() {"))]
+        fixture = self.base / "menu"
+        personal = fixture / "scripts/personal"
+        personal.mkdir(parents=True)
+        wrapper = personal / "install.sh"
+        wrapper.write_text('#!/bin/sh\nprintf "wrapper: %s\\n" "$*"\n')
+        wrapper.chmod(0o755)
+        self.env["REPO_ROOT"] = str(fixture)
+        self.assertEqual(self.bash(body + "\n}\nask=false; quiet=true; run_install").strip(), "wrapper: -y --quiet")
+
+    def test_legacy_cleanup_keeps_ii_service(self):
+        source = (ROOT / "sdata/subcmd-install/2.setups.sh").read_text()
+        body = source[source.index("function disable_super_daemon_if_present(){"):].split("\n}", 1)[0] + "\n}"
+        self.env["HOME"] = str(self.base)
+        unit = self.config / "systemd/user/ii-super-overview.service"
+        unit.parent.mkdir(parents=True)
+        unit.write_text("II service")
+        daemon = self.base / ".local/bin/ii_super_overview_daemon.py"
+        daemon.parent.mkdir(parents=True)
+        daemon.write_text("II daemon")
+        self.bash(body + "\ndisable_super_daemon_if_present")
+        self.assertEqual(unit.read_text(), "II service")
+        self.assertEqual(daemon.read_text(), "II daemon")
+
+    def test_update_preserves_existing_vesktop_theme(self):
+        source = (ROOT / "setup").read_text()
+        block = source.split("    # Update Vesktop themes", 1)[1].split("    # Migrations", 1)[0]
+        block = block[block.index("    if "):]
+        theme = self.config / "vesktop/themes/ii-system24.theme.css"
+        theme.parent.mkdir(parents=True)
+        theme.write_text("personal theme")
+        self.env.pop("INIR_INSTALL_SHARED_APP_CONFIGS", None)
+        self.bash(block)
+        self.assertEqual(theme.read_text(), "personal theme")
 
     def test_gamemode_command_handles_spaces(self):
         # QML string syntax is JSON-compatible for this command.

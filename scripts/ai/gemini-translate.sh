@@ -32,7 +32,7 @@ notify_error() {
 mkdir -p "$TRANSLATIONS_TARGET_DIR"
 
 # Get API key
-API_KEY=$(secret-tool lookup 'application' 'inir' 2>/dev/null | jq -r '.apiKeys.gemini // empty')
+API_KEY=$(secret-tool lookup 'application' 'illogical-impulse' 2>/dev/null | jq -r '.apiKeys.gemini // empty')
 if [[ -z "$API_KEY" || "$API_KEY" == "null" ]]; then
     notify_error "Gemini API key not set. Type /key on the AI sidebar to configure."
 fi

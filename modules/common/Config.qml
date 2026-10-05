@@ -1147,7 +1147,7 @@ Singleton {
                     property string titleFont: "Gabarito"
                     property string monospaceFont: "JetBrainsMono Nerd Font"
                     property real sizeScale: 1.0
-                    property bool syncWithSystem: true // Sync fonts with GTK/KDE apps
+                    property bool syncWithSystem: false // Explicit opt-in: GTK/KDE fonts are shared across sessions
                     property JsonObject variableAxes: JsonObject {
                         property int wght: 300
                         property int wdth: 105

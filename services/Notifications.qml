@@ -25,6 +25,10 @@ Singleton {
     }
 
     property bool _initialized: false
+    property bool _historyLoaded: false
+    property bool _historyWritable: false
+    property var _pendingNotifications: []
+    property int _missingAttempts: 0
     // Guard against re-entrant discardNotification calls (server dismiss → onNotificationChanged → discard again)
     property var _discardingIds: new Set()
 
@@ -421,67 +425,78 @@ Singleton {
         keepOnReload: false
         persistenceSupported: true
 
-        onNotification: (notification) => {
-            // Niri's screenshot-window IPC always emits a desktop notification, even
-            // when iNiR only asked it for an internal preview cache frame. Match the
-            // stable message signature rather than appName (which differs across
-            // packaging/desktop integration), and suppress it only during an internal
-            // preview capture so real user screenshots keep their notification.
-            const summaryLower = String(notification.summary ?? "").toLowerCase()
-            const bodyLower = String(notification.body ?? "").toLowerCase()
-            const niriScreenshotNotice = summaryLower.includes("screenshot captured")
-                && bodyLower.includes("paste the image from the clipboard")
-            if (GlobalStates.windowPreviewCaptureActive && niriScreenshotNotice)
-                return
+        onNotification: notification => root.receiveNotification(notification)
+    }
 
-            // User app filters are an ingress policy: blocked notifications never
-            // enter history, unread state, sound playback or popup presentation.
-            if (root._notificationBlocked(notification))
-                return
+    function receiveNotification(notification) {
+        // Niri's screenshot-window IPC always emits a desktop notification, even
+        // when iNiR only asked it for an internal preview cache frame. Match the
+        // stable message signature rather than appName (which differs across
+        // packaging/desktop integration), and suppress it only during an internal
+        // preview capture so real user screenshots keep their notification.
+        const summaryLower = String(notification.summary ?? "").toLowerCase()
+        const bodyLower = String(notification.body ?? "").toLowerCase()
+        const niriScreenshotNotice = summaryLower.includes("screenshot captured")
+            && bodyLower.includes("paste the image from the clipboard")
+        if (GlobalStates.windowPreviewCaptureActive && niriScreenshotNotice)
+            return
 
-            if (!_ingressAllowed(notification)) {
-                return;
-            }
+        // User app filters are an ingress policy: blocked notifications never
+        // enter history, unread state, sound playback or popup presentation.
+        if (root._notificationBlocked(notification))
+            return
 
-            notification.tracked = true
-            const newNotifObject = notifComponent.createObject(root, {
-                "notificationId": notification.id + root.idOffset,
-                "notification": notification,
-                "time": Date.now(),
-            });
-            if (!newNotifObject) {
-                console.warn("[Notifications] Failed to create notification wrapper")
-                return
-            }
-            root.list = [...root.list, newNotifObject];
-
-            // Optional notification sound
-            if ((Config.options?.sounds?.notifications ?? true) && !root.silent) {
-                Audio.playEvent(notification.urgency === NotificationUrgency.Critical
-                    ? "notificationCritical" : "notification");
-            }
-
-            // Popup
-            if (!root.popupInhibited) {
-                newNotifObject.popup = true;
-
-                const timeout = _timeoutForNotification(notification);
-                if (timeout !== 0) {
-                    newNotifObject.timer = notifTimerComponent.createObject(root, {
-                        "notificationId": newNotifObject.notificationId,
-                        "interval": timeout,
-                    });
-                }
-
-                // Legacy mode: increment manual counter
-                if (Config.options?.notifications?.useLegacyCounter ?? false) {
-                    root._manualUnreadCounter++;
-                }
-            }
-            root.notify(newNotifObject);
-            // console.log(notifToString(newNotifObject));
-            notifFileView.setText(stringifyList(root.list));
+        if (!_ingressAllowed(notification)) {
+            return;
         }
+
+        notification.tracked = true
+        if (!root._historyLoaded) {
+            root._pendingNotifications.push(notification);
+            root.ensureInitialized();
+            return;
+        }
+        root._addNotification(notification);
+    }
+
+    function _addNotification(notification) {
+        const newNotifObject = notifComponent.createObject(root, {
+            "notificationId": notification.id + root.idOffset,
+            "notification": notification,
+            "time": Date.now(),
+        });
+        if (!newNotifObject) {
+            console.warn("[Notifications] Failed to create notification wrapper")
+            return
+        }
+        root.list = [...root.list, newNotifObject];
+
+        // Optional notification sound
+        if ((Config.options?.sounds?.notifications ?? true) && !root.silent) {
+            Audio.playEvent(notification.urgency === NotificationUrgency.Critical
+                ? "notificationCritical" : "notification");
+        }
+
+        // Popup
+        if (!root.popupInhibited) {
+            newNotifObject.popup = true;
+
+            const timeout = _timeoutForNotification(notification);
+            if (timeout !== 0) {
+                newNotifObject.timer = notifTimerComponent.createObject(root, {
+                    "notificationId": newNotifObject.notificationId,
+                    "interval": timeout,
+                });
+            }
+
+            // Legacy mode: increment manual counter
+            if (Config.options?.notifications?.useLegacyCounter ?? false) {
+                root._manualUnreadCounter++;
+            }
+        }
+        root.notify(newNotifObject);
+        // console.log(notifToString(newNotifObject));
+        root.saveHistory();
     }
 
     function markAllRead() {
@@ -515,7 +530,7 @@ Singleton {
                 notif.timer = null;
             }
             root.list.splice(index, 1);
-            notifFileView.setText(stringifyList(root.list));
+            root.saveHistory();
             triggerListChange();
             // Destroy the Notif QML object to prevent memory leak
             notif.destroy();
@@ -543,7 +558,7 @@ Singleton {
         }
         root.list = root.list.filter(notif => notif.appName !== appName)
         triggerListChange();
-        notifFileView.setText(stringifyList(root.list));
+        root.saveHistory();
         for (const notif of doomed) {
             const id = notif.notificationId
             root._discardingIds.add(id);
@@ -568,7 +583,7 @@ Singleton {
         }
         root.list = []
         triggerListChange()
-        notifFileView.setText(stringifyList(root.list));
+        root.saveHistory();
         notifServer.trackedNotifications.values.forEach((notif) => {
             notif.dismiss()
         })
@@ -745,51 +760,88 @@ Singleton {
         }
     }
 
+    // Sharing is limited to the native history schema. Never rewrite an
+    // unread/malformed file with an empty list or a partial set of fields.
+    function parseHistory(text) {
+        const parsed = JSON.parse(text);
+        const fields = ["notificationId", "actions", "appIcon", "appName", "body",
+                        "image", "summary", "time", "urgency"];
+        if (!Array.isArray(parsed) || !parsed.every(n => n &&
+            Object.keys(n).every(k => fields.includes(k)) &&
+            Number.isInteger(n.notificationId) && Number.isFinite(n.time) &&
+            Array.isArray(n.actions) &&
+            ["appIcon", "appName", "body", "image", "summary", "urgency"].every(k => typeof n[k] === "string")))
+            throw new Error("Incompatible notification history");
+        return parsed;
+    }
+
+    function saveHistory() {
+        if (root._historyWritable)
+            notifFileView.setText(stringifyList(root.list));
+    }
+
+    function finishHistory(items, writable = true) {
+        if (root._historyLoaded) return;
+        root.list = items.map(notif => notifComponent.createObject(root, {
+            notificationId: notif.notificationId,
+            actions: [], // Actions from a previous session have no live sender.
+            appIcon: notif.appIcon, appName: notif.appName, body: notif.body,
+            image: notif.image, summary: notif.summary, time: notif.time,
+            urgency: notif.urgency
+        })).filter(notif => notif !== null);
+        root.idOffset = items.reduce((id, n) => Math.max(id, n.notificationId), 0);
+        root._historyLoaded = true;
+        root._historyWritable = writable;
+        const pending = root._pendingNotifications;
+        root._pendingNotifications = [];
+        for (const notification of pending) {
+            if (notification) root._addNotification(notification);
+        }
+        root.initDone();
+    }
+
     Component.onCompleted: {
-        // Lazy: load persistent notifications only when a UI needs them.
-        // Initialize silent from config
-        silent = Config.options?.notifications?.silent ?? false
+        silent = Config.options?.notifications?.silent ?? false;
+        root.ensureInitialized();
     }
 
     FileView {
         id: notifFileView
         path: Qt.resolvedUrl(filePath)
+        atomicWrites: true
         onLoaded: {
-            const fileContents = notifFileView.text()
-            root.list = JSON.parse(fileContents).map((notif) => {
-                return notifComponent.createObject(root, {
-                    "notificationId": notif.notificationId,
-                    "actions": [], // Notification actions are meaningless if they're not tracked by the server or the sender is dead
-                    "appIcon": notif.appIcon,
-                    "appName": notif.appName,
-                    "body": notif.body,
-                    "image": notif.image,
-                    "summary": notif.summary,
-                    "time": notif.time,
-                    "urgency": notif.urgency,
-                });
-            }).filter(notif => notif !== null);
-            // Find largest notificationId
-            let maxId = 0
-            root.list.forEach((notif) => {
-                maxId = Math.max(maxId, notif.notificationId)
-            })
-
-            _log("[Notifications] File loaded")
-            root.idOffset = maxId
-            root.initDone()
-        }
-        onLoadFailed: (error) => {
-            if(error == FileViewError.FileNotFound) {
-                console.log("[Notifications] File not found, creating new file.")
-                // Ensure parent directory exists
-                const parentDir = root.filePath.substring(0, root.filePath.lastIndexOf('/'))
-                Quickshell.execDetached(["/usr/bin/mkdir", "-p", parentDir])
-                root.list = []
-                notifFileView.setText(stringifyList(root.list));
-            } else {
-                console.log("[Notifications] Error loading file: " + error)
+            if (root._historyLoaded) return;
+            try {
+                root.finishHistory(root.parseHistory(notifFileView.text()));
+            } catch (e) {
+                console.warn("[Notifications] Shared history unreadable or incompatible; writes disabled.");
+                root.finishHistory([], false);
             }
+        }
+        onLoadFailed: error => {
+            if (root._historyLoaded) return;
+            if (error === FileViewError.FileNotFound) {
+                // Retry transient gaps without seeding over another shell's file.
+                if (++root._missingAttempts < 6) missingRetry.restart();
+                else historyDirectory.running = true;
+            } else {
+                console.warn("[Notifications] Shared history unavailable; writes disabled.");
+                root.finishHistory([], false);
+            }
+        }
+    }
+
+    Timer {
+        id: missingRetry
+        interval: 500
+        onTriggered: notifFileView.reload()
+    }
+
+    Process {
+        id: historyDirectory
+        command: ["mkdir", "-p", root.filePath.substring(0, root.filePath.lastIndexOf('/'))]
+        onExited: (code, status) => {
+            if (code === 0) root.finishHistory([]);
         }
     }
 }

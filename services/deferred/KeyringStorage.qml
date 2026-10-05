@@ -20,7 +20,7 @@ Singleton {
     property var keyringData: ({})
     
     property var properties: {
-        "application": "inir",
+        "application": "illogical-impulse",
         "explanation": Translation.tr("For storing API keys and other sensitive information"),
     }
     property var propertiesAsArgs: Object.keys(root.properties).reduce(
@@ -28,9 +28,18 @@ Singleton {
             return arr.concat([key, root.properties[key]]);
         }, []
     )
-    property string keyringLabel: Translation.tr("%1 Safe Storage").arg("inir")
+    property string keyringLabel: Translation.tr("%1 Safe Storage").arg("illogical-impulse")
+
+    property bool _pendingSave: false
+    property bool _validRead: false
 
     function setNestedField(path, value) {
+        // Never replace shared credentials with an unread or damaged snapshot.
+        if (!root.loaded || !path || path.length === 0) {
+            console.warn("[KeyringStorage] Storage not ready; edit was not saved.");
+            root.fetchKeyringData();
+            return;
+        }
         if (!root.keyringData) root.keyringData = {};
         let keys = path;
         let obj = root.keyringData;
@@ -65,10 +74,19 @@ Singleton {
     function fetchKeyringData() {
         // console.log("[KeyringStorage] Fetching keyring data...");
         // console.log("[KeyringStorage] getData command:'" + getData.command.join("' '") + "'");
+        if (getData.running || saveData.running) return;
+        root.loaded = false;
+        root._validRead = false;
         getData.running = true;
     }
 
     function saveKeyringData() {
+        if (!root.loaded) return;
+        if (saveData.running) {
+            root._pendingSave = true;
+            return;
+        }
+        root._pendingSave = false;
         saveData.stdinEnabled = true;
         saveData.running = true;
     }
@@ -86,6 +104,24 @@ Singleton {
                 stdinEnabled = false // End input stream
             }
         }
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0) {
+                root._pendingSave = false;
+                root.loaded = false;
+                console.warn("[KeyringStorage] Save failed; reload before editing again.");
+                return;
+            }
+            if (root._pendingSave)
+                Qt.callLater(root.saveKeyringData);
+        }
+    }
+
+    Component.onCompleted: root.fetchKeyringData()
+
+    Timer {
+        id: retryTimer
+        interval: 3000
+        onTriggered: root.fetchKeyringData()
     }
 
     Process {
@@ -101,27 +137,29 @@ Singleton {
         stdout: StdioCollector {
             id: keyringDataOutputCollector
             onStreamFinished: {
-                const data = keyringDataOutputCollector.text;
-                if (data.length === 0 || !data.startsWith("{")) return;
                 try {
-                    root.keyringData = JSON.parse(data);
-                    // console.log("[KeyringStorage] Keyring data fetched:", JSON.stringify(root.keyringData));
+                    const parsed = JSON.parse(keyringDataOutputCollector.text);
+                    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
+                    root.keyringData = parsed; // Preserve all other consumers' fields.
+                    root._validRead = true;
                 } catch (e) {
-                    console.error("[KeyringStorage] Failed to get keyring data, reinitializing.");
-                    root.keyringData = {};
-                    saveKeyringData()
+                    // Keep existing credentials untouched, including malformed data.
+                    root._validRead = false;
                 }
             }
         }
         onExited: (exitCode, exitStatus) => {
-            // console.log("[KeyringStorage] Keyring data fetch process exited with code:", exitCode);
-            if (exitCode === 1) {
-                console.error("[KeyringStorage] Entry not found, initializing.");
-                root.keyringData = {};
-                saveKeyringData()
-            }
-            if (exitCode !== 2) {
+            if (exitCode === 0 && root._validRead) {
                 root.loaded = true;
+            } else if (exitCode === 1) {
+                // Helper confirmed an unlocked keyring and no matching entry.
+                // Initialize in memory only; create it on an explicit user edit.
+                root.keyringData = {};
+                root.loaded = true;
+            } else {
+                root.loaded = false;
+                if (exitCode === 2) retryTimer.restart();
+                console.warn("[KeyringStorage] Shared storage unavailable; writes disabled.");
             }
         }
     }

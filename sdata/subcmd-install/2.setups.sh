@@ -129,32 +129,8 @@ function setup_super_daemon(){
 }
 
 function disable_super_daemon_if_present(){
-  tui_info "Cleaning up legacy Super-tap daemon..."
-
-  local daemon_dst="${HOME}/.local/bin/ii_super_overview_daemon.py"
-  local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}"
-  local systemd_user_dir="${config_dir}/systemd/user"
-  local service_dst="${systemd_user_dir}/ii-super-overview.service"
-
-  # Best-effort stop/disable user service if we appear to be in a graphical session
-  if [[ -n "${DBUS_SESSION_BUS_ADDRESS}" && -f "${service_dst}" ]]; then
-    systemctl --user disable --now ii-super-overview.service 2>/dev/null || true
-    systemctl --user daemon-reload 2>/dev/null || true
-  elif [[ -f "${service_dst}" ]]; then
-    log_warning "Legacy Super-tap daemon service file detected but user systemd may not be reachable. Disable it later with:"
-    echo "  systemctl --user disable --now ii-super-overview.service"
-  fi
-
-  # Remove service definition and helper script if they exist
-  if [[ -f "${service_dst}" ]]; then
-    rm -f "${service_dst}"
-  fi
-
-  if [[ -f "${daemon_dst}" ]]; then
-    rm -f "${daemon_dst}"
-  fi
-
-  log_success "Legacy Super-tap daemon disabled/removed (if it was installed)"
+  # This unit belongs to II; iNiR must not disable or remove it.
+  return 0
 }
 
 #####################################################################################

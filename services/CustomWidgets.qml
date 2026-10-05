@@ -13,7 +13,7 @@ Singleton {
     // Discovered custom widgets: [{ id, name, icon, qmlPath, dirPath, ... }]
     property list<var> widgets: []
     readonly property bool ready: _scanDone
-    readonly property string widgetsDir: `${Directories.configPath}/inir/widgets`
+    readonly property string widgetsDir: `${Directories.shellConfig}/widgets`
 
     property bool _scanDone: false
 
