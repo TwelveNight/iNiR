@@ -41,6 +41,7 @@ source_config_path_helper
 export INIR_CONFIG_DIR="$(inir_config_dir)"
 export INIR_STATE_DIR="$(inir_state_dir)"
 export INIR_VENV="${INIR_VENV:-${INIR_STATE_DIR}/.venv}"
+inir_validate_private_paths || exit $?
 
 source_niri_session_env_helper() {
     local helper_candidates=(

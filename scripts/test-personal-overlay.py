@@ -308,6 +308,9 @@ install-python-packages
         fixture = self.base / "fixture"
         entry = fixture / "scripts/personal/install.sh"
         entry.parent.mkdir(parents=True)
+        helper = fixture / "scripts/lib/private_paths.py"
+        helper.parent.mkdir(parents=True)
+        helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
         for name in ["install.sh", "preflight.sh", "configure-session.py"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())

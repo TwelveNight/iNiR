@@ -26,19 +26,7 @@ for option in "$@"; do
     [[ "$option" != --check ]] || check_only=true
     [[ "$option" == --check || "$option" == -y || "$option" == --yes || "$option" == --quiet || "$option" == -q ]] || { echo "Unsupported install option: $option" >&2; exit 2; }
 done
-# Refuse inherited overrides that point at II's directories or their contents.
-python3 - "$config_home" "$state_home" "$config_dir" "$state_dir" "$INIR_VENV" <<'PYCHECK'
-from pathlib import Path
-import sys
-raw = list(map(Path, sys.argv[1:]))
-if any(not path.is_absolute() or "\n" in str(path) for path in raw):
-    raise SystemExit("Install paths must be absolute, single-line paths")
-config_home, state_home, *targets = [path.resolve() for path in raw]
-shared = [config_home / "illogical-impulse", config_home / "quickshell/ii", state_home / "quickshell"]
-for target in targets:
-    if any(target == root or target in root.parents or root in target.parents for root in shared):
-        raise SystemExit(f"Refusing private path overlapping II/shared data: {target}")
-PYCHECK
+python3 "$repo/scripts/lib/private_paths.py" --runtime-links
 "$repo/scripts/personal/preflight.sh"
 [[ "$check_only" != true ]] || exit 0
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"

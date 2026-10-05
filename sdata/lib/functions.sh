@@ -147,7 +147,10 @@ cp_file(){
   local src="$1"
   local dst="$2"
 
-  x mkdir -p "$(dirname "$dst")"
+  # Replacing a managed file must not write through an existing target link.
+  [[ ! -L "$dst" ]] || { echo "Refusing symlink file destination: $dst" >&2; return 1; }
+
+  x mkdir -p "$(dirname "$dst")" || return 1
 
   # Avoid failing when source and destination are the same file
   # (e.g. when ~/.config/quickshell/inir points into the repo).
@@ -159,10 +162,10 @@ cp_file(){
     if [[ "$src_real" == "$dst_real" ]]; then
       echo -e "${STY_BLUE}[$0]: cp_file: '$src' and '$dst' are the same file, skipping copy.${STY_RST}"
     else
-      x cp -f "$src" "$dst"
+      x cp -f "$src" "$dst" || return 1
     fi
   else
-    x cp -f "$src" "$dst"
+    x cp -f "$src" "$dst" || return 1
   fi
 
   x mkdir -p "$(dirname "${INSTALLED_LISTFILE}")"
@@ -182,6 +185,7 @@ _runtime_rsync() {
   local -a exclusions
   mapfile -t exclusions <<< "$filters"
   local target="$2"
+  [[ ! -L "$target" ]] || { echo "Refusing symlink directory destination: $target" >&2; return 1; }
   shift 2
   rsync -a "${exclusions[@]}" "$@" "$source_path/" "$target/"
 }

@@ -88,6 +88,7 @@ python3 scripts/test-shared-app-colors.py
 python3 scripts/test-skwd-backend.py
 python3 scripts/test-disabled-wallpaper-backends.py
 python3 scripts/test-runtime-payload.py
+python3 scripts/test-safety-boundaries.py
 niri validate --config defaults/niri/config.kdl
 ```
 
@@ -164,3 +165,13 @@ Niri/iNiR 默认启动同一个 `kitty`，沿用现有 `~/.config/kitty/kitty.co
 SDDM 配色模块和模板后置钩子都要求实际登录管理器为 SDDM；GDM 主机上的遗留 SDDM 文件不会触发它们。安装的通用备份已确认只复制文件，不移动现有应用配置。
 
 上述验证使用合成配置和模拟系统命令。本轮未安装、未修改实际应用配置、未推送；实际 GDM 登录仍需部署后验收。
+
+## 维护和小组件安全复审
+
+- 小组件创建、扫描和删除改用参数数组调用 Python，不再把名称或路径拼进 Shell 命令。拒绝越界名称、组件目录符号链接和逃逸的入口文件；创建不会覆盖已有组件。组件 QML 本身仍是可执行代码，只应加载可信来源。
+- 安装、更新、回退、卸载和启动入口检查私有路径，拒绝与 II、常见共享应用目录及宽泛根目录重叠；维护入口还拒绝运行代码目录中指向外部的符号链接。该检查防止错误配置，不是对任意自定义路径或同用户恶意进程的沙箱。
+- 文件复制拒绝目标符号链接；更新和卸载备份失败会中止后续替换或删除。新增备份目录限制访问权限，卸载备份使用独立临时目录；共享的 `sync-pixel-sddm.py` 不再列入卸载删除清单。
+- 退出安装器不再删除固定的 `/tmp/buildyay`、`/tmp/buildparu`；可选 AUR 助手只清理本次创建的临时目录，失败向上传递。移除全权限免密码 sudo 的建议。个人安装流程仍跳过系统依赖安装。
+- Chrome 配色脚本即使显式开启共享应用接入，也不创建系统策略目录、不提权、不放宽权限，只使用已有可写目录。
+
+新增 11 项临时目录安全回归，已接入完整本地分发检查；覆盖恶意名称、路径别名、目标链接、备份失败、卸载保护、临时目录清理和浏览器权限边界。测试不读取真实凭据或通知数据。

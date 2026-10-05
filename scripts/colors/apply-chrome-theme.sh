@@ -7,12 +7,8 @@
 #   apply-chrome-theme.sh "#ff6b35"        # explicit hex color
 #
 # Supports: Google Chrome, Chromium, Brave
-# Requires: jq, writable policy dir (one-time sudo/pkexec setup)
-#
-# One-time setup per browser:
-#   sudo mkdir -p /etc/chromium/policies/managed && sudo chmod a+rw /etc/chromium/policies/managed
-#   sudo mkdir -p /etc/opt/chrome/policies/managed && sudo chmod a+rw /etc/opt/chrome/policies/managed
-#   sudo mkdir -p /etc/brave/policies/managed && sudo chmod a+rw /etc/brave/policies/managed
+# Requires: jq and an existing writable policy directory.
+# This script never creates system policy directories or changes permissions.
 
 XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 STATE_DIR="$XDG_STATE_HOME/quickshell"
@@ -59,59 +55,12 @@ is_omarchy() {
   return 1
 }
 
-elevate() {
-  # 1. Interactive terminal — use sudo directly
-  if [[ -t 0 ]] && [[ -t 1 ]]; then
-    sudo "$@"
-    return $?
-  fi
-
-  # 2. Non-interactive but cached sudo credentials available
-  if sudo -n true 2>/dev/null; then
-    sudo "$@"
-    return $?
-  fi
-
-  # 3. Graphical session with polkit — try pkexec if an agent is running
-  if command -v pkexec >/dev/null 2>&1 && [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]]; then
-    if pgrep -xf 'polkit-.+-authentication-agent' >/dev/null 2>&1 \
-       || pgrep -xf 'polkitd' >/dev/null 2>&1 \
-       || pgrep -xf 'gnome-shell' >/dev/null 2>&1 \
-       || pgrep -xf 'kwin_wayland' >/dev/null 2>&1; then
-      pkexec "$@"
-      return $?
-    else
-      log "elevate: pkexec available but no polkit agent detected — skipping elevation"
-      return 1
-    fi
-  fi
-
-  log "elevate: no elevation method available (need sudo/pkexec with agent)"
-  return 1
-}
-
 ensure_policy_dir_writable() {
-  local policy_dir="$1"
-  local name="$2"
-
-  if [[ -d "$policy_dir" && -w "$policy_dir" ]]; then
-    return 0
-  fi
-
-  # Runtime color changes must not request privileges or relax system policy
-  # directory permissions. Preparing integration is an explicit setup action.
-  [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]] || return 1
-
-  log "$name: requesting writable policy dir: $policy_dir"
-  if elevate mkdir -p "$policy_dir" && elevate chmod a+rw "$policy_dir"; then
-    log "$name: policy dir ready: $policy_dir"
-    notify_user "$name can now write browser policy files."
-    return 0
-  fi
-
-  log "$name: ERROR — failed to prepare $policy_dir"
-  log "$name: run manually: sudo mkdir -p $policy_dir && sudo chmod a+rw $policy_dir"
-  notify_user "$name needs writable policy files.\nsudo mkdir -p $policy_dir && sudo chmod a+rw $policy_dir"
+  local policy_dir="$1" name="$2"
+  # Never create or relax permissions on a system browser policy directory.
+  # A writable policy path must already have been provisioned by its owner.
+  [[ -d "$policy_dir" && -w "$policy_dir" ]] && return 0
+  log "$name: policy directory unavailable; preserving system permissions"
   return 1
 }
 

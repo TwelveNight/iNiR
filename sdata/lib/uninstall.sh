@@ -29,7 +29,6 @@ declare -A INIR_ONLY_PATHS=(
     ["${XDG_DATA_HOME}/applications/inir.desktop"]="iNiR desktop entry"
     ["${XDG_DATA_HOME}/applications/inir-settings.desktop"]="iNiR settings desktop entry"
     ["${XDG_DATA_HOME}/icons/hicolor/scalable/apps/inir.svg"]="iNiR launcher icon"
-    ["${HOME}/.local/bin/sync-pixel-sddm.py"]="iNiR SDDM theme sync helper"
 )
 
 # Shared configs - may be used by other apps or user customizations
@@ -322,28 +321,28 @@ uninstall_backup_restorable_configs() {
             [[ -e "$candidate" || -L "$candidate" ]] || continue
             rel="${candidate#${XDG_CONFIG_HOME}/}"
             destination="$backup_dir/shared-configs/$rel"
-            mkdir -p "$(dirname "$destination")"
-            cp -a -- "$candidate" "$destination"
+            mkdir -p "$(dirname "$destination")" || return 1
+            cp -a -- "$candidate" "$destination" || return 1
         done
     done
 }
 
 uninstall_backup_shell_integration() {
     local backup_dir="$1" profile destination
-    mkdir -p "$backup_dir/shell-integration"
+    mkdir -p "$backup_dir/shell-integration" || return 1
 
     for profile in "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc" \
                    "$HOME/.zprofile" "$HOME/.zshrc"; do
         [[ -f "$profile" ]] || continue
         destination="$backup_dir/shell-integration/$(basename "$profile")"
-        cp -a -- "$profile" "$destination"
+        cp -a -- "$profile" "$destination" || return 1
     done
 
     for profile in "${XDG_CONFIG_HOME}/fish/conf.d/inir-path.fish" \
                    "${XDG_CONFIG_HOME}/fish/conf.d/inir-env.fish"; do
         [[ -e "$profile" || -L "$profile" ]] || continue
         destination="$backup_dir/shell-integration/$(basename "$profile")"
-        cp -a -- "$profile" "$destination"
+        cp -a -- "$profile" "$destination" || return 1
     done
 }
 
@@ -405,38 +404,41 @@ uninstall_restore_preinstall_configs() {
 }
 
 uninstall_create_backup() {
-    local backup_dir="${HOME}/.local/share/inir-uninstall-backup-$(date +%Y%m%d-%H%M%S)"
+    local backup_dir
 
     tui_info "Creating backup before uninstall..." >&2
-    mkdir -p "$backup_dir"
+    mkdir -p "${XDG_DATA_HOME}" || return 1
+    backup_dir=$(umask 077; mktemp -d "${XDG_DATA_HOME}/inir-uninstall-backup-$(date +%Y%m%d-%H%M%S)-XXXXXX") || return 1
 
     # Backup iNiR-specific files
     if [[ -d "${XDG_CONFIG_HOME}/quickshell/inir" ]]; then
-        cp -r "${XDG_CONFIG_HOME}/quickshell/inir" "$backup_dir/quickshell-inir"
+        cp -r "${XDG_CONFIG_HOME}/quickshell/inir" "$backup_dir/quickshell-inir" || return 1
     fi
 
     if [[ -d "${INIR_CONFIG_DIR}" ]]; then
-        cp -r "${INIR_CONFIG_DIR}" "$backup_dir/$(basename "$INIR_CONFIG_DIR")"
+        cp -r "${INIR_CONFIG_DIR}" "$backup_dir/$(basename "$INIR_CONFIG_DIR")" || return 1
     fi
 
     # Backup niri config
     if [[ -f "${XDG_CONFIG_HOME}/niri/config.kdl" ]]; then
-        cp "${XDG_CONFIG_HOME}/niri/config.kdl" "$backup_dir/"
+        cp "${XDG_CONFIG_HOME}/niri/config.kdl" "$backup_dir/" || return 1
     fi
 
     # Backup user state
     if [[ -d "${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}/user" ]]; then
-        cp -r "${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}/user" "$backup_dir/quickshell-state"
+        cp -r "${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}/user" "$backup_dir/quickshell-state" || return 1
     fi
 
-    uninstall_backup_restorable_configs "$backup_dir"
-    uninstall_backup_shell_integration "$backup_dir"
+    uninstall_backup_restorable_configs "$backup_dir" || return 1
+    uninstall_backup_shell_integration "$backup_dir" || return 1
 
     tui_success "Backup created: $backup_dir" >&2
     echo "$backup_dir"
 }
 
 uninstall_remove_inir_only() {
+    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
+        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
     local removed=0
     local _start=$SECONDS
 
@@ -462,12 +464,12 @@ uninstall_remove_inir_only() {
 
             if [[ -d "$ep" ]]; then
                 ((idx+=1))
-                rm -rf "$ep"
+                rm -rf -- "$ep" || return 1
                 echo -e "  ${STY_FAINT}[$idx/$total]${STY_RST} ${STY_RED}✗${STY_RST} Removed: $desc"
                 ((removed+=1))
             elif [[ -f "$ep" ]]; then
                 ((idx+=1))
-                rm -f "$ep"
+                rm -f -- "$ep" || return 1
                 echo -e "  ${STY_FAINT}[$idx/$total]${STY_RST} ${STY_RED}✗${STY_RST} Removed: $desc"
                 ((removed+=1))
             fi
@@ -688,6 +690,8 @@ uninstall_show_packages() {
 ###############################################################################
 
 run_uninstall() {
+    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
+        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
     local _uninstall_start=$SECONDS
     local installed_mode
     local update_strategy
@@ -787,13 +791,13 @@ run_uninstall() {
 
     # Create backup first
     local backup_dir
-    backup_dir=$(uninstall_create_backup)
+    backup_dir=$(uninstall_create_backup) || { tui_warn "Backup failed; uninstall stopped"; return 1; }
 
     # Stop services
     uninstall_stop_services
 
     # Remove iNiR-exclusive files (always safe)
-    uninstall_remove_inir_only
+    uninstall_remove_inir_only || return 1
     uninstall_reload_user_systemd
 
     uninstall_restore_preinstall_configs
@@ -853,6 +857,8 @@ EOF
 ###############################################################################
 
 run_uninstall_quick() {
+    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
+        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
     echo ""
     tui_title "iNiR Quick Uninstall"
     echo ""
@@ -871,14 +877,14 @@ run_uninstall_quick() {
 
     # Backup
     local backup_dir
-    backup_dir=$(uninstall_create_backup)
+    backup_dir=$(uninstall_create_backup) || { tui_warn "Backup failed; uninstall stopped"; return 1; }
 
     # Stop services
     uninstall_stop_services
 
     # Remove only iNiR-exclusive files
     ask=false  # Disable prompts for shared configs
-    uninstall_remove_inir_only
+    uninstall_remove_inir_only || return 1
     uninstall_reload_user_systemd
     uninstall_restore_preinstall_configs
     uninstall_remove_shell_integration || tui_warn "Could not fully remove shell profile integration"

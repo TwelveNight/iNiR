@@ -62,9 +62,7 @@ _show_privilege_instructions() {
     echo "     - Install: polkit-kde-authentication-agent-1 or polkit-gnome" >&2
     echo "     - It should auto-launch in your graphical session" >&2
     echo "" >&2
-    echo "  2. Configure sudo with passwordless NOPASSWD (quick fix):" >&2
-    echo "     sudo visudo" >&2
-    echo "     # Add line: $(whoami) ALL=(ALL) NOPASSWD: ALL" >&2
+    echo "  2. Run the installer from a terminal with password-authenticated sudo." >&2
     echo "" >&2
   else
     # TTY/Console environment
@@ -92,9 +90,6 @@ _show_privilege_instructions() {
   echo "" >&2
   echo "  # Option B: Allow specific user" >&2
   echo "  $(whoami) ALL=(ALL) ALL" >&2
-  echo "" >&2
-  echo "  # Option C: Passwordless (not recommended for daily use)" >&2
-  echo "  $(whoami) ALL=(ALL) NOPASSWD: ALL" >&2
 }
 
 # Use elevate() when USE_ELEVATE is set (graphical mode), otherwise use sudo
@@ -159,42 +154,20 @@ pkg_sudo() {
 # AUR Helpers (Arch-specific)
 #####################################################################################
 
-install-yay(){
-  tui_info "Installing yay (AUR helper)..."
-
-  # Clean up previous attempts
-  rm -rf /tmp/buildyay
-
-  # Sync databases and install base-devel
-  if ! x pkg_sudo pacman -Sy --needed --noconfirm base-devel git; then
-      log_error "Failed to install base-devel/git. Check your pacman mirrors."
-      return 1
-  fi
-
-  # Clone yay-bin (faster than compiling yay)
-  x git clone https://aur.archlinux.org/yay-bin.git /tmp/buildyay || return 1
-
-  # Build and install
-  x cd /tmp/buildyay
-  if ! x makepkg -si --noconfirm; then
-      log_error "Failed to build/install yay."
-      x cd "${REPO_ROOT}"
-      return 1
-  fi
-
-  x cd "${REPO_ROOT}"
-  rm -rf /tmp/buildyay
-}
-
-install-paru(){
-  tui_info "Installing paru (AUR helper)..."
-  x pkg_sudo pacman -S --needed --noconfirm base-devel git
-  x git clone https://aur.archlinux.org/paru-bin.git /tmp/buildparu
-  x cd /tmp/buildparu
+install_aur_helper() (
+  local helper="$1" build_dir
+  [[ "$helper" == yay || "$helper" == paru ]] || return 2
+  tui_info "Installing $helper (AUR helper)..."
+  build_dir=$(mktemp -d "${TMPDIR:-/tmp}/inir-${helper}.XXXXXX") || return 1
+  trap 'rm -rf -- "$build_dir"' EXIT
+  x pkg_sudo pacman -S --needed --noconfirm base-devel git || return 1
+  x git clone "https://aur.archlinux.org/${helper}-bin.git" "$build_dir/source" || return 1
+  cd "$build_dir/source" || return 1
   x makepkg -si --noconfirm
-  x cd "${REPO_ROOT}"
-  rm -rf /tmp/buildparu
-}
+)
+
+install-yay(){ install_aur_helper yay; }
+install-paru(){ install_aur_helper paru; }
 
 ensure_aur_helper(){
   if command -v yay &>/dev/null; then

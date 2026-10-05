@@ -49,13 +49,13 @@ cd "$REPO_ROOT"
 
 # Personal branch: the standard install command owns all isolation safeguards.
 source "$REPO_ROOT/scripts/personal/setup-entry.sh" "$@"
+python3 "$REPO_ROOT/scripts/lib/private_paths.py" --runtime-links || exit $?
 
 # Handle Ctrl+C gracefully
 cleanup() {
     type _tui_kill_spinner &>/dev/null && _tui_kill_spinner 2>/dev/null || true
     echo ""
     echo -e "\033[33mCancelled.\033[0m"
-    rm -rf /tmp/buildyay /tmp/buildparu 2>/dev/null
     exit 130
 }
 
@@ -83,7 +83,7 @@ run_migrate() {
     show_session_impact_notices
 }
 trap cleanup INT
-trap 'type _tui_kill_spinner &>/dev/null && _tui_kill_spinner 2>/dev/null || true; rm -rf /tmp/buildyay /tmp/buildparu 2>/dev/null' EXIT TERM
+trap 'type _tui_kill_spinner &>/dev/null && _tui_kill_spinner 2>/dev/null || true' EXIT TERM
 
 # Load core libraries
 source ./sdata/lib/environment-variables.sh
@@ -1811,7 +1811,7 @@ run_install() {
         tui_task_run 2 "configs, backups, theming"
         tui_task_finalize
         tui_step 3 3 "Installing config files" "User configs, backups, wallpaper defaults, and generated theme inputs."
-        source ./sdata/subcmd-install/3.files.sh
+        source ./sdata/subcmd-install/3.files.sh || return 1
         echo ""
         tui_task_init \
             "Install dependencies" \

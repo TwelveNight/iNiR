@@ -100,14 +100,17 @@ create_update_backup() {
     local target_dir="$1"
     local timestamp
     timestamp=$(date +%Y%m%d-%H%M%S)
-    local backup_path="${II_BACKUP_DIR}/pre-update-${timestamp}"
-
-    mkdir -p "$backup_path"
+    local backup_path marker
+    (umask 077; mkdir -p "$II_BACKUP_DIR") || return 1
+    backup_path=$(mktemp -d "${II_BACKUP_DIR}/pre-update-${timestamp}-XXXXXX") || return 1
 
     # Only backup QML code, not user configs
-    rsync -a --exclude='.inir-manifest' "$target_dir/" "$backup_path/" 2>/dev/null
+    # Archive mode would otherwise copy the source directory's public mode.
+    rsync -a --chmod=D700 --exclude='.inir-manifest' "$target_dir/" "$backup_path/" || return 1
 
-    echo "$backup_path" > "${II_BACKUP_DIR}/.last-backup"
+    marker=$(mktemp "${II_BACKUP_DIR}/.last-backup.XXXXXX") || return 1
+    printf '%s\n' "$backup_path" > "$marker" || { rm -f -- "$marker"; return 1; }
+    mv -fT -- "$marker" "${II_BACKUP_DIR}/.last-backup" || { rm -f -- "$marker"; return 1; }
     cleanup_old_backups "$II_BACKUP_DIR" 5
 
     echo "$backup_path"

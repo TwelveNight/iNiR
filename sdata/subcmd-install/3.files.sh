@@ -96,7 +96,7 @@ case "${SKIP_QUICKSHELL}" in
     # Create backup before update (if this is an update)
     if [[ "${IS_UPDATE}" == "true" ]]; then
       log_info "Creating backup before update..."
-      create_update_backup "$II_TARGET" >/dev/null
+      create_update_backup "$II_TARGET" >/dev/null || return 1
     fi
 
     # Generate manifest BEFORE syncing (to know what should exist)
@@ -106,7 +106,7 @@ case "${SKIP_QUICKSHELL}" in
     # Copy all .qml files from root (auto-detect, no manual list needed)
     for qml_file in "${II_SOURCE}"/*.qml; do
       if [[ -f "$qml_file" ]]; then
-        install_file "$qml_file" "${II_TARGET}/$(basename "$qml_file")"
+        install_file "$qml_file" "${II_TARGET}/$(basename "$qml_file")" || return 1
       fi
     done
 
@@ -115,7 +115,7 @@ case "${SKIP_QUICKSHELL}" in
       while IFS= read -r runtime_file; do
         [[ -n "$runtime_file" ]] || continue
         if [[ -f "${II_SOURCE}/${runtime_file}" ]]; then
-          install_file "${II_SOURCE}/${runtime_file}" "${II_TARGET}/${runtime_file}"
+          install_file "${II_SOURCE}/${runtime_file}" "${II_TARGET}/${runtime_file}" || return 1
         fi
       done < "$runtime_root_manifest"
     fi
@@ -132,7 +132,7 @@ case "${SKIP_QUICKSHELL}" in
     fi
 
     # Finalize manifest
-    mv "${II_TARGET}/.inir-manifest.new" "${II_TARGET}/.inir-manifest"
+    mv "${II_TARGET}/.inir-manifest.new" "${II_TARGET}/.inir-manifest" || return 1
 
     # Cleanup orphan files (files that no longer exist in repo)
     if [[ "${IS_UPDATE}" == "true" ]]; then

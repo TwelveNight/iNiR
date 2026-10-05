@@ -1,0 +1,28 @@
+{
+    "name": "@WIDGET_CLASS@",
+    "icon": "widgets",
+    "version": "1.0",
+    "author": "",
+    "description": "Custom desktop widget",
+    "category": "custom",
+    "main": "@WIDGET_CLASS@.qml",
+    "iris": {
+        "main": "IrisCompact.qml",
+        "slots": ["island.desktop"]
+    },
+    "defaultConfig": {
+        "placementStrategy": "free",
+        "widgetScale": 100,
+        "widgetOpacity": 100,
+        "colorMode": "auto",
+        "dim": 0,
+        "x": 200,
+        "y": 200
+    },
+    "configKeys": {
+        "label": { "type": "string", "default": "@WIDGET_CLASS@", "label": "Widget label" },
+        "showIcon": { "type": "bool", "default": true, "label": "Show icon" }
+    },
+    "resizableAxes": { "uniform": "widgetScale" },
+    "defaultSize": { "width": 200, "height": 80 }
+}

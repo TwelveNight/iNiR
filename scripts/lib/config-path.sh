@@ -8,6 +8,12 @@
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 INIR_CONFIG_DIR_NEW="${XDG_CONFIG_HOME}/inir"
+INIR_PATH_HELPER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+inir_validate_private_paths() {
+    INIR_CONFIG_DIR="$(inir_config_dir)" INIR_STATE_DIR="$(inir_state_dir)" \
+        python3 "$INIR_PATH_HELPER_DIR/private_paths.py"
+}
 
 inir_config_dir() {
     printf '%s\n' "${INIR_CONFIG_DIR:-$INIR_CONFIG_DIR_NEW}"
