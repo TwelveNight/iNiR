@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Synthetic destructive-boundary checks. Never use live desktop paths."""
 import json
+import importlib.util
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -325,6 +327,30 @@ source "$2"
         for action in ["theme", "icons", "walls"]:
             self.assertFalse((self.base / f"unexpected-{action}").exists())
         self.assertFalse((self.base / "data/color-schemes").exists())
+
+    def test_dependency_audit_distinguishes_required_optional_and_providers(self):
+        spec = importlib.util.spec_from_file_location("dependencies", ROOT / "scripts/personal/dependencies.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        def package_query(args, **kwargs):
+            self.assertEqual(args[:2], ["pacman", "-T"])
+            # The dependency probe must never insist on replacing quickshell-git.
+            self.assertNotIn("quickshell", args)
+            return subprocess.CompletedProcess(args, 0, "", "")
+        with patch.object(module.shutil, "which", side_effect=lambda name: None if name in {"swaylock", "missioncenter"} else "/fixture/tool"), \
+                patch.object(module.subprocess, "run", side_effect=package_query):
+            report = module.check()
+        self.assertEqual([row["item"] for row in report["required"]], ["swaylock"])
+        self.assertEqual([row["package"] for row in report["optional"]], ["mission-center"])
+        self.assertFalse(report["errors"])
+        def missing_qt(args, **kwargs):
+            missing = "qt6-multimedia" in args
+            return subprocess.CompletedProcess(args, 127 if missing else 0, "qt6-multimedia\n" if missing else "", "")
+        with patch.object(module.shutil, "which", return_value="/fixture/tool"), \
+                patch.object(module.subprocess, "run", side_effect=missing_qt):
+            report = module.check()
+        self.assertIn("qt6-multimedia", [row["item"] for row in report["required"]])
+        self.assertFalse(report["errors"])
 
 
 if __name__ == "__main__":

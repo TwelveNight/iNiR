@@ -311,7 +311,7 @@ install-python-packages
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
-        for name in ["install.sh", "preflight.sh", "configure-session.py"]:
+        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)
@@ -347,7 +347,7 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         (self.ii / "installed_true").touch()
         binary = self.base / "mock-bin"
         binary.mkdir()
-        for name in ["skwd-helm", "niri", "qs", "jq", "rsync", "uv", "systemctl", "swayidle"]:
+        for name in ["skwd-helm", "niri", "qs", "jq", "rsync", "uv", "systemctl", "swayidle", "swaylock"]:
             mock = binary / name
             mock.write_text("#!/bin/sh\nexit 0\n")
             mock.chmod(0o755)

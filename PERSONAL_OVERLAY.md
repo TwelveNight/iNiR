@@ -53,7 +53,7 @@ GDM 登录时选择 **Niri**。标准入口通过 `niri.service` 启动；`inir.
 
 部署入口（与官方命令一致，当前个人分支会自动进入隔离流程）：
 
-当前主机最后一次只读预检（2026-10-05，本次复审）已通过，包含 `swayidle`、GDM/Niri 入口和三个用户服务。安装前可再次检查：
+依赖检查已扩展到锁屏兜底、音频/网络、钥匙环、Qt/QML 模块及私有 Python 的原生构建依赖。2026-10-05 重新核对发现本机缺少必需的 `swaylock`，需要补齐后再安装；此前较窄的预检通过不代表所有功能依赖齐全。安装前检查：
 
 ```sh
 ./setup install --check
@@ -185,3 +185,19 @@ SDDM 配色模块和模板后置钩子都要求实际登录管理器为 SDDM；G
 安装前备份位于 `~/.local/state/inir/install-backups/<时间>-<进程号>/`（自定义状态目录时随之改变）。除已有 Niri、iNiR 设置、运行代码、私有用户状态和启动器外，备份包含各用户服务 target 下原有的 `inir.service` 链接，以及 `data/` 下旧的 iNiR 桌面入口和图标。只恢复这些明确对应的文件；不要整体覆盖共享 systemd 目录。该快照不包含系统包、整个 Python 环境或登录后的共享历史修改，卸载也不等于自动完整回退。
 
 安全回归增加至 15 项，包括真实资源安装段的临时目录执行，以及系统包迁移、Deno 和 Steam 保护；个人安装测试同时验证新增备份内容。本轮仅修改仓库，未部署到实际桌面。
+
+## 依赖检查补充
+
+依赖需要补齐，保护配置不意味着不需要系统包。`python3 scripts/personal/dependencies.py` 输出必需缺项和可选功能缺项；`./setup install --check` 和正式安装都调用它，缺少必需项会在部署前中止。检查只查询命令和本地 `pacman -T`，保留当前提供 Quickshell 的 `quickshell-git`，不调用会卸载其他 Shell、替换 Quickshell 或全系统升级的上游依赖流程。
+
+2026-10-05 本机核验：`plasma-integration`、`plasma-browser-integration`、Deno 2.9.7、主要 Qt/QML 和 Python 原生构建依赖已存在。必需缺项是用于 Shell 锁屏失败时兜底的 `swaylock`：
+
+```sh
+sudo pacman -S --needed swaylock
+./setup install --check
+./setup install
+```
+
+可选缺项包括 `mission-center`（默认任务管理器）、`lsp-plugins-lv2`（EasyEffects 均衡器）、`mpv-mpris`、`ttf-oxanium` 及部分 OCR 语言模型。英语和简体中文 OCR 模型已安装。按需要单独补齐，安装器会明确列出，不把可选功能缺项当成 Shell 无法启动。
+
+系统包安装会作用于两边桌面，先查看包管理器事务；配置隔离不保证系统包永远不变。iNiR 的 Python 依赖仍由安装器装入私有环境。增加了依赖分类与替代 provider 回归，安全回归共 16 项；本轮没有执行系统包安装。

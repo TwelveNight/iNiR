@@ -9,15 +9,7 @@ if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$XDG_RUNTIME_DIR/bus" ]]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 failed=0
-missing=()
-for command in skwd-helm niri qs jq rsync uv python3 systemctl matugen swayidle wl-copy wl-paste cliphist ffmpeg magick socat; do
-    command -v "$command" >/dev/null || missing+=("$command")
-done
-if (( ${#missing[@]} )); then
-    printf 'Missing command: %s\n' "${missing[@]}" >&2
-    echo 'Install the missing system dependencies before deploying this overlay.' >&2
-    failed=1
-fi
+python3 "$repo/scripts/personal/dependencies.py" || failed=1
 if command -v niri >/dev/null; then
     niri validate --config "$repo/defaults/niri/config.kdl" || failed=1
 fi
