@@ -32,3 +32,7 @@ spawn-at-startup "/usr/lib/mate-polkit/polkit-mate-authentication-agent-1"
 
 // skwd-walld is the shared renderer; it reconnects after switching sessions.
 spawn-at-startup "bash" "-c" "exec \"$HOME/.config/quickshell/inir/scripts/wallpaper/skwd-session.sh\""
+
+// Personal custom startup: Fcitx5 and 1Password already use XDG autostart.
+// CC Switch has no XDG entry; wait at most 30 s for the shell's tray watcher.
+spawn-at-startup "bash" "-c" "for ((i=0;i<150;i++)); do busctl --user status org.kde.StatusNotifierWatcher >/dev/null 2>&1 && break; sleep 0.2; done; command -v cc-switch >/dev/null && { pgrep -u \"$(id -u)\" -x cc-switch >/dev/null || exec cc-switch; }"

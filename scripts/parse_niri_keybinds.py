@@ -507,7 +507,10 @@ def parse_niri_config(config_path: Path) -> dict:
     for block in recent_blocks:
         for kb in parse_keybinds_from_block(block):
             merged.setdefault((tuple(kb['mods']), kb['key']), kb)
-    keybinds = list(merged.values())
+    # A personal disabled override suppresses the inherited action, not just
+    # the UI row. Filter only after merging so the upstream row stays hidden.
+    keybinds = [kb for kb in merged.values()
+                if kb.get('action', '').strip('; ') != 'spawn "/usr/bin/true"']
     keybinds_by_category = {}
     
     for kb in keybinds:

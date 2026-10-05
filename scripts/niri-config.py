@@ -23,9 +23,9 @@ Commands:
   detect-customizations Report Niri files that differ from shipped iNiR defaults
   sync-backdrop-overview-shadow on|off  Manage the backdrop-only overview shadow override
   set SECTION KEY VAL  Surgical edit of a single config value
-  get-binds            JSON of all keybinds from 70-binds.kdl with categories/metadata
-  set-bind KEY ACTION  Add or update a keybind in 70-binds.kdl (surgical edit)
-  remove-bind KEY      Comment out a keybind in 70-binds.kdl (surgical edit)
+  get-binds            JSON of effective upstream/personal keybinds with metadata
+  set-bind KEY ACTION  Add or update a personal keybind (surgical edit)
+  remove-bind KEY      Disable a personal keybind without changing upstream
 """
 
 from difflib import unified_diff
@@ -47,6 +47,7 @@ DEFAULT_NIRI_FILES = [
     "config.d/50-startup.kdl",
     "config.d/60-animations.kdl",
     "config.d/70-binds.kdl",
+    "config.d/75-personal-binds.kdl",
     "config.d/80-layer-rules.kdl",
     "config.d/90-user-extra.kdl",
 ]
@@ -3031,23 +3032,29 @@ def _kb_find_in_block(block_lines: list, key_combo: str, check_commented: bool =
 # ─── Keybind commands ──────────────────────────────────────────────────
 
 
-def cmd_get_binds():
-    """Return structured JSON of all keybinds from 70-binds.kdl.
+PERSONAL_BINDS = "config.d/75-personal-binds.kdl"
 
-    Output: { binds: [...], categories: [...], config_file: "..." }
-    Each bind entry includes key_combo, options, action, action_raw,
-    category, description, line_number (1-based, in the file), commented.
-    """
-    binds_file = resolve_niri_section_file("config.d/70-binds.kdl")
-    if not binds_file.exists():
-        print(json.dumps({"error": f"Binds file not found: {binds_file}"}))
-        return 1
 
+def personal_binds_file():
+    candidate = get_niri_config_dir() / PERSONAL_BINDS
+    return candidate if candidate.is_file() and _root_includes(PERSONAL_BINDS) else None
+
+
+def writable_binds_file():
+    return personal_binds_file() or resolve_niri_section_file("config.d/70-binds.kdl")
+
+
+def _bind_identity(combo):
+    parts = combo.lower().split("+")
+    aliases = {"control": "ctrl", "win": "super"}
+    return tuple(sorted(aliases.get(p, p) for p in parts[:-1])), parts[-1]
+
+
+def _read_bind_entries(binds_file):
     content = binds_file.read_text()
     bounds = _find_block_bounds(content, "binds", top_level=True)
     if not bounds:
-        print(json.dumps({"error": "No binds { } block found in file"}))
-        return 1
+        return []
 
     _, inner_start, inner_end, _ = bounds
     block_content = content[inner_start:inner_end]
@@ -3119,6 +3126,7 @@ def cmd_get_binds():
         all_binds.append(
             {
                 "key_combo": key_combo,
+                "source_file": str(binds_file),
                 "options": options_clean,
                 "action": action,
                 "action_raw": action_raw,
@@ -3129,6 +3137,36 @@ def cmd_get_binds():
             }
         )
         i += 1
+
+    return all_binds
+
+
+def cmd_get_binds():
+    """Read effective stock and personal bindings; edits target the personal file."""
+    binds_file = writable_binds_file()
+    if not binds_file.exists():
+        print(json.dumps({"error": f"Binds file not found: {binds_file}"}))
+        return 1
+    base = resolve_niri_section_file("config.d/70-binds.kdl")
+    files = [base]
+    if personal_binds_file():
+        files.append(personal_binds_file())
+    extra = get_niri_config_dir() / "config.d/90-user-extra.kdl"
+    if extra.is_file() and _root_includes("config.d/90-user-extra.kdl"):
+        files.append(extra)
+    merged = {}
+    commented = []
+    for path in files:
+        for entry in _read_bind_entries(path):
+            if entry["commented"]:
+                commented.append(entry)
+            else:
+                merged[_bind_identity(entry["key_combo"])] = entry
+    all_binds = list(merged.values()) + commented
+    for entry in all_binds:
+        if entry["action_raw"].rstrip("; ") == 'spawn "/usr/bin/true"':
+            entry["description"] = "Disabled (personal override)"
+            entry["commented"] = True
 
     _KB_CATEGORY_ORDER = [
         "System",
@@ -3174,7 +3212,7 @@ def cmd_get_binds():
 
 
 def cmd_set_bind(args):
-    """Add or update a keybind in 70-binds.kdl (surgical edit).
+    """Add or update a keybind in the personal layer when present.
 
     Usage: set-bind KEY_COMBO ACTION [--options OPTIONS_STRING]
 
@@ -3202,7 +3240,7 @@ def cmd_set_bind(args):
         else:
             idx += 1
 
-    binds_file = resolve_niri_section_file("config.d/70-binds.kdl")
+    binds_file = writable_binds_file()
     binds_file.parent.mkdir(parents=True, exist_ok=True)
     if not binds_file.exists():
         print(json.dumps({"error": f"Binds file not found: {binds_file}"}))
@@ -3253,7 +3291,7 @@ def cmd_set_bind(args):
 
 
 def cmd_remove_bind(args):
-    """Comment out a keybind in 70-binds.kdl (surgical edit).
+    """Disable a personal bind, or comment it out in legacy single-file configs.
 
     Usage: remove-bind KEY_COMBO
 
@@ -3266,7 +3304,13 @@ def cmd_remove_bind(args):
 
     key_combo = args[0]
 
-    binds_file = resolve_niri_section_file("config.d/70-binds.kdl")
+    if personal_binds_file():
+        # A commented override would reactivate the inherited stock action.
+        # Use a harmless explicit binding so removal stays local to this file.
+        return cmd_set_bind([key_combo, 'spawn "/usr/bin/true"',
+                             "--options", "repeat=false hotkey-overlay-title=null"])
+
+    binds_file = writable_binds_file()
     if not binds_file.exists():
         print(json.dumps({"error": f"Binds file not found: {binds_file}"}))
         return 1

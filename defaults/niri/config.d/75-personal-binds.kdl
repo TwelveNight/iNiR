@@ -1,0 +1,100 @@
+// Personal bindings, translated from ~/.config/hypr/custom/keybinds.lua.
+// Loaded AFTER 70-binds.kdl. Niri 26.04 replaces an earlier binding with the
+// same key: this removes its old action before installing the personal action.
+// Niri has no Hyprland-style `unbind`; empty actions are invalid.
+// Match upstream Mod/Super spelling exactly (they are distinct merge keys).
+// Keep the upstream file unchanged; put future personal bindings here.
+// See PERSONAL_OVERLAY.md for behavior differences and unsupported actions.
+
+binds {
+    // Hyprland custom frees Super+D; suppress the inherited maximize action.
+    Mod+D repeat=false hotkey-overlay-title=null { spawn "/usr/bin/true"; }
+    // Personal Hyprland custom equivalents; see PERSONAL_OVERLAY.md for differences.
+    Alt+H { focus-column-left; }
+    Alt+L { focus-column-right; }
+    Alt+K { focus-window-up; }
+    Alt+J { focus-window-down; }
+    Mod+H { move-column-left; }
+    Mod+L { move-column-right; }
+    Mod+K { move-window-up; }
+    Mod+J { move-window-down; }
+    Mod+Shift+H { set-window-width "-30"; }
+    Mod+Shift+L { set-window-width "+30"; }
+    Mod+Shift+K { set-window-height "-30"; }
+    Mod+Shift+J { set-window-height "+30"; }
+    Mod+Minus { set-window-width "-30"; }
+    Mod+Equal { set-window-width "+30"; }
+    Mod+N repeat=false { focus-workspace-down; }
+    Mod+P repeat=false { focus-workspace-up; }
+    Mod+O repeat=false { maximize-column; }
+    Mod+Shift+O repeat=false { toggle-windowed-fullscreen; }
+    Mod+Shift+MouseMiddle repeat=false { toggle-windowed-fullscreen; }
+    Mod+Shift+F repeat=false { fullscreen-window; }
+    Mod+Alt+O repeat=false { fullscreen-window; }
+    Mod+MouseMiddle repeat=false { maximize-column; }
+    Mod+Alt+MouseMiddle repeat=false { fullscreen-window; }
+    Ctrl+Mod+MouseRight repeat=false { toggle-window-floating; }
+    Mod+Alt+N { move-window-to-workspace-down; }
+    Mod+Alt+P { move-window-to-workspace-up; }
+    Mod+Alt+H { move-window-to-workspace-up; }
+    Mod+Alt+L { move-window-to-workspace-down; }
+    Mod+Alt+Left { move-window-to-workspace-up; }
+    Mod+Alt+Right { move-window-to-workspace-down; }
+    Mod+Alt+Up { move-window-to-workspace-up; }
+    Mod+Alt+Down { move-window-to-workspace-down; }
+    Mod+Alt+WheelScrollUp cooldown-ms=150 { move-window-to-workspace-up; }
+    Mod+Alt+WheelScrollDown cooldown-ms=150 { move-window-to-workspace-down; }
+    Mod+Ctrl+Shift+H { move-window-to-workspace-up focus=false; }
+    Mod+Ctrl+Shift+L { move-window-to-workspace-down focus=false; }
+    Ctrl+Shift+MouseLeft { move-window-to-workspace-up focus=false; }
+    Ctrl+Shift+MouseRight { move-window-to-workspace-down focus=false; }
+    Mod+Shift+WheelScrollUp cooldown-ms=150 { move-window-to-workspace-up; }
+    Mod+Shift+WheelScrollDown cooldown-ms=150 { move-window-to-workspace-down; }
+    Mod+Ctrl+Shift+N repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
+    Mod+Ctrl+Shift+O repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
+    Alt+Shift+MouseLeft repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
+    Alt+Shift+MouseRight repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
+    Super+W repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" float"; }
+    Ctrl+Shift+A repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" tmux"; }
+    Super+E repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" files"; }
+    Mod+BackSpace repeat=false { spawn "inir" "lock" "activate"; }
+    Mod+A repeat=false { spawn "inir" "sidebarLeft" "toggle"; }
+    Mod+B repeat=false { spawn "inir" "sidebarRight" "toggle"; }
+    Mod+Shift+Alt+J repeat=false { spawn "inir" "bar" "toggle"; }
+    Mod+Shift+Alt+K repeat=false { spawn "inir" "osk" "toggle"; }
+    Alt+Space repeat=false { spawn "inir" "overview" "toggle"; }
+    Ctrl+1 repeat=false { spawn "inir" "region" "screenshot"; }
+    Ctrl+Alt+MouseLeft repeat=false { spawn "inir" "region" "screenshot"; }
+    Ctrl+Alt+MouseRight repeat=false { spawn "inir" "region" "menu"; }
+    Ctrl+Alt+S repeat=false { spawn "inir" "region" "menu"; }
+    Ctrl+Alt+A repeat=false { spawn "inir" "region" "menu"; }
+    Mod+Space repeat=false { toggle-overview; }
+    Mod+F repeat=false { spawn "inir" "browser"; }
+    Mod+I repeat=false { spawn "inir" "settings"; }
+    Mod+Shift+BackSpace repeat=false { spawn "systemctl" "suspend"; }
+    Mod+Ctrl+Alt+Escape repeat=false { quit; }
+    Ctrl+Alt+P allow-when-locked=true repeat=false { spawn "playerctl" "play-pause"; }
+    Ctrl+Alt+L allow-when-locked=true repeat=false { spawn "playerctl" "next"; }
+    Ctrl+Alt+Right allow-when-locked=true repeat=false { spawn "playerctl" "next"; }
+    Ctrl+Alt+H allow-when-locked=true repeat=false { spawn "playerctl" "previous"; }
+    Ctrl+Alt+Left allow-when-locked=true repeat=false { spawn "playerctl" "previous"; }
+    Ctrl+Alt+MouseBack allow-when-locked=true repeat=false { spawn "playerctl" "previous"; }
+    Ctrl+Alt+MouseForward allow-when-locked=true repeat=false { spawn "playerctl" "next"; }
+    Ctrl+Alt+M allow-when-locked=true repeat=false { spawn "wpctl" "set-mute" "@DEFAULT_SINK@" "toggle"; }
+    Ctrl+Alt+J allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
+    Ctrl+Alt+Down allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
+    Ctrl+Alt+K allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
+    Ctrl+Alt+Up allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
+    Ctrl+Alt+WheelScrollUp allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%+" "-l" "1.5"; }
+    Ctrl+Alt+WheelScrollDown allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%-" "-l" "1.5"; }
+    Ctrl+Shift+Z repeat=false { spawn "1password" "--toggle"; }
+    Ctrl+Shift+Space repeat=false { spawn "1password" "--quick-access"; }
+    Mod+Alt+F repeat=false { spawn "fcitx5" "--replace" "-d"; }
+    Ctrl+Mod+F repeat=false { spawn "fcitx5" "--replace" "-d"; }
+    Mod+Alt+I repeat=false { spawn "env" "XDG_CURRENT_DESKTOP=GNOME" "XDG_SESSION_DESKTOP=gnome" "gnome-control-center"; }
+    Mod+Alt+E repeat=false { spawn "env" "QT_QPA_PLATFORM=xcb" "pcmanfm-qt" "--profile" "xwayland" "--new-window"; }
+    Mod+Shift+E repeat=false { spawn "rofi" "-show" "filebrowser"; }
+    Mod+Ctrl+W repeat=false { spawn "skwd-wall-v2"; }
+    Ctrl+Mod+Slash repeat=false { spawn "bash" "-c" "xdg-open \"$INIR_CONFIG_DIR/config.json\""; }
+    Ctrl+Mod+Alt+Slash repeat=false { spawn "bash" "-c" "xdg-open \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/75-personal-binds.kdl\""; }
+}

@@ -7,6 +7,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 environment {
+    // Match the existing Hyprland cursor without changing shared GTK settings.
+    XCURSOR_THEME "Bibata-Modern-Classic"
+    XCURSOR_SIZE "24"
+    XMODIFIERS "@im=fcitx"
+    // Native Wayland text-input; XWayland uses XMODIFIERS.
+    GTK_IM_MODULE null
+    QT_IM_MODULE null
+    SDL_IM_MODULE null
+    EDITOR "nvim"
+    // AMD drives eDP, NVIDIA drives HDMI. Keep Niri's automatic GPU selection.
+    // AQ_DRM_DEVICES/WLR_* are not Niri settings. Do not force all apps offload.
+
     // Tell apps which compositor is running (used by xdg-desktop-portal, etc.).
     XDG_CURRENT_DESKTOP "niri"
 

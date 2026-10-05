@@ -12,6 +12,7 @@
 //   50  Processes spawned at login
 //   60  Animations (spring physics tuning)
 //   70  Key bindings (iNiR shell + window management)
+//   75  Personal key bindings (override upstream conflicts)
 //   80  Layer rules (backdrop surfaces for iNiR panels)
 //   90  Your personal overrides (never touched by updates)
 //
@@ -47,5 +48,6 @@ include "config.d/40-environment.kdl"
 include "config.d/50-startup.kdl"
 include "config.d/60-animations.kdl"
 include "config.d/70-binds.kdl"
+include "config.d/75-personal-binds.kdl"
 include "config.d/80-layer-rules.kdl"
 include "config.d/90-user-extra.kdl"

@@ -287,6 +287,13 @@ Singleton {
         onFileChanged: reloadDebounce.restart()
     }
 
+    FileView {
+        id: personalBindsWatcher
+        path: Quickshell.env("HOME") + "/.config/niri/config.d/75-personal-binds.kdl"
+        watchChanges: true
+        onFileChanged: reloadDebounce.restart()
+    }
+
     Timer {
         id: reloadDebounce
         interval: 300

@@ -16,6 +16,19 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     if any(not Path(value).is_absolute() or "\n" in value for value in paths.values()):
         raise ValueError("iNiR paths must be absolute, single-line paths")
     niri = config_home / "niri"
+    # Install the separate personal layer once; preserve subsequent user edits.
+    root_config = niri / "config.kdl"
+    root_text = root_config.read_text()
+    upstream_include = 'include "config.d/70-binds.kdl"'
+    personal_include = 'include "config.d/75-personal-binds.kdl"'
+    if upstream_include in root_text:
+        personal = niri / "config.d/75-personal-binds.kdl"
+        if not personal.exists():
+            template = Path(__file__).resolve().parents[2] / "defaults/niri/config.d/75-personal-binds.kdl"
+            personal.write_text(template.read_text())
+        if personal_include not in root_text:
+            root_config.write_text(root_text.replace(upstream_include,
+                                   upstream_include + "\n" + personal_include, 1))
     env_file = niri / "config.d/40-environment.kdl"
     if not env_file.is_file():
         env_file = niri / "config.kdl"
@@ -30,7 +43,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
 
     # GDM need not add ~/.local/bin to PATH; every iNiR binding has an absolute executable.
     launcher = str(bin_home / "inir")
-    for binding in [niri / "config.kdl", niri / "config.d/70-binds.kdl"]:
+    for binding in [niri / "config.kdl", niri / "config.d/70-binds.kdl", niri / "config.d/75-personal-binds.kdl"]:
         if binding.is_file():
             text = binding.read_text()
             text = re.sub(r'\bspawn "(?:[^"\n]*/)?inir"', lambda _: "spawn " + json.dumps(launcher), text)

@@ -417,6 +417,15 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         binds = (self.config / "niri/config.d/70-binds.kdl").read_text()
         self.assertNotIn('spawn "inir"', binds)
         self.assertIn(str(self.base / "bin dir/inir"), binds)
+        personal = self.config / "niri/config.d/75-personal-binds.kdl"
+        self.assertNotIn('spawn "inir"', personal.read_text())
+        # Reinstalling wires the layer once and keeps later personal edits.
+        personal.write_text(personal.read_text() + "\n// keep my later edit\n")
+        saved = personal.read_bytes()
+        module.configure(*args)
+        self.assertEqual(saved, personal.read_bytes())
+        self.assertEqual((self.config / "niri/config.kdl").read_text().count(
+            'include "config.d/75-personal-binds.kdl"'), 1)
         subprocess.run(["niri", "validate", "--config", str(self.config / "niri/config.kdl")],
                        check=True, capture_output=True)
         dropin = (self.config / "systemd/user/inir.service.d/20-personal-paths.conf").read_text()

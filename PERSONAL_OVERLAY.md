@@ -79,6 +79,67 @@ GDM 登录时选择 **Niri**。标准入口通过 `niri.service` 启动；`inir.
 
 ## 验收
 
+### 本机显卡、光标、启动项与个人键位（2026-10-06）
+
+本机内屏 eDP-2 接 AMD Cezanne，HDMI-A-1 接 NVIDIA RTX 3060 Laptop。
+两张卡驱动均已加载；NVIDIA 615.71.09 的 DRM modeset 已开启，Niri 为 26.04。
+保留 Niri 自动选卡和多 GPU 输出支持，不复制 `AQ_DRM_DEVICES`、`WLR_*`，
+也不全局设置 `__NV_PRIME_RENDER_OFFLOAD`、`__GLX_VENDOR_LIBRARY_NAME` 或 `LIBVA_DRIVER_NAME=nvidia`。
+需要独显的单个程序可使用现有 `prime-run <程序>`；不改变其他桌面的驱动设置。
+当前尚未实测 GDM 登录后的多屏渲染、休眠唤醒和独显 offload。
+若实际观察到 Niri 的 NVIDIA 显存异常增长，再按
+[Niri 官方 NVIDIA 文档](https://niri-wm.github.io/niri/Nvidia.html)
+为 `niri` 进程设置 `GLVidHeapReuseRatio=0`；本次未全局添加驱动补丁。
+
+Niri 光标和启动应用的 `XCURSOR_THEME/SIZE` 使用现有的黑色
+`Bibata-Modern-Classic`、24 像素。没有修改共享 GTK/GSettings、Hyprland 或 Kitty 设置。
+输入法使用 Wayland text-input，XWayland 保留 `XMODIFIERS=@im=fcitx`。
+
+Fcitx5、1Password 已在现有 XDG autostart 中，由 Niri/systemd 启动，避免重复添加。
+新增 CC Switch 登录启动，先有限等待托盘，并检查当前用户是否已有实例。
+自定义启动文件中已注释的 Clash Verge、HyprGlass、插件加载命令不迁移；
+原有其他 XDG 应用仍按各自启动项运行。
+用户已明确不再需要 libinput-gestures：本机的 XDG 项设为 `Hidden=true`，
+用户服务已禁用并停止，保留程序和配置以便恢复。没有添加 Niri 特例或更改 Hyprland 原生手势。
+
+个人键位独立放在 `defaults/niri/config.d/75-personal-binds.kdl`，上游 `70-binds.kdl` 保持原样。
+主配置先加载 70，再加载 75，最后加载用户自留的 90。Niri 26.04 的后续同键定义会替换旧动作，
+等效于先解除旧绑定再重绑，不会同时触发两个动作；它不支持 Hyprland 的独立 `unbind` 指令。
+多步操作由
+`scripts/personal/niri-actions.py` 使用 Niri IPC 完成，不调用 Hyprland 脚本。
+
+| 快捷键 | Niri 行为 |
+|---|---|
+| Alt+H/J/K/L | 左右聚焦列，上下聚焦列内窗口 |
+| Super+H/J/K/L | 左右移动列，上下移动列内窗口 |
+| Super+Shift+H/J/K/L；Super+-/= | 调整窗口宽高，每次 30 像素 |
+| Super+N/P | 下一个/上一个工作区 |
+| Super+Alt+N/P、H/L、方向键、滚轮 | 移动窗口到相邻工作区并跟随 |
+| Super+Ctrl+Shift+H/L | 移动到相邻工作区，不跟随 |
+| Super+Ctrl+Shift+N/O | 移动到/聚焦当前显示器末尾的空工作区 |
+| Super+W | 浮动并设为 50%×60%、居中；再次按恢复平铺 |
+| Super+O；Super+Shift+F；Super+Shift+O | 最大化列；全屏窗口；窗口伪全屏 |
+| Super+F/E/I | 浏览器；Dolphin 优先的文件管理器；iNiR 设置 |
+| Super+Space/Tab；Alt+Space | Niri 概览；iNiR 启动器（随面板家族路由） |
+| Super+A/B；Super+Shift+Alt+J/K | 左/右侧栏；状态栏/屏幕键盘 |
+| Super+Backspace；Super+Shift+Backspace | 锁屏；休眠 |
+| Ctrl+Alt+P/H/L/M、方向键、J/K、滚轮、前后侧键 | 播放暂停、切歌、静音、音量 |
+| Ctrl+1、Ctrl+Alt+左键；Ctrl+Alt+S/A/右键 | 区域截图；iNiR 截图工具菜单 |
+| Ctrl+Shift+A/Z/Space | Kitty+tmux；1Password 主窗口/快速访问 |
+| Super+Alt+F、Ctrl+Super+F | 重启 Fcitx5 |
+| Super+Ctrl+W；Super+Alt+I/E；Super+Shift+E | skwd-wall-v2；GNOME 设置/XWayland 文件管理器；Rofi 文件浏览 |
+| Ctrl+Super+/；Ctrl+Super+Alt+/ | 编辑 iNiR 设置；编辑 Niri 键位文件 |
+| Super+Ctrl+Alt+Escape | 带确认的退出 Niri（释放 Super+Shift+E 给 Rofi） |
+
+Niri 是滚动平铺：左右移动默认操作列，不保证与 Hyprland 的任意窗口换位相同。
+Hyprland 的工作区组 ±10、任意 clean submap、额外鼠标键 6/7、
+笔记专用开关、五指自定义手势和单独松开 Super 没有在本次中伪造等价行为。
+仍保留 Niri 的 Super+鼠标左/右键移动/缩放手势和原有专用列操作。
+截图编辑使用 iNiR 自己的工具；没有执行包含 `hyprshot` 的旧脚本。
+Super+Shift+O 已解除上游关闭显示器动作，改为窗口伪全屏。
+设置 UI 读取合并后的键位，新增/编辑写入 75 个人文件；删除使用显式无操作绑定，
+防止简单注释后意外恢复上游动作。90 文件仍保留最高优先级的手工覆盖。
+
 已提供临时目录隔离测试和离屏 QML 后端测试：
 
 ```sh
