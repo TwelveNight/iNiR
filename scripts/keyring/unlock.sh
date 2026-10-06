@@ -1,23 +1,18 @@
 #!/usr/bin/env bash
-# Based on https://unix.stackexchange.com/a/602935
-
+set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Skip if already unlocked
-if "${SCRIPT_DIR}/is_unlocked.sh"; then
-    exit 1
-fi
-
-# Prompt for password if not provided
-if [[ -z "${UNLOCK_PASSWORD}" ]]; then
-    echo -n 'Login password: ' >&2
-    read -s UNLOCK_PASSWORD || return
-fi
-
-# Unlock
-killall -q -u "$(whoami)" gnome-keyring-daemon
-eval $(echo -n "${UNLOCK_PASSWORD}" \
-           | gnome-keyring-daemon --daemonize --login \
-           | sed -e 's/^/export /')
+# Do not pass the lock-screen password to status checks or child environments.
+password="${UNLOCK_PASSWORD-}"
 unset UNLOCK_PASSWORD
-echo '' >&2
+trap 'unset password' EXIT
+status=0
+"$SCRIPT_DIR/is_unlocked.sh" || status=$?
+[[ "$status" != 0 ]] || exit 0
+[[ "$status" == 1 ]] || exit "$status"
+if [[ -z "$password" ]]; then
+    [[ -t 0 ]] || exit 2
+    read -r -s -p 'Login keyring password: ' password || exit 2
+    printf '\n' >&2
+fi
+# Unlock the current daemon over its local control socket; no kill/restart/eval.
+printf '%s' "$password" | /usr/bin/python3 "$SCRIPT_DIR/login-keyring.py" --unlock

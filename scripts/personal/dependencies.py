@@ -39,7 +39,7 @@ REQUIRED_PACKAGES = [
     "qt6-multimedia", "qt6-imageformats", "qt6-quicktimeline", "kirigami",
     "syntax-highlighting", "xdg-desktop-portal", "xdg-desktop-portal-gnome",
     "xdg-desktop-portal-gtk", "pipewire", "polkit", "gnome-keyring",
-    "cairo", "gobject-introspection", "pkgconf", "base-devel",
+    "cairo", "gobject-introspection", "python-gobject", "pkgconf", "base-devel",
 ]
 
 OPTIONAL_COMMANDS = [

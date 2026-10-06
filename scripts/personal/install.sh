@@ -60,7 +60,7 @@ for link in "$config_home"/systemd/user/*.wants/inir.service; do
     cp -a "$link" "$snapshot/config/$name"
 done
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
-for name in applications/inir.desktop applications/inir-settings.desktop icons/hicolor/scalable/apps/inir.svg; do
+for name in applications/inir.desktop applications/inir-settings.desktop icons/hicolor/scalable/apps/inir.svg dbus-1/services/org.freedesktop.secrets.service dbus-1/services/org.gnome.keyring.service; do
     if [[ -e "$data_home/$name" || -L "$data_home/$name" ]]; then
         mkdir -p "$snapshot/data/$(dirname "$name")"
         cp -a "$data_home/$name" "$snapshot/data/$name"
@@ -89,6 +89,7 @@ INIR_PERSONAL_INSTALL_STAGE=files ./setup install --skip-deps --skip-setups "$@"
 python3 "$repo/scripts/personal/configure-session.py"
 "$repo/scripts/personal/disable-autostart.sh"
 python3 "$repo/scripts/personal/configure-autostart.py"
+python3 "$repo/scripts/personal/configure-keyring.py"
 systemctl --user daemon-reload
 niri validate --config "$config_home/niri/config.kdl"
 [[ -x "$launcher" && -f "$config_dir/installed_true" ]] || { echo 'Incomplete launcher/config install' >&2; exit 1; }

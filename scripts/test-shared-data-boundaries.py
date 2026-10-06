@@ -86,9 +86,10 @@ store)
 *) exit 9 ;;
 esac
 ''')
-        self.executable("busctl", '''#!/bin/sh
-if [ "$MOCK_KEYRING_MODE" = locked ]; then printf 'b true\\n'; else printf 'b false\\n'; fi
-''')
+        # Persistence tests use a synthetic status backend, never the real bus.
+        # The real helper is covered by test-login-keyring.py on a private bus.
+        (self.base / "scripts/keyring/login-keyring.py").write_text(
+            "import os, sys\nsys.exit(1 if os.environ['MOCK_KEYRING_MODE'] == 'locked' else 0)\n")
 
     def copy_singleton(self, source, destination=None):
         dest = self.base / (destination or source)

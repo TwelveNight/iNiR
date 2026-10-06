@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
-locked_state=$(busctl --user get-property org.freedesktop.secrets \
-    /org/freedesktop/secrets/collection/login \
-    org.freedesktop.Secret.Collection Locked)
-if [[ "${locked_state}" == "b false" ]]; then
-    echo 'Keyring is unlocked' >&2
-    exit 0
-else
-    echo 'Keyring is locked' >&2
-    exit 1
-fi
+# Open a Secret Service session before reading Collection.Locked (GNOME 50).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+unset UNLOCK_PASSWORD
+exec /usr/bin/python3 "$SCRIPT_DIR/login-keyring.py" --status
