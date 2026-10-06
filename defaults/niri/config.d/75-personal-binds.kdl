@@ -15,6 +15,9 @@ binds {
     // Personal Hyprland custom equivalents; see PERSONAL_OVERLAY.md for differences.
     Alt+H { focus-column-left; }
     Alt+L { focus-column-right; }
+    // Alt+wheel follows the horizontal column order; keep Shift+wheel for apps.
+    Alt+WheelScrollUp cooldown-ms=150 { focus-column-left; }
+    Alt+WheelScrollDown cooldown-ms=150 { focus-column-right; }
     Alt+K { focus-window-up; }
     Alt+J { focus-window-down; }
     Mod+H { move-column-left; }
