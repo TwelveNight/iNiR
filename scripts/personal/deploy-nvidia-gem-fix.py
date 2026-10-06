@@ -226,6 +226,10 @@ def main():
     os.umask(0o077)
     os.environ["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/bin"
     os.environ["LC_ALL"] = "C"
+    BASE.parent.mkdir(mode=0o755, exist_ok=True)
+    if BASE.parent.is_symlink() or BASE.parent.stat().st_uid != 0:
+        raise ValueError("Repair state parent must be root-owned and not redirected")
+    BASE.parent.chmod(0o755)
     BASE.mkdir(parents=True, mode=0o755, exist_ok=True)
     if BASE.is_symlink() or BASE.stat().st_uid != 0:
         raise ValueError("Repair backup directory must be root-owned and not redirected")
