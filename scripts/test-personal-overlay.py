@@ -358,7 +358,8 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.env["INIR_CONFIG_DIR"] = str(self.base / "private settings")
         private = Path(self.env["INIR_CONFIG_DIR"])
         private.mkdir()
-        (private / "config.json").write_text("private config")
+        previous_private_config = json.dumps({"personalSentinel": "private config"})
+        (private / "config.json").write_text(previous_private_config)
         (self.ii / "installed_true").touch()
         binary = self.base / "mock-bin"
         binary.mkdir()
@@ -387,7 +388,7 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.assertEqual((snapshots[0] / "config/autostart/org.kde.kgpg.desktop").read_text(), previous_autostart)
         self.assertIn("Hidden=true", autostart.read_text())
         self.assertEqual((snapshots[0] / "config/niri/config.kdl").read_text(), "previous niri")
-        self.assertEqual((snapshots[0] / "inir-config/config.json").read_text(), "private config")
+        self.assertEqual((snapshots[0] / "inir-config/config.json").read_text(), previous_private_config)
         self.assertEqual((snapshots[0] / "config/systemd/user/default.target.wants/inir.service").readlink(),
                          Path("../inir.service"))
         self.assertEqual((snapshots[0] / "data/applications/inir.desktop").read_text(), "previous desktop entry")

@@ -122,6 +122,20 @@ def configure_personal_games(niri):
         extra.write_text(text.rstrip() + "\n\n// Per-game window policy; keep upstream and launchers unchanged.\n" + include + "\n")
 
 
+def configure_shell_preferences(config_dir):
+    """Apply personal shell defaults only to iNiR's private configuration."""
+    target = config_dir / "config.json"
+    if config_dir.is_symlink() or target.is_symlink():
+        raise ValueError("Personal shell config must not redirect to another desktop's files")
+    options = json.loads(target.read_text()) if target.exists() else {}
+    weather = options.setdefault("bar", {}).setdefault("weather", {})
+    if weather.get("enable") is False:
+        return
+    weather["enable"] = False
+    config_dir.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(options, ensure_ascii=False, indent=4) + "\n")
+
+
 def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     paths = {
         "INIR_CONFIG_DIR": str(config_dir),
@@ -131,6 +145,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     }
     if any(not Path(value).is_absolute() or "\n" in value for value in paths.values()):
         raise ValueError("iNiR paths must be absolute, single-line paths")
+    configure_shell_preferences(config_dir)
     configure_portals(config_home)
     niri = config_home / "niri"
     # Install the separate personal layer once; preserve subsequent user edits.

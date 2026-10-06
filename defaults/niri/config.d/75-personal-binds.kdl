@@ -63,8 +63,8 @@ binds {
     // Open wallpaper picker.
     Mod+Ctrl+W repeat=false hotkey-overlay-title="Open wallpaper picker" { spawn "skwd-wall-v2"; }
 
-    // Edit shell configuration.
-    Ctrl+Mod+Slash repeat=false hotkey-overlay-title="Edit shell configuration" { spawn "bash" "-c" "xdg-open \"$INIR_CONFIG_DIR/config.json\""; }
+    // Edit shell configuration in Neovim.
+    Ctrl+Mod+Slash repeat=false hotkey-overlay-title="Edit shell configuration" { spawn "bash" "-c" "exec /usr/bin/kitty /usr/bin/nvim \"${INIR_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/inir}/config.json\""; }
 
     // Edit personal key bindings.
     Ctrl+Mod+Alt+Slash repeat=false hotkey-overlay-title="Edit personal key bindings" { spawn "bash" "-c" "xdg-open \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/75-personal-binds.kdl\""; }
@@ -179,11 +179,12 @@ binds {
     // Focus
     // ═══════════════════════════════════════════════════════════════════════
 
+    // Alt+H/J/K/L focus within the layout, then cross to the monitor at its edge.
     // Focus left.
-    Alt+H hotkey-overlay-title="Focus left" { focus-column-left; }
+    Alt+H hotkey-overlay-title="Focus left" { focus-column-or-monitor-left; }
 
     // Focus right.
-    Alt+L hotkey-overlay-title="Focus right" { focus-column-right; }
+    Alt+L hotkey-overlay-title="Focus right" { focus-column-or-monitor-right; }
 
     // Alt+wheel follows the horizontal column order; keep Shift+wheel for apps.
     Alt+WheelScrollUp cooldown-ms=150 hotkey-overlay-title="Focus left" { focus-column-left; }
@@ -192,10 +193,10 @@ binds {
     Alt+WheelScrollDown cooldown-ms=150 hotkey-overlay-title="Focus right" { focus-column-right; }
 
     // Focus up.
-    Alt+K hotkey-overlay-title="Focus up" { focus-window-up; }
+    Alt+K hotkey-overlay-title="Focus up" { focus-window-or-monitor-up; }
 
     // Focus down.
-    Alt+J hotkey-overlay-title="Focus down" { focus-window-down; }
+    Alt+J hotkey-overlay-title="Focus down" { focus-window-or-monitor-down; }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Move Windows
