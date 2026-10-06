@@ -90,7 +90,9 @@ Singleton {
 
     Process {
         id: watchProc
-        command: ["skwd-helm", "watch"]
+        // Service shutdown/crashes can bypass QML destructors. Tie this listener
+        // to its Quickshell parent so the next event cannot hit an orphan's pipe.
+        command: ["setpriv", "--pdeathsig", "TERM", "skwd-helm", "watch"]
         stdout: SplitParser {
             onRead: line => {
                 try {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the real QML backend offscreen against an isolated skwd client."""
-import os, subprocess, tempfile
+import os, signal, subprocess, tempfile, time
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='inir-qs-test-') as tmp:
@@ -20,6 +20,8 @@ elif sys.argv[1]=='apply':
  if sys.argv[2]=='/fail.png':sys.exit(7)
  with (p/'applies').open('a') as f:f.write(sys.argv[2]+'\\n')
 elif sys.argv[1]=='watch':
+ (p/'watch.pid').write_text(str(os.getpid()))
+ if os.environ.get('MOCK_HOLD')=='1': time.sleep(30); sys.exit(0)
  time.sleep(1.5)
  (p/'event').touch()
  print(json.dumps({'event':'skwd.wall.applied'}),flush=True)
@@ -38,6 +40,7 @@ ShellRoot {
   running: true; repeat: true; interval: 50
   onTriggered: {
    root.ticks++
+   if (Quickshell.env("MOCK_HOLD") === "1") return
    if (root.ticks > 100) { console.error("FAIL timeout stage="+root.stage+" error="+SkwdBackend.lastError); Qt.quit(); return }
    if (root.stage === 0 && SkwdBackend.available) {
     if (SkwdBackend.wallpaperPath("eDP-2") !== "/original.png") { console.error("FAIL initial"); Qt.quit(); return }
@@ -59,3 +62,38 @@ ShellRoot {
  assert 'PASS state query' in result.stdout
  assert 'FAIL' not in result.stdout
  assert (p/'applies').read_text().splitlines()==['/first.mp4','/latest.gif']
+
+ # Closing settings or restarting the service must not leave its watch client
+ # behind. In particular, SIGTERM/SIGKILL need not run QML destructors.
+ def alive(pid):
+  try:
+   return Path(f'/proc/{pid}/stat').read_text().split(') ',1)[1][0] != 'Z'
+  except FileNotFoundError:
+   return False
+
+ def wait_dead(pid):
+  deadline=time.monotonic()+2
+  while alive(pid) and time.monotonic()<deadline: time.sleep(.02)
+  return not alive(pid)
+
+ assert wait_dead(int((p/'watch.pid').read_text())), 'Watcher survived normal QML exit'
+ for stop_signal in (signal.SIGTERM, signal.SIGKILL):
+  (p/'watch.pid').unlink()
+  process=subprocess.Popen(['qs','-p',str(p),'--no-color'],env=dict(env,MOCK_HOLD='1',QS_DISABLE_CRASH_HANDLER='1'),
+                           stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  pid=None
+  try:
+   deadline=time.monotonic()+5
+   while not (p/'watch.pid').exists() and time.monotonic()<deadline:
+    assert process.poll() is None, 'Quickshell failed before watch started'
+    time.sleep(.02)
+   pid=int((p/'watch.pid').read_text())
+   assert alive(pid), 'Watch client did not start'
+   process.send_signal(stop_signal)
+   process.wait(timeout=3)
+   assert wait_dead(pid), f'Watcher survived Quickshell {stop_signal.name}'
+  finally:
+   if process.poll() is None:
+    process.kill(); process.wait(timeout=3)
+   if pid is not None and alive(pid): os.kill(pid,signal.SIGKILL)
+ print('PASS watch cleanup after QML exit, SIGTERM and SIGKILL')
