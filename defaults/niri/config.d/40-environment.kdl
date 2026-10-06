@@ -16,8 +16,8 @@ environment {
     QT_IM_MODULE null
     SDL_IM_MODULE null
     EDITOR "nvim"
-    // AMD drives eDP, NVIDIA drives HDMI. Keep Niri's automatic GPU selection.
-    // AQ_DRM_DEVICES/WLR_* are not Niri settings. Do not force all apps offload.
+    // GPU selection lives in 05-personal-gpu.kdl; do not use Hyprland's
+    // AQ_DRM_DEVICES or WLR_* variables to select Niri's primary renderer.
 
     // Tell apps which compositor is running (used by xdg-desktop-portal, etc.).
     XDG_CURRENT_DESKTOP "niri"

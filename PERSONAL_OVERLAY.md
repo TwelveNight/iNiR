@@ -97,10 +97,17 @@ Niri 的标准 `niri-session` 入口会通过 `niri-shutdown.target` 停止图�
 
 本机内屏 eDP-2 接 AMD Cezanne，HDMI-A-1 接 NVIDIA RTX 3060 Laptop。
 两张卡驱动均已加载；NVIDIA 615.71.09 的 DRM modeset 已开启，Niri 为 26.04。
-保留 Niri 自动选卡和多 GPU 输出支持，不复制 `AQ_DRM_DEVICES`、`WLR_*`，
-也不全局设置 `__NV_PRIME_RENDER_OFFLOAD`、`__GLX_VENDOR_LIBRARY_NAME` 或 `LIBVA_DRIVER_NAME=nvidia`。
-需要独显的单个程序可使用现有 `prime-run <程序>`；不改变其他桌面的驱动设置。
-当前尚未实测 GDM 登录后的多屏渲染、休眠唤醒和独显 offload。
+独立的 `config.d/05-personal-gpu.kdl` 按
+[Niri 官方 render-drm-device 文档](https://niri-wm.github.io/niri/Configuration%3A-Debug-Options.html#render-drm-device)
+指定 NVIDIA 为主渲染卡，使用稳定的 PCI render-node 路径；AMD 继续参与内屏输出。
+Wayland 应用可通过 Niri 的 DMA-BUF 反馈选择主卡；Niri 启动的 GLX/XWayland、Vulkan
+应用另有 NVIDIA PRIME 偏好。不复制 `AQ_DRM_DEVICES`、`WLR_*`，不设置全局驱动环境文件。
+`INIR_SHELL_GPU_PREFERENCE=integrated` 让 iNiR Quickshell 单独使用 AMD Mesa EGL/OpenGL/Vulkan，
+与 `resources.monitorGpu` 开关无关。Shell 启动普通应用时恢复覆盖前的应用 GPU 变量，
+不会把 AMD 限制传给应用；`INIR_GPU_FORCE_DEFAULT=1` 可跳过 Shell 的 GPU 覆盖。
+只影响 Niri/iNiR，不改变 Hyprland、II、鼠标样式或共享壁纸服务。
+主 GPU 在 Niri 启动时确定，热重载不能切换；同步后需退出 Niri 再从 GDM 登录，
+并重启旧应用。重登后的应用选卡、多屏渲染、休眠唤醒及流畅度仍需实际验收。
 若实际观察到 Niri 的 NVIDIA 显存异常增长，再按
 [Niri 官方 NVIDIA 文档](https://niri-wm.github.io/niri/Nvidia.html)
 为 `niri` 进程设置 `GLVidHeapReuseRatio=0`；本次未全局添加驱动补丁。

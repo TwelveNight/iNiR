@@ -1623,10 +1623,12 @@ _get_systemd_user_env() {
 _niri_app_environment_file() {
     local niri_dir="${XDG_CONFIG_HOME:-$HOME/.config}/niri"
     local root_cfg="${niri_dir}/config.kdl"
-    local modular_cfg="${niri_dir}/config.d/40-environment.kdl"
+    # Default source: config.d/40-environment.kdl; also read the personal GPU layer.
+    local filename="${1:-40-environment.kdl}"
+    local modular_cfg="${niri_dir}/config.d/${filename}"
 
     if [[ -f "$modular_cfg" ]] && { [[ ! -f "$root_cfg" ]] \
-            || grep -Eq '^[[:space:]]*include[[:space:]]+"config\.d/40-environment\.kdl"[[:space:]]*$' "$root_cfg"; }; then
+            || grep -Eq "^[[:space:]]*include[[:space:]]+\"config[.]d/${filename//./[.]}\"[[:space:]]*$" "$root_cfg"; }; then
         printf '%s' "$modular_cfg"
     elif [[ -f "$root_cfg" ]]; then
         printf '%s' "$root_cfg"
@@ -1651,12 +1653,33 @@ apply_niri_app_environment() {
         value="$(_niri_app_environment_value "$name" "$cfg")"
         [[ -n "$value" ]] && export "${name}=${value}"
     done
+    # systemd does not inherit Niri's spawn environment. Mirror only the
+    # personal app-GPU defaults before applying the Shell's separate policy.
+    cfg="$(_niri_app_environment_file 05-personal-gpu.kdl)"
+    for name in __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME \
+                __VK_LAYER_NV_optimus INIR_SHELL_GPU_PREFERENCE; do
+        value="$(_niri_app_environment_value "$name" "$cfg")"
+        [[ -n "$value" ]] && export "${name}=${value}"
+    done
+    return 0
+}
+
+_inir_set_shell_gpu_var() {
+    local name="$1" value="$2" saved="INIR_GPU_APP_$1"
+    # Preserve the app-facing value once, including an explicit empty value.
+    # ShellExec restores it before launching user apps; the user manager may
+    # not have Niri's spawn-only NVIDIA policy in its environment.
+    if [[ " ${INIR_SHELL_GPU_POLICY_VARS:-} " != *" $name "* ]]; then
+        [[ -v $name ]] && export "$saved=${!name}"
+        export INIR_SHELL_GPU_POLICY_VARS="${INIR_SHELL_GPU_POLICY_VARS:+$INIR_SHELL_GPU_POLICY_VARS }$name"
+    fi
+    export "$name=$value"
 }
 
 apply_gpu_policy() {
-    # Pin Qt/Mesa to the iGPU on hybrid laptops so the dGPU can stay in
-    # runtime PM suspend.  Coupled to resources.monitorGpu (Settings UI):
-    # only fires when the user disabled GPU monitoring.  See #106, #136.
+    # An explicit integrated preference pins only Quickshell to the iGPU,
+    # regardless of GPU polling. Without it, retain upstream's power-saving
+    # policy when monitoring is disabled. See #106, #136.
     # Hard opt-out: INIR_GPU_FORCE_DEFAULT=1.
     [[ "${INIR_GPU_FORCE_DEFAULT:-0}" == "1" ]] && return
 
@@ -1665,14 +1688,16 @@ apply_gpu_policy() {
         local _gpu_cfg
         _gpu_cfg="$(inir_config_file 2>/dev/null)"
         if [[ -n "$_gpu_cfg" && -f "$_gpu_cfg" ]]; then
-            monitor_gpu="$(jq -r '.resources.monitorGpu // true' "$_gpu_cfg" 2>/dev/null || true)"
+            monitor_gpu="$(jq -r 'if .resources.monitorGpu == false then false else true end' "$_gpu_cfg" 2>/dev/null || true)"
             [[ -z "$monitor_gpu" ]] && monitor_gpu="true"
         fi
     fi
-    [[ "$monitor_gpu" == "true" ]] && return
+    local pin_integrated=false
+    [[ "${INIR_SHELL_GPU_PREFERENCE:-}" == integrated ]] && pin_integrated=true
+    [[ "$monitor_gpu" == "true" && "$pin_integrated" == false ]] && return
 
     # Hybrid detection via DRM boot_vga (1=iGPU primary, 0=dGPU secondary).
-    local igpu_pci="" has_dgpu=""
+    local igpu_pci="" igpu_device="" has_dgpu=""
     local card bvga_file boot_vga dev_link
     for card in /sys/class/drm/card*; do
         [[ -d "$card" ]] || continue
@@ -1682,6 +1707,8 @@ apply_gpu_policy() {
         if [[ "$boot_vga" == "1" && -z "$igpu_pci" ]]; then
             dev_link=$(readlink -f "${card}/device" 2>/dev/null)
             igpu_pci=$(printf '%s\n' "$dev_link" | grep -oE '[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]' | tail -1)
+            igpu_device="$(cat "${card}/device/vendor" 2>/dev/null):$(cat "${card}/device/device" 2>/dev/null)"
+            igpu_device="${igpu_device//0x/}"
         elif [[ "$boot_vga" == "0" ]]; then
             has_dgpu=1
         fi
@@ -1691,63 +1718,60 @@ apply_gpu_policy() {
     # Track only variables iNiR injects for the shell. App launchers use this
     # marker to remove shell-only GPU policy before starting user applications,
     # so Steam/Wine/compute workloads retain the user's normal GPU selection.
-    local _gpu_policy_vars=""
 
     # Vulkan loader: skip NVIDIA's ICD entirely (loader 1.3.207+).  Without
     # this the loader dlopens libnvidia-* during enumeration, which is what
     # opens the /dev/nvidia* fds in #136's lsof.
-    if [[ -z "${VK_LOADER_DRIVERS_DISABLE:-}" ]]; then
-        export VK_LOADER_DRIVERS_DISABLE="*nvidia*"
-        _gpu_policy_vars+=" VK_LOADER_DRIVERS_DISABLE"
+    if [[ -z "${VK_LOADER_DRIVERS_DISABLE:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var VK_LOADER_DRIVERS_DISABLE "*nvidia*"
     fi
-    # Mesa Vulkan device-select: prefer the iGPU PCI bus.
-    if [[ -z "${MESA_VK_DEVICE_SELECT:-}" ]]; then
-        export MESA_VK_DEVICE_SELECT="pci-$igpu_pci"
-        _gpu_policy_vars+=" MESA_VK_DEVICE_SELECT"
+    # Mesa Vulkan device-select uses vendor:device IDs, unlike DRI_PRIME.
+    if [[ -z "${MESA_VK_DEVICE_SELECT:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var MESA_VK_DEVICE_SELECT "$igpu_device"
     fi
-    if [[ -z "${MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE:-}" ]]; then
-        export MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE=1
-        _gpu_policy_vars+=" MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE"
+    if [[ -z "${MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE 1
     fi
     # GLVND: OpenGL via Mesa, not NVIDIA's libGLX.
-    if [[ -z "${__GLX_VENDOR_LIBRARY_NAME:-}" ]]; then
-        export __GLX_VENDOR_LIBRARY_NAME=mesa
-        _gpu_policy_vars+=" __GLX_VENDOR_LIBRARY_NAME"
+    if [[ -z "${__GLX_VENDOR_LIBRARY_NAME:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var __GLX_VENDOR_LIBRARY_NAME mesa
     fi
-    if [[ -z "${__NV_PRIME_RENDER_OFFLOAD:-}" ]]; then
-        export __NV_PRIME_RENDER_OFFLOAD=0
-        _gpu_policy_vars+=" __NV_PRIME_RENDER_OFFLOAD"
+    if [[ -z "${__NV_PRIME_RENDER_OFFLOAD:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var __NV_PRIME_RENDER_OFFLOAD 0
     fi
     # Qt FFmpeg: keep the NVIDIA decoder paths out without disabling hardware
     # decoding altogether. VAAPI uses the Mesa iGPU selected above; when VAAPI
     # is unavailable Qt falls back to software decoding instead of waking CUDA.
-    if [[ -z "${QT_FFMPEG_DECODING_HW_DEVICE_TYPES+x}" ]]; then
-        export QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi
-        _gpu_policy_vars+=" QT_FFMPEG_DECODING_HW_DEVICE_TYPES"
+    if [[ -z "${QT_FFMPEG_DECODING_HW_DEVICE_TYPES+x}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var QT_FFMPEG_DECODING_HW_DEVICE_TYPES vaapi
     fi
     # NVIDIA optimus Vulkan layer: pretend iGPU only.
-    if [[ -z "${__VK_LAYER_NV_optimus:-}" ]]; then
-        export __VK_LAYER_NV_optimus=non_NVIDIA_only
-        _gpu_policy_vars+=" __VK_LAYER_NV_optimus"
+    if [[ -z "${__VK_LAYER_NV_optimus:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var __VK_LAYER_NV_optimus non_NVIDIA_only
     fi
     # Block legacy NVIDIA VDPAU probing; Qt Multimedia still has VAAPI above.
-    if [[ -z "${VDPAU_DRIVER:-}" ]]; then
-        export VDPAU_DRIVER=none
-        _gpu_policy_vars+=" VDPAU_DRIVER"
+    if [[ -z "${VDPAU_DRIVER:-}" || "$pin_integrated" == true ]]; then
+        _inir_set_shell_gpu_var VDPAU_DRIVER none
     fi
 
-    if [[ -n "$_gpu_policy_vars" ]]; then
-        export INIR_SHELL_GPU_POLICY_VARS="${_gpu_policy_vars# }"
+    if [[ "$pin_integrated" == true ]]; then
+        # GLVND EGL must use Mesa even when Wayland advertises NVIDIA as its
+        # primary GPU. DRI_PRIME selects the iGPU inside Mesa using its PCI ID.
+        local mesa_egl=/usr/share/glvnd/egl_vendor.d/50_mesa.json
+        if [[ -f "$mesa_egl" ]]; then
+            _inir_set_shell_gpu_var __EGL_VENDOR_LIBRARY_FILENAMES "$mesa_egl"
+        fi
+        _inir_set_shell_gpu_var DRI_PRIME "pci-${igpu_pci//[:.]/_}"
     fi
 }
 
 apply_qt_runtime_env() {
     # Must run before Qt reads env at QGuiApplication construction.
-    apply_gpu_policy
     # inir.service is started by systemd, not as a direct Niri child. Mirror
     # Niri's app-facing policy so Quickshell and apps launched through it see
     # the same Qt platform/style values as direct compositor spawns.
     apply_niri_app_environment
+    apply_gpu_policy
 
     # Scene graph texture atlas.  Qt allocates one atlas per QQuickWindow, and
     # the shell runs ~9 of them (bar, background, backdrop, dock, strip, pill,

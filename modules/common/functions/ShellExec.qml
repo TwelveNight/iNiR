@@ -112,9 +112,16 @@ Singleton {
             done
 
             # The launcher marks exactly which GPU variables iNiR injected for
-            # the shell. Restore user values (or unset them) before games/apps.
+            # the shell. Prefer the Niri app value captured before the Shell
+            # override: spawn-only values may be absent from the user manager.
             for _var in $INIR_SHELL_GPU_POLICY_VARS; do
-                restore_from_manager "$_var"
+                _saved="INIR_GPU_APP_$_var"
+                if [[ -v $_saved ]]; then
+                    export "$_var=\${!_saved}"
+                else
+                    restore_from_manager "$_var"
+                fi
+                unset "$_saved"
             done
             unset INIR_SHELL_GPU_POLICY_VARS INIR_DISABLE_HOT_RELOAD
 

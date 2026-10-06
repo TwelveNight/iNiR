@@ -45,6 +45,15 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     # Install the separate personal layer once; preserve subsequent user edits.
     root_config = niri / "config.kdl"
     root_text = root_config.read_text()
+    gpu_anchor = 'include "config.d/10-input-and-cursor.kdl"'
+    gpu_include = 'include "config.d/05-personal-gpu.kdl"'
+    if gpu_anchor in root_text:
+        personal_gpu = niri / "config.d/05-personal-gpu.kdl"
+        if not personal_gpu.exists():
+            template = Path(__file__).resolve().parents[2] / "defaults/niri/config.d/05-personal-gpu.kdl"
+            personal_gpu.write_text(template.read_text())
+        if gpu_include not in root_text:
+            root_text = root_text.replace(gpu_anchor, gpu_include + "\n" + gpu_anchor, 1)
     upstream_include = 'include "config.d/70-binds.kdl"'
     personal_include = 'include "config.d/75-personal-binds.kdl"'
     if upstream_include in root_text:
