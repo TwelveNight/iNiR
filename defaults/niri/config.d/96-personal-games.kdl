@@ -1,0 +1,23 @@
+// Per-game rules, loaded by 90-user-extra.kdl after the upstream rules.
+// Inspect actual app-id/title with `niri msg windows`: Proton sideloads can
+// share steam_app_default, so always pair that ID with the game's main title.
+// Do not fullscreen Heroic, every Wine window, or Windows launchers/dialogs.
+// Fullscreen belongs to the game: forcing a windowed Wine client fullscreen
+// can retain its old buffer size and crop the bottom on another output.
+// https://niri-wm.github.io/niri/Configuration%3A-Window-Rules.html
+
+// Arknights: Heroic + Proton-CachyOS currently uses steam_app_default on
+// native Wine Wayland. Also recognize executable IDs used by Wine/Xwayland.
+window-rule {
+    match app-id=r#"(?i)^(steam_app_default|(?:wine\.)?arknights(?:\.exe)?)$"# title=r#"^(明日方舟|Arknights)$"#
+
+    // Start on the 100% external output so Wine chooses its size at launch.
+    // Niri falls back to an available output if this monitor is disconnected.
+    open-on-output "HDMI-A-1"
+    geometry-corner-radius 0
+    clip-to-geometry false
+    opacity 1.0
+    border { off; }
+    focus-ring { off; }
+    shadow { off; }
+}

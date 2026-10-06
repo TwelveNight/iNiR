@@ -103,6 +103,25 @@ def configure_personal_input(niri):
         extra.write_text(text.rstrip() + "\n\n// Personal input preferences; keep upstream input untouched.\n" + include + "\n")
 
 
+def configure_personal_games(niri):
+    """Load game-specific rules after upstream, without replacing user rules."""
+    root = niri / "config.kdl"
+    if 'include "config.d/90-user-extra.kdl"' not in root.read_text():
+        return
+    extra = niri / "config.d/90-user-extra.kdl"
+    target = niri / "config.d/96-personal-games.kdl"
+    if extra.is_symlink() or target.is_symlink() or target.parent.is_symlink():
+        raise ValueError("Personal game config must not redirect to another file")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.exists():
+        template = Path(__file__).resolve().parents[2] / "defaults/niri/config.d/96-personal-games.kdl"
+        target.write_text(template.read_text())
+    text = extra.read_text() if extra.exists() else ""
+    include = 'include "96-personal-games.kdl"'
+    if not re.search(r'^\s*include\s+"96-personal-games\.kdl"\s*(?://.*)?$', text, re.MULTILINE):
+        extra.write_text(text.rstrip() + "\n\n// Per-game window policy; keep upstream and launchers unchanged.\n" + include + "\n")
+
+
 def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     paths = {
         "INIR_CONFIG_DIR": str(config_dir),
@@ -118,6 +137,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     root_config = niri / "config.kdl"
     root_text = root_config.read_text()
     configure_personal_input(niri)
+    configure_personal_games(niri)
     gpu_anchor = 'include "config.d/10-input-and-cursor.kdl"'
     gpu_include = 'include "config.d/05-personal-gpu.kdl"'
     if gpu_anchor in root_text:

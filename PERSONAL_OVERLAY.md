@@ -102,6 +102,53 @@ Docker Desktop 和 Sunshine 的用户服务取消自动启用，仍可手动启�
 习惯一致。由用户文件 `90-user-extra.kdl` 引入；不改 `10-input-and-cursor.kdl`，
 也不改鼠标滚轮方向、光标样式或多指工作区手势。安装器保留此文件后续个人修改。
 
+## Windows 游戏窗口与 Heroic
+
+个人游戏规则放在 `config.d/96-personal-games.kdl`，由安装器接入
+`90-user-extra.kdl`，后续保留用户编辑。上游窗口规则和 Heroic 启动器窗口保持独立。
+
+明日方舟在当前 Heroic + Proton-CachyOS + Wine Wayland 组合下，主窗口实际
+`app-id` 是 `steam_app_default`，标题是 `明日方舟`。它没有命中上游仅匹配
+`steam_app_[0-9]+` / `wine` / `wine64` 的游戏规则。个人规则同时匹配主窗口的
+身份和标题，移除游戏窗口的圆角裁剪、边框、阴影和
+失焦透明度。另兼容 Wine/Xwayland 常见的 `Arknights.exe` 身份。
+主窗口优先在 `HDMI-A-1` 外屏打开；目标输出不可用时由 Niri 回退到当前
+可用输出。外屏为 2560×1440 / 100%，内屏为 2560×1600 / 125%
+（逻辑尺寸 2048×1280）。实测从内屏启动后强制全屏会裁掉底部，
+直接从外屏启动则正常，且用户确认全屏和流畅度恢复。因此优先在初次配置
+窗口时选定外屏，避免启动后再强制拉伸。此输出规则已通过 Niri 校验；
+从内屏发起启动时自动选外屏的行为尚未单独重启验证。
+游戏自行控制全屏状态，不设置 `open-fullscreen`。
+
+游戏自身的显示模式也要设置为**全屏/无边框全屏**：Unity 保存的窗口模式会
+产生带标题和关闭按钮的 Wine 窗口；只把窗口分辨率设为屏幕分辨率不会变成全屏。
+2026-10-06 实测原有 `Screenmanager Fullscreen mode` 为 3（窗口模式），在游戏内
+修改后为 1（无边框全屏），标题栏消失。优先通过游戏设置保存，不直接编辑
+正在运行的 Wine 注册表，不为所有 Windows 程序强制全屏。
+
+本机的 Heroic 游戏设置保留已经验证的组合：
+
+| 设置 | 明日方舟当前值 |
+| --- | --- |
+| Runner | Proton-CachyOS-latest |
+| Wine 原生 Wayland | 开启；实际加载 `winewayland.drv`，禁用 `winex11.drv` |
+| NVIDIA PRIME | 开启；进程实际加载 NVIDIA Vulkan/GL 驱动 |
+| DXVK / VKD3D | 沿用 Heroic 已有配置 |
+| Gamescope / Gamescope 限帧 | 未启用 |
+| MangoHud、额外帧率限制、HDR | 未启用 |
+| 游戏文件、Wine prefix | 保留现有路径 |
+
+不要为了全屏改系统级 `DISPLAY`、`WINEDLLOVERRIDES` 或强制所有游戏使用
+同一种窗口后端；原生 Wine Wayland 不兼容的游戏可在 **Heroic 的单游戏设置**
+关闭 Wine Wayland，经现有 xwayland-satellite 运行。需要固定渲染尺寸或嵌套
+合成器的游戏再单独考虑 Gamescope，不因标题栏问题启用它。
+
+新增游戏时先用 `niri msg windows` 核实主窗口 `app-id` 和标题，再在个人游戏文件
+增加专用规则。多个 Proton sideload 可能共用 `steam_app_default`，不能只凭这个
+身份把启动器、对话框和其他游戏全部全屏。参考
+[Niri 窗口规则](https://niri-wm.github.io/niri/Configuration%3A-Window-Rules.html#open-fullscreen)
+和 [Niri Xwayland 说明](https://niri-wm.github.io/niri/Xwayland.html)。
+
 ## 显示屏开关
 
 “显示器 → 输出 → 显示屏开关”和“合成器 → 显示器”可单独开关连接的屏幕，
