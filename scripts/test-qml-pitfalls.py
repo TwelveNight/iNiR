@@ -6,6 +6,7 @@ warning in the log. Each check below was confirmed to fail on the Qt 6.9 floor a
 declaration per line, as this codebase is formatted:
 
 - Two handlers for the same signal in one object ("Property value set multiple times").
+- Two assignments to the same property in one object (the same load failure).
 - `Behavior on` a readonly property of the same object ("Invalid property assignment").
 - `component X: …` inside another inline component ("Nested inline components are not supported").
 - A JS method named `escape` ("Illegal method name").
@@ -32,6 +33,7 @@ NOT_ITEM = re.compile(r"^(?:\w*Window|WlSessionLock\w*|QtObject|Scope|Singleton|
                       r"FrameAnimation|IpcHandler|Shortcut|GlobalShortcut|StdioCollector|SplitParser|\w*Model|\w*Proxy)$")
 PROPERTY = re.compile(r"\bproperty\s+[\w.<>]+\s+(\w+)\b")
 HANDLER = re.compile(r"^\s*(on[A-Z]\w*)\s*:")
+ASSIGNMENT = re.compile(r"^\s*([a-zA-Z_]\w*(?:\.\w+)*)\s*:")
 READONLY = re.compile(r"\breadonly\s+property\s+[\w.<>]+\s+(\w+)")
 BEHAVIOR = re.compile(r"\bBehavior\s+on\s+(\w+)\s*\{")
 COMPONENT = re.compile(r"^\s*component\s+(\w+)\s*:")
@@ -49,7 +51,10 @@ def scan(rel: str, text: str) -> list:
     # Open blocks: an object block holds its handlers, readonly properties and whether it is an inline component's body;
     # JS blocks are None, so a handler-like key inside a JS object literal does not count.
     stack = []
+    in_function_signature = False
     for number, line in enumerate(blank(text).splitlines(), 1):
+        if re.search(r"\bfunction\s+\w+\s*\(", line) and "{" not in line:
+            in_function_signature = True
         obj = stack[-1] if stack and stack[-1] is not None else None
         handler = HANDLER.match(line)
         if handler and obj is not None:
@@ -58,6 +63,12 @@ def scan(rel: str, text: str) -> list:
                 out.append(f"{rel}:{number}: second `{handler.group(1)}` handler in one object (first at line "
                            f"{first}): the component fails to load")
         if obj is not None:
+            assignment = ASSIGNMENT.match(line)
+            if assignment and not HANDLER.match(line) and not in_function_signature:
+                first = obj["assignments"].setdefault(assignment.group(1), number)
+                if first != number:
+                    out.append(f"{rel}:{number}: second `{assignment.group(1)}` assignment in one object "
+                               f"(first at line {first}): the component fails to load")
             obj["readonly"].update(READONLY.findall(line))
             if obj["item"]:
                 for name in PROPERTY.findall(line):
@@ -81,11 +92,13 @@ def scan(rel: str, text: str) -> list:
         opened = OBJECT_OPEN.search(line) if opens == 1 and closes == 0 else None
         if opened:
             kind = opened.group(1).split(".")[-1]
-            stack.append({"handlers": {}, "readonly": set(), "component": bool(component),
+            stack.append({"handlers": {}, "assignments": {}, "readonly": set(), "component": bool(component),
                           "item": not NOT_ITEM.match(kind)})
         else:
             stack.extend([None] * max(0, opens - closes))
             del stack[len(stack) - min(len(stack), max(0, closes - opens)):]
+        if in_function_signature and opens:
+            in_function_signature = False
     return out
 
 

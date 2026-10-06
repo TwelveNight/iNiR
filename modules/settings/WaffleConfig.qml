@@ -200,9 +200,8 @@ ContentPage {
             }
 
             SettingsSwitch {
-                visible: Config.options?.waffles?.background?.backdrop?.enable ?? true
+                visible: !Wallpapers.skwdBackendEnabled && (Config.options?.waffles?.background?.backdrop?.enable ?? true)
                 buttonIcon: "play_circle"
-                visible: !Wallpapers.skwdBackendEnabled
                 text: Translation.tr("Enable animated wallpapers (videos/GIFs)")
                 checked: Config.options?.waffles?.background?.backdrop?.enableAnimation ?? false
                 onCheckedChanged: {
