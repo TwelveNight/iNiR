@@ -42,6 +42,9 @@ binds {
     // iNiR Shell
     // ═══════════════════════════════════════════════════════════════════════
 
+    // Toggle Orbit; replace the upstream Mod+Tab Niri overview action.
+    Mod+Tab repeat=false hotkey-overlay-title="Orbit" { spawn "inir" "orbit" "toggle"; }
+
     // Power menu.
     Ctrl+Alt+Delete repeat=false hotkey-overlay-title="Power menu" { spawn "inir" "session" "open"; }
 

@@ -2793,6 +2793,7 @@ _KB_IPC_MAP = {
     ("altSwitcher", "previous"): "Previous window",
     ("overlay", "toggle"): "iNiR Overlay",
     ("overview", "toggle"): "iNiR Overview",
+    ("orbit", "toggle"): "Orbit",
     ("clipboard", "toggle"): "Clipboard",
     ("lock", "activate"): "Lock screen",
     ("region", "screenshot"): "Screenshot region",
@@ -3009,6 +3010,7 @@ def _kb_categorize(description: str, action: str) -> str:
         if target in (
             "overlay",
             "overview",
+            "orbit",
             "clipboard",
             "lock",
             "wallpaperSelector",
