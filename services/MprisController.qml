@@ -1306,9 +1306,23 @@ Singleton {
 		return ["chromium", "googlechrome", "chrome", "firefox", "zen", "brave", "vivaldi", "opera", "librewolf", "floorp", "waterfox"].includes(key);
 	}
 
+	readonly property var desktopHintCache: {
+		void AppSearch.desktopLookupCache;
+		return new Map();
+	}
+
 	function _desktopEntryForHint(value): var {
 		const hint = root._cleanDisplayName(value);
 		if (!hint.length) return null;
+		const cache = root.desktopHintCache;
+		if (cache.has(hint)) return cache.get(hint);
+		const entry = root._desktopEntryForHintUncached(hint);
+		if (cache.size >= 256) cache.delete(cache.keys().next().value);
+		cache.set(hint, entry);
+		return entry;
+	}
+
+	function _desktopEntryForHintUncached(hint): var {
 		const direct = AppSearch.lookupDesktopEntry(hint);
 		if (direct) return direct;
 		const hintKey = root._volumeKey(hint);

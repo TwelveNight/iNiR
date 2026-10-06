@@ -356,6 +356,9 @@ Scope {
         Region { id: stripRegion }
         property bool published: false
         property bool drawn: false
+        property var lastRuns: null
+        property int lastOriginX: 0
+        property int lastOriginY: 0
         Connections {
             target: strip.contentItem?.Window.window ?? null
             enabled: !strip.drawn
@@ -365,6 +368,20 @@ Scope {
         function publish(runs: var): void {
             const ox = strip.edge === "right" ? Math.round(root.windowWidth) - root.depth : 0
             const oy = strip.edge === "bottom" ? Math.round(root.windowHeight) - root.depth : 0
+            // Subpixel movement often produces the same integer blur region.
+            // Reassigning it still unions every child Region and commits a
+            // Wayland surface; retain it until its actual pixels change.
+            const previous = strip.lastRuns
+            let unchanged = previous !== null && previous.length === runs.length
+                && strip.lastOriginX === ox && strip.lastOriginY === oy
+            for (let n = 0; unchanged && n < runs.length; n++) {
+                const a = previous[n], b = runs[n]
+                unchanged = a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+            }
+            if (unchanged) return
+            strip.lastRuns = runs
+            strip.lastOriginX = ox
+            strip.lastOriginY = oy
             const pool = strip.pool
             while (pool.length < runs.length) {
                 const made = strip.runComponent.createObject(stripRegion)

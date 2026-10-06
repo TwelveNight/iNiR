@@ -19,6 +19,11 @@ Item {
     readonly property real reach: 18 * IrisStyle.density * root.strength
     property real level: 0
     property real phase: 0
+    // Audio arrives at Cava's rate. A display-rate FrameAnimation also redraws
+    // the full chassis and rebuilds its blur regions at 144/165 Hz between
+    // samples. Keep this ambient effect at the source rate, capped at 60 Hz.
+    readonly property int updateFps: Math.max(1, Math.min(60,
+        Number(Config.options?.appearance?.cava?.framerate ?? 60) || 60))
     readonly property real visibleLevel: root.active ? root.level : 0
     readonly property vector4d amplitudes: Qt.vector4d(
         root.edges !== "horizontal" ? root.visibleLevel * root.reach : 0,
@@ -37,20 +42,32 @@ Item {
         active: root.active && (MprisController.activePlayer?.isPlaying ?? false)
         sampleCount: 16
     }
-    FrameAnimation {
-        running: root.active && (cava.held || root.level > 0.002)
-        onTriggered: {
-            const points = cava.points ?? []
-            let bass = 0
-            const count = Math.min(4, points.length)
-            for (let i = 0; i < count; ++i) bass += Number(points[i] ?? 0)
-            bass = count > 0 ? Math.min(1, bass / count / Math.max(1, cava.normalizationCeiling)) : 0
-            bass = Math.min(1, Math.sqrt(bass) * root.sensitivity)
-            const step = Math.min(0.05, frameTime)
-            const rate = bass > root.level ? 18 : 3.2
-            root.level += (bass - root.level) * Math.min(1, rate * step)
-            if (root.level < 0.002 && !cava.held) root.level = 0
+    function advance(elapsed: real): void {
+        const points = cava.held && cava.audioSignalActive ? (cava.points ?? []) : []
+        let bass = 0
+        const count = Math.min(4, points.length)
+        for (let i = 0; i < count; ++i) bass += Number(points[i] ?? 0)
+        bass = count > 0 ? Math.min(1, bass / count / Math.max(1, cava.normalizationCeiling)) : 0
+        bass = Math.min(1, Math.sqrt(bass) * root.sensitivity)
+        const step = Math.max(0, Math.min(0.05, elapsed))
+        const rate = bass > root.level ? 18 : 3.2
+        root.level += (bass - root.level) * Math.min(1, rate * step)
+        if (root.level < 0.002 && bass === 0) root.level = 0
+        if (root.level > 0)
             root.phase = (root.phase + step * (0.6 + 2.4 * root.level) * root.speed) % 6283.185
+    }
+    Timer {
+        property real lastTick: 0
+        interval: Math.ceil(1000 / root.updateFps)
+        repeat: true
+        // A paused/silent stream must stop scheduling frames, even when its
+        // MPRIS player still reports Playing. Let the last pulse settle first.
+        running: root.active && ((cava.held && cava.audioSignalActive) || root.level > 0)
+        onRunningChanged: lastTick = Date.now()
+        onTriggered: {
+            const now = Date.now()
+            root.advance((now - lastTick) / 1000)
+            lastTick = now
         }
     }
 }

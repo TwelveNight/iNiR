@@ -101,9 +101,12 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: !root.open ? WlrKeyboardFocus.None
         : root.pinned || root.peek ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive
-    mask: ownMask
-    Region { id: ownMask; item: !root.open || !frame.armed ? frame : root.pinned || root.peek ? peekZone : dismiss }
-    MouseArea { id: dismiss; anchors.fill: parent; enabled: !root.pinned && !root.peek; onClicked: root.close() }
+    // Retained panels may still be mapped while their closing animation runs.
+    // Release input immediately; object residency must never retain a grab.
+    mask: root.open ? ownMask : emptyMask
+    Region { id: emptyMask }
+    Region { id: ownMask; item: !frame.armed ? frame : root.pinned || root.peek ? peekZone : dismiss }
+    MouseArea { id: dismiss; anchors.fill: parent; enabled: root.open && !root.pinned && !root.peek; onClicked: root.close() }
 
     Item {
         id: peekZone
@@ -128,6 +131,7 @@ PanelWindow {
     }
     HoverHandler {
         id: peekHover
+        enabled: root.open
         property point last: Qt.point(-1, -1)
         onHoveredChanged: if (!hovered) peekZone.release()
         onPointChanged: {
@@ -167,6 +171,7 @@ PanelWindow {
         // Out of its own edge, never faded: nothing sits between it and that edge to hide behind.
         behindOrigin: false
         id: frame
+        enabled: root.open
         compositorBlurred: true
         ownField: !root.notch
         fieldBacked: root.notch

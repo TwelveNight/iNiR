@@ -1144,7 +1144,9 @@ Loader {
         id: mixerComponent
         Section {
             id: mixer
-            readonly property var streams: Audio.outputAppNodes.filter(node => node?.audio)
+            // Keep the panel tree, but release the live mixer subscription and
+            // its delegates while hidden. PipeWire metadata can change often.
+            readonly property var streams: root.contentActive ? Audio.outputAppNodes.filter(node => node?.audio) : []
             title: Translation.tr("Sound mixer")
             glyph: "graphic_eq"
             tint: IrisStyle.identity.indigo

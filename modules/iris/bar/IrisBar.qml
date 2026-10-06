@@ -721,7 +721,7 @@ Scope {
                     : barWindow.pinned || stage.cardArmed || (controlCentreLoader.item?.armed ?? false)
                         || (dockLoader.item?.menuOpen ?? false) || (spotlightLoader.item?.armed ?? false)
                         || (galleryLoader.item?.armed ?? false) || (orbitLoader.item?.armed ?? false)
-                        || (islandLoader.item?.morphing ?? false)
+                        || (barWindow.expanded && (islandLoader.item?.morphing ?? false))
                         ? null : chassisRegion
                 Region { id: emptyRegion }
                 component PieceRegion: Region {

@@ -2296,8 +2296,9 @@ Item {
                 : root.vertical && root.grownPage ? (root.rightEdge ? -root.grownInset / 2 : root.grownInset / 2) : 0
             width: Math.max(0, root.expandedWidth - root.padding * 2)
             // Incubated: the chassis spring still waits for Loader.Ready, so nothing moves before the page exists.
-            active: root.expanded || details.opacity > 0.004 || details.warm
+            active: root.expanded || details.opacity > 0.004 || details.warm || details.keepLoaded
             asynchronous: true
+            readonly property bool keepLoaded: Config.options?.iris?.keepPanelsLoaded ?? false
             property bool warm: false
             Timer { id: pageWarmth; interval: 20000; onTriggered: details.warm = false }
             Connections {
@@ -2337,8 +2338,16 @@ Item {
                     property string name: ""
                     property bool bleeds: false
                     readonly property bool current: root.effectivePage === pageItem.name
+                    // Reuse visited pages while warm, or until shell shutdown
+                    // when the user prefers responsiveness over memory savings.
+                    // Otherwise every round trip destroys and synchronously
+                    // recreates the page while the chassis is animating.
+                    property bool visited: false
+                    onCurrentChanged: if (pageItem.current) pageItem.visited = true
+                    Component.onCompleted: pageItem.visited = pageItem.current
                     readonly property bool resident: pageItem.current || pageItem.opacity > 0.004
                         || root.pageIntent === pageItem.name
+                        || (pageItem.visited && (details.warm || details.keepLoaded))
                     readonly property bool switching: root.visualExpanded && details.opacity >= 1
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -2347,7 +2356,7 @@ Item {
                     scale: pageItem.current || pageItem.bleeds ? 1 : 0.97
                     transformOrigin: root.bottomEdge ? Item.Bottom : Item.Top
                     visible: opacity > 0
-                    enabled: pageItem.current
+                    enabled: pageItem.current && root.visualExpanded
                     Behavior on opacity {
                         id: pageFade
                         enabled: pageItem.switching

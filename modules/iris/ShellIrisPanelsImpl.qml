@@ -49,6 +49,7 @@ Item {
         required property bool open
         property bool extraCondition: true
         property bool requireEnabledPanel: true
+        property bool keepLoaded: false
         property int closeGraceMs: IrisStyle.revealDuration + 30
         property bool resident: open
         property Timer closeGrace: Timer {
@@ -68,8 +69,9 @@ Item {
             }
         }
 
-        loading: enabledPanel && resident
-        activeAsync: enabledPanel && GlobalStates.deferredPanelsReady && resident
+        readonly property bool contentWanted: resident || keepLoaded
+        loading: enabledPanel && contentWanted
+        activeAsync: enabledPanel && GlobalStates.deferredPanelsReady && contentWanted
     }
 
     IrisAppsSync {}
@@ -91,6 +93,7 @@ Item {
 
     OnDemandPanelLoader {
         identifier: "irisSidebarLeft"
+        keepLoaded: Config.options?.iris?.keepPanelsLoaded ?? false
         requireEnabledPanel: false
         open: GlobalStates.sidebarLeftOpen
         extraCondition: Config.options?.iris?.sidebars?.left?.enable ?? true
@@ -100,6 +103,7 @@ Item {
 
     OnDemandPanelLoader {
         identifier: "irisSidebarRight"
+        keepLoaded: Config.options?.iris?.keepPanelsLoaded ?? false
         requireEnabledPanel: false
         open: GlobalStates.sidebarRightOpen
         extraCondition: Config.options?.iris?.sidebars?.right?.enable ?? true

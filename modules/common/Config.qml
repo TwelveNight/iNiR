@@ -3911,6 +3911,9 @@ Singleton {
             }
 
             property JsonObject iris: JsonObject {
+                // Preload Island/sidebars and keep visited pages for faster reopening.
+                // Residency is independent of visibility, input and polling.
+                property bool keepPanelsLoaded: false
                 property JsonObject sidebars: JsonObject {
                     property JsonObject left: JsonObject {
                         property bool enable: true

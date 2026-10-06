@@ -180,6 +180,17 @@ Singleton {
     property var _execBasenameMap: ({})
     property var _desktopIdStemMap: ({})
 
+    // Misses matter too: audio stream IDs often have no desktop entry. Reuse
+    // results until the application index changes instead of rescanning it for
+    // every icon binding. Mutating the Map does not notify QML consumers.
+    readonly property var desktopLookupCache: {
+        void DesktopEntries.applications.values;
+        void root._startupClassMap;
+        void root._execBasenameMap;
+        void root._desktopIdStemMap;
+        return new Map();
+    }
+
     readonly property var list: _cachedList
     readonly property var preppedNames: _cachedPreppedNames
     readonly property var preppedIcons: _cachedPreppedIcons
@@ -430,6 +441,15 @@ Singleton {
     // their .desktop file (e.g., "@trezor/suite-desktop" → "trezor-suite.desktop").
     function lookupDesktopEntry(appId) {
         if (!appId || appId.length === 0) return null;
+        const cache = root.desktopLookupCache;
+        if (cache.has(appId)) return cache.get(appId);
+        const entry = root._lookupDesktopEntryUncached(appId);
+        if (cache.size >= 256) cache.delete(cache.keys().next().value);
+        cache.set(appId, entry);
+        return entry;
+    }
+
+    function _lookupDesktopEntryUncached(appId) {
 
         // 1. Quickshell's built-in heuristic (handles simple cases)
         const entry = DesktopEntries.heuristicLookup(appId);

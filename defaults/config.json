@@ -2371,6 +2371,7 @@
         "performancePreset": "balanced"
     },
     "iris": {
+        "keepPanelsLoaded": false,
         "sidebars": {
             "left": {
                 "enable": true, "width": 380, "height": 88,
