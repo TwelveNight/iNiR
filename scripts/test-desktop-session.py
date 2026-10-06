@@ -70,6 +70,18 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(self.manager["AQ_DRM_DEVICES"], "nvidia:amd")
         self.assertEqual(self.manager["XDG_CURRENT_DESKTOP"], "Hyprland")
 
+    def test_inherited_empty_gpu_placeholders_are_not_reimported(self):
+        for desktop in ("niri", "hyprland"):
+            with self.subTest(desktop=desktop):
+                env = dict(WAYLAND_DISPLAY="wayland-1", __EGL_VENDOR_LIBRARY_FILENAMES="",
+                           DRI_PRIME="", VK_LOADER_DRIVERS_DISABLE="",
+                           QT_FFMPEG_DECODING_HW_DEVICE_TYPES="")
+                with patch.object(session, "run", self.fake_run):
+                    session.publish_environment(desktop, env)
+                for name in ("__EGL_VENDOR_LIBRARY_FILENAMES", "DRI_PRIME", "VK_LOADER_DRIVERS_DISABLE"):
+                    self.assertNotIn(name, self.manager)
+                self.assertEqual(self.manager["QT_FFMPEG_DECODING_HW_DEVICE_TYPES"], "")
+
     def test_old_watcher_does_not_stop_new_compositor_or_shared_wallpaper(self):
         self.manager = {"NIRI_SOCKET": "new", "WAYLAND_DISPLAY": "wayland-1"}
         identity = dict(desktop="niri", pid=123, key="NIRI_SOCKET", value="old", wayland="wayland-1")

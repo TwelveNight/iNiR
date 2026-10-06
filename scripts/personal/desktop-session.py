@@ -53,6 +53,12 @@ def session_identity(desktop, env):
 
 def publish_environment(desktop, env):
     env = dict(env)
+    # A prior D-Bus handoff can leave empty placeholders in the login process.
+    # Treat empty GPU selectors as absent, or they get re-imported into systemd
+    # after our unset-environment call. An empty FFmpeg list is intentional.
+    for name in GPU:
+        if name != "QT_FFMPEG_DECODING_HW_DEVICE_TYPES" and env.get(name) == "":
+            env.pop(name)
     env["XDG_CURRENT_DESKTOP"] = "niri" if desktop == "niri" else "Hyprland"
     env["XDG_SESSION_DESKTOP"] = env["XDG_CURRENT_DESKTOP"]
     opposite = ("HYPRLAND_INSTANCE_SIGNATURE", "AQ_DRM_DEVICES",

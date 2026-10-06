@@ -107,9 +107,16 @@ Docker Desktop 和 Sunshine 的用户服务取消自动启用，仍可手动启�
 指定 NVIDIA 为主渲染卡，使用稳定的 PCI render-node 路径；AMD 继续参与内屏输出。
 Wayland 应用可通过 Niri 的 DMA-BUF 反馈选择主卡；Niri 启动的 GLX/XWayland、Vulkan
 应用另有 NVIDIA PRIME 偏好。不复制 `AQ_DRM_DEVICES`、`WLR_*`，不设置全局驱动环境文件。
-`INIR_SHELL_GPU_PREFERENCE=integrated` 让 iNiR Quickshell 单独使用 AMD Mesa EGL/OpenGL/Vulkan，
-与 `resources.monitorGpu` 开关无关。Shell 启动普通应用时恢复覆盖前的应用 GPU 变量，
-不会把 AMD 限制传给应用；`INIR_GPU_FORCE_DEFAULT=1` 可跳过 Shell 的 GPU 覆盖。
+`INIR_SHELL_GPU_PREFERENCE=compositor` 让 iNiR 跟随 Niri 的 GPU 选择，本机为 NVIDIA，
+与 `resources.monitorGpu` 开关无关。2026-10-06 的运行对照中，停止 AMD 渲染的 iNiR 后
+用户确认鼠标明显流畅；将同一套 shell 改为 NVIDIA 后仍然流畅，恢复 AMD 后迟缓复现。
+因此不再把 Hyprland 下 II 的核显策略直接用于 Niri。Hyprland 的 II 设置保持独立。
+`integrated` 选项仍可显式启用；该模式启动普通应用时恢复覆盖前的应用 GPU 变量。
+会话发布器和 iNiR 启动器清除空的 GPU 选择变量，避免 D-Bus 留下的
+`__EGL_VENDOR_LIBRARY_FILENAMES=` 禁用 EGL 驱动。空的 FFmpeg 硬解列表仍保留其软件解码含义。
+
+本次鼠标改善的证据来自 shell GPU 对照。单独的 NVIDIA GEM 内存错误补丁已加载，
+但不能将鼠标改善归因于它；完整 Niri → Hyprland → Niri 切换仍需验证。
 只影响 Niri/iNiR，不改变 Hyprland、II、鼠标样式或共享壁纸服务。
 主 GPU 在 Niri 启动时确定，热重载不能切换；同步后需退出 Niri 再从 GDM 登录，
 并重启旧应用。重登后的应用选卡、多屏渲染、休眠唤醒及流畅度仍需实际验收。

@@ -1,5 +1,5 @@
-// Personal hybrid-GPU policy: NVIDIA renders Niri; AMD remains available for
-// the internal panel and iNiR's Quickshell. GPU changes require a new login.
+// NVIDIA renders Niri and iNiR together. Pinning Quickshell to AMD caused
+// cursor latency on this dual-screen setup; AMD still drives the internal panel.
 // https://niri-wm.github.io/niri/Configuration%3A-Debug-Options.html#render-drm-device
 debug {
     render-drm-device "/dev/dri/by-path/pci-0000:01:00.0-render"
@@ -11,6 +11,6 @@ environment {
     __NV_PRIME_RENDER_OFFLOAD "1"
     __GLX_VENDOR_LIBRARY_NAME "nvidia"
     __VK_LAYER_NV_optimus "NVIDIA_only"
-    // Shell-only override, independent of Resource Monitor GPU polling.
-    INIR_SHELL_GPU_PREFERENCE "integrated"
+    // Keep shell surfaces on the compositor GPU, regardless of GPU polling.
+    INIR_SHELL_GPU_PREFERENCE "compositor"
 }

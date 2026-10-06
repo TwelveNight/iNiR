@@ -5,7 +5,7 @@
 // This config is split into modular files under config.d/ so you can edit
 // individual sections without touching the rest. Niri auto-reloads on save.
 //
-//   05  Personal GPU policy (NVIDIA compositor/apps, AMD shell)
+//   05  Personal GPU policy (NVIDIA compositor, apps and shell)
 //   10  Input, touchpad, mouse, cursor
 //   20  Layout, gaps, borders, shadows, overview
 //   30  Window rules (corner radius, per-app tweaks)

@@ -25,8 +25,10 @@ class GpuPolicyTests(unittest.TestCase):
         (niri.parent / 'config.kdl').write_text(
             'include "config.d/40-environment.kdl"\ninclude "config.d/05-personal-gpu.kdl"\n')
         (niri / '40-environment.kdl').write_text('environment {\nQT_QPA_PLATFORM "wayland"\n}\n')
-        (niri / '05-personal-gpu.kdl').write_text(
-            (ROOT / 'defaults/niri/config.d/05-personal-gpu.kdl').read_text())
+        self.gpu_config = niri / '05-personal-gpu.kdl'
+        self.gpu_config.write_text(
+            (ROOT / 'defaults/niri/config.d/05-personal-gpu.kdl').read_text()
+            .replace('"compositor"', '"integrated"'))
         self.settings = self.base / 'config.json'
         self.settings.write_text('{"resources":{"monitorGpu":true}}')
         drm = self.base / 'drm'
@@ -88,12 +90,25 @@ class GpuPolicyTests(unittest.TestCase):
                      'VK_LOADER_DRIVERS_DISABLE', 'MESA_VK_DEVICE_SELECT']:
             self.assertIsNone(result[name])
 
-    def test_explicit_empty_app_value_survives_and_markers_are_removed(self):
+    def test_empty_egl_placeholder_is_not_restored_to_launched_apps(self):
         self.env['__EGL_VENDOR_LIBRARY_FILENAMES'] = ''
         result = self.run_policy(self.restore_fragment() +
             '\n[[ -z "${INIR_SHELL_GPU_POLICY_VARS+x}" ]]\n' +
             '[[ -z "${INIR_GPU_APP___GLX_VENDOR_LIBRARY_NAME+x}" ]]')
-        self.assertEqual(result['__EGL_VENDOR_LIBRARY_FILENAMES'], '')
+        self.assertIsNone(result['__EGL_VENDOR_LIBRARY_FILENAMES'])
+
+    def test_personal_compositor_policy_survives_disabled_gpu_monitoring(self):
+        self.gpu_config.write_text(
+            (ROOT / 'defaults/niri/config.d/05-personal-gpu.kdl').read_text())
+        self.settings.write_text('{"resources":{"monitorGpu":false}}')
+        self.env['__EGL_VENDOR_LIBRARY_FILENAMES'] = ''
+        self.env['DRI_PRIME'] = ''
+        result = self.run_policy()
+        self.assertEqual(result['__GLX_VENDOR_LIBRARY_NAME'], 'nvidia')
+        self.assertEqual(result['__NV_PRIME_RENDER_OFFLOAD'], '1')
+        self.assertIsNone(result['__EGL_VENDOR_LIBRARY_FILENAMES'])
+        self.assertIsNone(result['DRI_PRIME'])
+        self.assertIsNone(result['VK_LOADER_DRIVERS_DISABLE'])
 
     def test_reapplying_policy_keeps_original_application_values(self):
         result = self.run_policy('apply_gpu_policy\n' + self.restore_fragment())

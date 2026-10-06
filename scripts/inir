@@ -1677,6 +1677,27 @@ _inir_set_shell_gpu_var() {
 }
 
 apply_gpu_policy() {
+    # D-Bus cannot unset activation variables and publishes empty placeholders
+    # at session handoff. In particular an empty EGL vendor list disables all
+    # vendors instead of restoring auto-detection. Normalize device selectors
+    # before capturing app values or deciding whether to override the shell.
+    # Leave QT_FFMPEG_DECODING_HW_DEVICE_TYPES alone: empty intentionally means
+    # software decoding there.
+    local selector
+    for selector in DRI_PRIME __EGL_VENDOR_LIBRARY_FILENAMES \
+                    __GLX_VENDOR_LIBRARY_NAME __NV_PRIME_RENDER_OFFLOAD \
+                    __VK_LAYER_NV_optimus VK_LOADER_DRIVERS_DISABLE \
+                    MESA_VK_DEVICE_SELECT MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE \
+                    LIBVA_DRIVER_NAME VDPAU_DRIVER; do
+        if [[ -v $selector && -z ${!selector} ]]; then
+            unset "$selector"
+        fi
+    done
+
+    # Use the compositor's device selection without the upstream iGPU fallback
+    # when resource monitoring is disabled. No shell-only overrides to restore.
+    [[ "${INIR_SHELL_GPU_PREFERENCE:-}" == compositor ]] && return
+
     # An explicit integrated preference pins only Quickshell to the iGPU,
     # regardless of GPU polling. Without it, retain upstream's power-saving
     # policy when monitoring is disabled. See #106, #136.
