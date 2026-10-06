@@ -116,6 +116,7 @@ Niri 下跳过系统的 Xwayland Video Bridge XDG 自启动项，避免捕获辅
 | 快捷键 | Niri 行为 |
 |---|---|
 | Super+Q | Niri 原生关闭窗口，不经过 Shell 关闭脚本 |
+| Ctrl+Shift+Esc | 在 Kitty 中打开 btop 系统监控 |
 | Alt+H/J/K/L | 左右聚焦列，上下聚焦列内窗口 |
 | Super+H/J/K/L | 左右移动列，上下移动列内窗口 |
 | Super+Shift+H/J/K/L；Super+-/= | 调整窗口宽高，每次 30 像素 |

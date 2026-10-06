@@ -7,6 +7,7 @@
 // See PERSONAL_OVERLAY.md for behavior differences and unsupported actions.
 
 binds {
+    Ctrl+Shift+Escape repeat=false hotkey-overlay-title="System monitor (btop)" { spawn "/usr/bin/kitty" "--title" "btop" "/usr/bin/btop"; }
     // Close through the compositor directly, including XWayland windows.
     Mod+Q repeat=false { close-window; }
     // Hyprland custom frees Super+D; suppress the inherited maximize action.
