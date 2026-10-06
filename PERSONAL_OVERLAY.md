@@ -117,6 +117,12 @@ Wayland 应用可通过 Niri 的 DMA-BUF 反馈选择主卡；Niri 启动的 GLX
 
 本次鼠标改善的证据来自 shell GPU 对照。单独的 NVIDIA GEM 内存错误补丁已加载，
 但不能将鼠标改善归因于它；完整 Niri → Hyprland → Niri 切换仍需验证。
+
+内屏 125% 缩放需要 Qt 的 `QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough`。
+此前强制 `RoundPreferFloor` 会关闭 Qt Wayland 的分数缩放协议，退回 200% 缓冲区：
+2048×1280 逻辑尺寸绘制为 4096×2560，再缩小到 2560×1600，增加绘制与跨显卡复制量。
+启动器和服务统一采用 PassThrough，保留 `QT_SCALE_FACTOR=1` 及 QML 自身的界面缩放。
+Vulkan、实际时间动画驱动和暂停壁纸的对照未消除内屏迟缓，均未作为持久设置保留。
 只影响 Niri/iNiR，不改变 Hyprland、II、鼠标样式或共享壁纸服务。
 主 GPU 在 Niri 启动时确定，热重载不能切换；同步后需退出 Niri 再从 GDM 登录，
 并重启旧应用。重登后的应用选卡、多屏渲染、休眠唤醒及流畅度仍需实际验收。

@@ -137,6 +137,23 @@ class GpuPolicyTests(unittest.TestCase):
         self.assertEqual(result['__GLX_VENDOR_LIBRARY_NAME'], 'nvidia')
         self.assertIsNone(result['VK_LOADER_DRIVERS_DISABLE'])
 
+    def test_shell_scale_preserves_fractional_output_protocol(self):
+        launcher = (ROOT / 'scripts/inir').read_text()
+        function = re.search(r'^apply_shell_scale\(\) \{.*?^\}', launcher, re.M | re.S)[0]
+        names = ['QT_SCALE_FACTOR', 'QT_SCALE_FACTOR_ROUNDING_POLICY',
+                 'QT_SCREEN_SCALE_FACTORS', 'QT_FONT_DPI', 'QT_WAYLAND_FORCE_DPI']
+        env = dict(self.env, QT_SCALE_FACTOR='2', QT_SCALE_FACTOR_ROUNDING_POLICY='RoundPreferFloor',
+                   QT_SCREEN_SCALE_FACTORS='eDP-2=2', QT_FONT_DPI='192', QT_WAYLAND_FORCE_DPI='192')
+        script = function + '\napply_shell_scale\npython3 -c ' + repr(
+            'import os,json;print(json.dumps({k:os.environ.get(k) for k in ' + repr(names) + '}))')
+        result = json.loads(subprocess.check_output(['bash', '-euc', script], env=env, text=True))
+        self.assertEqual(result['QT_SCALE_FACTOR'], '1')
+        self.assertEqual(result['QT_SCALE_FACTOR_ROUNDING_POLICY'], 'PassThrough')
+        for name in names[2:]:
+            self.assertIsNone(result[name])
+        self.assertIn('Environment=QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough',
+                      (ROOT / 'assets/systemd/inir.service').read_text())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -20,11 +20,11 @@ BusName=org.kde.StatusNotifierWatcher
 
 # Pre-seed stable environment so the bash wrapper skips detection at boot.
 # QT_SCALE_FACTOR must be 1 — shell scaling is handled in QML.
-# QT_SCALE_FACTOR_ROUNDING_POLICY=RoundPreferFloor prevents blurry rendering
-# when compositor uses fractional scaling (1.25 etc) — Qt rounds to integer.
+# PassThrough enables Qt Wayland's fractional-scale protocol. Integer rounding
+# can supersample fractional outputs at their next integer buffer scale.
 # QT_LOGGING_RULES suppresses noisy Qt/KF warnings.
 Environment=QT_SCALE_FACTOR=1
-Environment=QT_SCALE_FACTOR_ROUNDING_POLICY=RoundPreferFloor
+Environment=QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough
 Environment=QT_LOGGING_RULES=quickshell.dbus.properties=false;qt.qml.settings.warning=false;qt.core.qsettings.warning=false;kf.xmlgui=false;kf.coreaddons=false;kf.config.core=false;kf.iconthemes=false
 
 ExecStart=/usr/bin/inir run --session
