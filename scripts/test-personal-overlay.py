@@ -316,7 +316,7 @@ install-python-packages
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
-        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf", "niri-session-environment.conf", "disable-autostart.sh", "wallpaper-session.conf"]:
+        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf", "niri-session-environment.conf", "disable-autostart.sh", "wallpaper-session.conf", "inir-output-wallpaper.service"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)

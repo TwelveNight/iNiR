@@ -104,6 +104,25 @@ Waffle 的显示器设置也提供相同入口。关闭后仍保留列表入口�
 重新登录或更改输出配置可能重置开关。窗口会按 Niri 的规则迁移到剩余屏幕。
 此功能仅对 Niri 生效，不修改 Hyprland/II。
 
+### 显示器热插拔兼容（2026-10-06）
+
+- `inir-output-wallpaper.service` 仅随 Niri 启停。输出变化稳定 3 秒后检查实际
+  layer-shell 图层；只有缺失 skwd 壁纸图层的活动屏幕才按 daemon 当前保存的路径
+  重新应用，保留其他屏幕的选择，不重启 skwd 服务。正常热插拔不重复重载壁纸。
+- Steam 自带 GTK2 2.24.10 在 `XRRGetOutputInfo` 返回 NULL 时崩溃；2.24.33
+  上游仍缺少这处检查。`scripts/personal/steam/` 提供 Niri 专用的启动兼容层，
+  仅 Steam 主进程中 GTK2 的失败 RandR 查询得到“输出已断开/CRTC 已停用”的空记录。
+  正常查询结果和其他调用者不变；构造函数恢复原 LD_PRELOAD，子进程/游戏不继承此库。
+  不覆盖系统库、Steam runtime 或驱动；Hyprland 直接执行原 `/usr/bin/steam`。
+- 部署 live 后执行 `python3 ~/.config/quickshell/inir/scripts/personal/steam/install.py`
+  编译 32 位库至 `~/.local/share/inir/steam/`，安装 `~/.local/bin/steam` 和同 ID 的
+  `~/.local/share/applications/steam.desktop`。需要 gcc、32 位 libc 和 Xrandr 头文件。
+  安装器备份既有受管文件，遇到未知自定义 Steam 入口则拒绝覆盖。Steam 更新不覆盖此层；
+  overlay 更新兼容层源码后重新运行安装器编译即可。
+- 回退 Steam 修复：删除以上新增的受管桌面入口、启动器及 `inir/steam/` 目录（已有文件
+  可从 `~/.local/state/inir/backups/steam-randr-*` 恢复），系统 Steam 文件始终保留。
+  直接使用 `/usr/bin/steam` 可绕过兼容层。
+
 ## 验收
 
 ### 本机显卡、光标、启动项与个人键位（2026-10-06）

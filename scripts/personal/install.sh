@@ -37,7 +37,7 @@ fi
 snapshot="$state_dir/install-backups/$(date +%Y%m%d-%H%M%S)-$$"
 umask 077
 mkdir -p "$snapshot/config" "$snapshot/state"
-for name in niri xdg-desktop-portal/niri-portals.conf systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.d systemd/user/niri.service.wants/inir.service systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d systemd/user/hyprland-session.target hypr/hyprland/execs.lua hypr/custom/execs.lua hypr/custom/inir-session.lua systemd/user/skwd-walld.service.d systemd/user/ii-skwd-wall-theme.service.d systemd/user/graphical-session.target.wants/docker-desktop.service systemd/user/graphical-session.target.wants/app-dev.lizardbyte.app.Sunshine.service systemd/user/sunshine.service; do
+for name in systemd/user/inir-output-wallpaper.service systemd/user/niri.service.wants/inir-output-wallpaper.service niri xdg-desktop-portal/niri-portals.conf systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.d systemd/user/niri.service.wants/inir.service systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d systemd/user/hyprland-session.target hypr/hyprland/execs.lua hypr/custom/execs.lua hypr/custom/inir-session.lua systemd/user/skwd-walld.service.d systemd/user/ii-skwd-wall-theme.service.d systemd/user/graphical-session.target.wants/docker-desktop.service systemd/user/graphical-session.target.wants/app-dev.lizardbyte.app.Sunshine.service systemd/user/sunshine.service; do
     if [[ -e "$config_home/$name" || -L "$config_home/$name" ]]; then
         mkdir -p "$snapshot/config/$(dirname "$name")"
         cp -a "$config_home/$name" "$snapshot/config/$name"

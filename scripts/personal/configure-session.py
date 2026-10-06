@@ -45,6 +45,15 @@ def configure_desktop_sessions(config_home):
         wallpaper.parent.mkdir(parents=True, exist_ok=True)
         wallpaper.write_text((template_dir / "wallpaper-session.conf").read_text())
 
+    unit = config_home / "systemd/user/inir-output-wallpaper.service"
+    if unit.is_symlink():
+        raise ValueError("Wallpaper output watcher unit must not be redirected")
+    unit.write_text((template_dir / "inir-output-wallpaper.service").read_text())
+    wants = config_home / "systemd/user/niri.service.wants/inir-output-wallpaper.service"
+    wants.parent.mkdir(parents=True, exist_ok=True)
+    if not wants.exists() and not wants.is_symlink():
+        wants.symlink_to("../inir-output-wallpaper.service")
+
     hooks = config_home / "hypr/hyprland/execs.lua"
     custom = config_home / "hypr/custom/execs.lua"
     activation = config_home / "hypr/custom/inir-session.lua"

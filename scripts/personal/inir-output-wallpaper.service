@@ -1,0 +1,14 @@
+[Unit]
+Description=Restore skwd-wall surfaces after Niri display changes settle
+PartOf=niri.service
+Requisite=niri.service
+After=niri.service skwd-walld.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.config/quickshell/inir/scripts/wallpaper/skwd-output-watch.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=niri.service
