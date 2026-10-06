@@ -47,6 +47,9 @@ def configure(config_home):
     if todesk.is_file():
         text = todesk.read_text()
         if re.search(r"(?m)^Exec=.*(?<!\S)/opt/todesk/bin/ToDesk(?:\s|$)", text):
+            # This legacy entry stored its app version (4.8.1.0) here; the
+            # desktop specification's Version field describes the file format.
+            text = set_key(text, "Version", "1.0")
             changes[todesk] = set_key(text, "TryExec", "/opt/todesk/bin/ToDesk")
 
     directory.mkdir(parents=True, exist_ok=True)
