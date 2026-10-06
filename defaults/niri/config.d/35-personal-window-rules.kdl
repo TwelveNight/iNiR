@@ -1,4 +1,6 @@
-// Personal dialog rules; keep upstream 30-window-rules.kdl separate.
+// Personal window rules, migrated from ~/.config/hypr/custom/rules.lua.
+// Keep upstream 30-window-rules.kdl separate. Opening rules apply to new windows;
+// they do not force already-open windows to float after a config reload.
 // Portal dialogs may lack a transient parent, so Niri cannot auto-float them.
 window-rule {
     match app-id=r#"^xdg-desktop-portal-(gtk|gnome|kde)$"#
@@ -7,4 +9,98 @@ window-rule {
     open-floating true
     default-column-width { fixed 960; }
     default-window-height { fixed 700; }
+}
+
+// Multiple match directives are alternatives; keep app IDs anchored and exact.
+window-rule {
+    match app-id=r#"^com\.onepassword\.OnePassword$"#
+    match app-id=r#"^yesplaymusic$"#
+    match app-id=r#"^QQ$"#
+    match app-id=r#"^Feishu$"#
+    match app-id=r#"^org\.telegram\.desktop$"#
+    match app-id=r#"^WebCord$"#
+    match app-id=r#"^wechat$"#
+    match app-id=r#"^feh$"#
+    match app-id=r#"^wemeetapp$"#
+    match app-id=r#"^pavucontrol-qt$"#
+    match app-id=r#"^cc-switch$"#
+    match app-id=r#"^scrcpy$"#
+    match app-id=r#"^monitor_layout$"#
+    match app-id=r#"^waypaper$"#
+    match app-id=r#"^brave-cdonnmffkdaoajfknoeeecmchibpmkmg-Default$"#
+    match app-id=r#"^(wps|et|wpp|pdf)$"#
+
+    open-floating true
+}
+
+// New floating windows are centered by Niri by default. Proportions use the
+// working area rather than Hyprland's full monitor dimensions.
+window-rule {
+    match app-id=r#"^Waydroid$"#
+    open-floating true
+    default-column-width { fixed 540; }
+    default-window-height { fixed 960; }
+}
+
+window-rule {
+    match app-id=r#"^(clash-verge|sparkle|mihomo-party)$"#
+    open-floating true
+    default-column-width { proportion 0.40; }
+    default-window-height { proportion 0.60; }
+}
+
+// Hyprland initial_title becomes a title match at Niri's initial configure.
+// Preserve Firefox sizing without adding an application-wide floating rule.
+window-rule {
+    match title=r#"^Firefox Nightly$"#
+    default-column-width { proportion 0.40; }
+    default-window-height { proportion 0.50; }
+}
+
+window-rule {
+    match title=r#"^Untitled - Brave$"#
+    open-floating true
+    default-column-width { proportion 0.40; }
+    default-window-height { proportion 0.50; }
+}
+
+// open-focused is an opening preference, not Hyprland's lifetime no_focus.
+window-rule {
+    match app-id=r#"^jetbrains-.*$"# title=r#"^splash$"#
+    open-floating true
+    open-focused false
+    border { off; }
+}
+
+window-rule {
+    match app-id=r#"^jetbrains-.*$"# title=r#"^ $"#
+    open-floating true
+    // Closest opening equivalent to stay_focused; does not lock later focus.
+    open-focused true
+    border { off; }
+}
+
+window-rule {
+    match app-id=r#"^jetbrains-.*$"# title=r#"^win.*$"#
+    open-floating true
+    open-focused false
+}
+
+// From custom/hermes_pet.lua: only Hermes has this distinct pet title.
+// Niri has no native pin/no_follow_mouse rule. If the title arrives after
+// initial configure, runtime floating promotion still needs an IPC helper.
+window-rule {
+    match app-id=r#"^hermes$"# title=r#"^Hermes Pet Overlay$"#
+    open-floating true
+    opacity 1.0
+    focus-ring { off; }
+    border { off; }
+    shadow { off; }
+    draw-border-with-background false
+    geometry-corner-radius 0
+    clip-to-geometry false
+    background-effect {
+        blur false
+        xray false
+    }
 }

@@ -104,6 +104,29 @@ Docker Desktop 和 Sunshine 的用户服务取消自动启用，仍可手动启�
 习惯一致。由用户文件 `90-user-extra.kdl` 引入；不改 `10-input-and-cursor.kdl`，
 也不改鼠标滚轮方向、光标样式或多指工作区手势。安装器保留此文件后续个人修改。
 
+## 个人浮动窗口
+
+`config.d/35-personal-window-rules.kdl` 同时迁移了
+`~/.config/hypr/custom/rules.lua` 的个人浮动偏好：通讯软件、1Password、scrcpy、
+音量/代理工具、指定 Brave 应用和 WPS。WPS 的字体、查找和替换窗口已由整个
+WPS 应用匹配覆盖。Waydroid 初始尺寸为 540×960；Clash Verge、Sparkle、
+Mihomo Party 为工作区宽度的 40%、高度的 60%。新浮动窗口使用 Niri 默认居中
+位置；尺寸为逻辑像素/工作区比例，保留应用自身的尺寸约束。
+Firefox Nightly 仅迁移初始尺寸，不额外强制浮动；Brave 空白窗口和 JetBrains
+辅助窗口按原有标题限定，JetBrains 主窗口没有整体浮动规则。
+
+浮动与初始尺寸规则在窗口创建时应用，热加载不会把已有窗口自动改为浮动。
+`initial_title` 使用初次 configure 时的 `title` 匹配；若标题此后才到达，初始
+属性不会重新应用。JetBrains 的 `no_focus` / `stay_focused` 仅映射为初始
+不聚焦/聚焦，不保证整个窗口生命周期内禁止或锁定焦点。
+
+`custom/hermes_pet.lua` 的 Hermes pet 只匹配独有标题 `Hermes Pet Overlay`，
+迁移浮动和关闭装饰、阴影、模糊、失焦透明度。其标题变化后自动浮动逻辑、
+`pin` 和 `no_follow_mouse` 无静态规则等价项，未模拟。没有为同名的 ChatGPT
+主窗口和 pet 添加宽泛匹配。Vicinae 的 layer-shell 模糊属于图层效果，本次
+浮动规则迁移不处理它。Hyprland 源配置保持原样。参考
+[Niri 窗口规则](https://niri-wm.github.io/niri/Configuration%3A-Window-Rules.html)。
+
 ## Windows 游戏窗口与 Heroic
 
 个人游戏规则放在 `config.d/96-personal-games.kdl`，由安装器接入
