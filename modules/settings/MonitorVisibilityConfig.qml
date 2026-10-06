@@ -5,6 +5,7 @@ import Quickshell.Io
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import "root:modules/common/functions/MonitorResolution.js" as MonitorResolution
 
 ContentPage {
     id: root
@@ -141,11 +142,8 @@ ContentPage {
     }
 
     function monitorResolution(screen: var): string {
-        const width = screen?.width ?? 0
-        const height = screen?.height ?? 0
-        if (width <= 0 || height <= 0)
-            return Translation.tr("Resolution unknown")
-        return width + "×" + height
+        const output = CompositorService.isNiri ? NiriService.outputs?.[screen?.name] : null
+        return MonitorResolution.resolution(output, screen) || Translation.tr("Resolution unknown")
     }
 
     function niriOutputNames(): var {
@@ -826,7 +824,7 @@ ContentPage {
             StyledText {
                 Layout.alignment: Qt.AlignHCenter
                 visible: monitorRect.height >= 62
-                text: Math.round(monitorRect.logicalWidth) + "×" + Math.round(monitorRect.logicalHeight)
+                text: root.monitorResolution({ name: monitorRect.outputName })
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 color: !monitorRect.validPosition
                     ? Appearance.colors.colOnErrorContainer

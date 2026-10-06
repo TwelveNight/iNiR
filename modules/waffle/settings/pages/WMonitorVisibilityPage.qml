@@ -7,6 +7,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.waffle.looks
 import qs.modules.waffle.settings
+import "root:modules/common/functions/MonitorResolution.js" as MonitorResolution
 
 WSettingsPage {
     id: root
@@ -68,11 +69,8 @@ WSettingsPage {
     }
 
     function monitorResolution(screen: var): string {
-        const width = screen?.width ?? 0
-        const height = screen?.height ?? 0
-        if (width <= 0 || height <= 0)
-            return Translation.tr("Resolution unknown")
-        return width + "×" + height
+        const output = CompositorService.isNiri ? NiriService.outputs?.[screen?.name] : null
+        return MonitorResolution.resolution(output, screen) || Translation.tr("Resolution unknown")
     }
 
     function desktopWidgetOutputNames(): var {
