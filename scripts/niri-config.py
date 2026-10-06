@@ -8,6 +8,7 @@ structure are always preserved.
 
 Commands:
   outputs              JSON array of outputs with modes/capabilities
+  output-power NAME on|off  Toggle an output for this session (keep one active)
   apply-output NAME    Apply temporary output changes via niri msg
   persist-output NAME  Write one output config to KDL config.d/15-outputs.kdl
   persist-layout JSON  Persist all connected output positions atomically
@@ -30,11 +31,13 @@ Commands:
 
 from difflib import unified_diff
 import glob
+import fcntl
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -225,6 +228,59 @@ def cmd_outputs():
 
     print(json.dumps(result))
     return 0
+
+
+def set_output_power(args):
+    """Called under a per-session lock; never write or infer display geometry."""
+    if len(args) != 2 or args[1] not in ("on", "off"):
+        raise ValueError("Usage: output-power NAME on|off")
+    name, state = args
+
+    def outputs():
+        raw, rc = run_niri("-j", "outputs")
+        if rc:
+            raise ValueError(f"Could not query displays: {raw}")
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("Invalid display response")
+        return data
+
+    def active(output):
+        return output.get("current_mode") is not None and output.get("logical") is not None
+
+    data = outputs()
+    if name not in data:
+        raise ValueError("The display is no longer connected")
+    desired = state == "on"
+    if active(data[name]) == desired:
+        return {"success": True, "changed": False}
+    if not desired and sum(active(o) for o in data.values()) <= 1:
+        raise ValueError("Cannot turn off the last active display")
+    raw, rc = run_niri("output", name, state)
+    if rc:
+        raise ValueError(f"Could not change display state: {raw}")
+    for _ in range(12):
+        data = outputs()
+        if name in data and active(data[name]) == desired:
+            return {"success": True, "changed": True}
+        time.sleep(0.15)
+    raise ValueError("Display state was not confirmed; refresh the display list")
+
+
+def cmd_output_power(args):
+    try:
+        runtime = os.environ.get("XDG_RUNTIME_DIR")
+        if not runtime:
+            raise ValueError("XDG_RUNTIME_DIR is required")
+        # Serialize separate settings windows so both cannot disable the final pair.
+        with (Path(runtime) / "inir-output-power.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            result = set_output_power(args)
+        print(json.dumps(result))
+        return 0
+    except (ValueError, OSError) as error:
+        print(json.dumps({"error": str(error)}))
+        return 1
 
 
 def cmd_apply_output(args):
@@ -3474,7 +3530,7 @@ def main():
         print(
             json.dumps(
                 {
-                    "error": "No command. Use: outputs, apply-output, persist-output, persist-layout, get-input, get-hot-corners, get-layout, get-animations, get-window-rules, list-cursor-themes, sync-cursor, validate, detect-customizations, set, get-binds, set-bind, remove-bind, get-alt-tab, set-alt-tab"
+                    "error": "No command. Use: outputs, output-power, apply-output, persist-output, persist-layout, get-input, get-hot-corners, get-layout, get-animations, get-window-rules, list-cursor-themes, sync-cursor, validate, detect-customizations, set, get-binds, set-bind, remove-bind, get-alt-tab, set-alt-tab"
                 }
             )
         )
@@ -3485,6 +3541,7 @@ def main():
 
     commands = {
         "outputs": lambda: cmd_outputs(),
+        "output-power": lambda: cmd_output_power(args),
         "apply-output": lambda: cmd_apply_output(args),
         "persist-output": lambda: cmd_persist_output(args),
         "persist-layout": lambda: cmd_persist_layout(args),

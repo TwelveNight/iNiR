@@ -1206,6 +1206,23 @@ ContentPage {
     SettingsTaskLoader {
         requested: root.activeSection === "outputs" && CompositorService.isNiri
         sourceComponent: Component {
+            SettingsCardSection {
+                settingsTaskSection: "outputs"
+                expanded: true
+                icon: "monitor"
+                title: Translation.tr("Display power")
+                SettingsGroup {
+                    NiriOutputSwitches {
+                        controlsLocked: root.monitorLayoutBusy || root.draggingLayoutOutput.length > 0
+                    }
+                }
+            }
+        }
+    }
+
+    SettingsTaskLoader {
+        requested: root.activeSection === "outputs" && CompositorService.isNiri
+        sourceComponent: Component {
     SettingsCardSection {
         settingsTaskSection: "outputs"
         expanded: true

@@ -81,6 +81,7 @@ NavigationRailButton 1.0 NavigationRailButton.qml
 NavigationRailExpandButton 1.0 NavigationRailExpandButton.qml
 NavigationRail 1.0 NavigationRail.qml
 NavigationRailTabArray 1.0 NavigationRailTabArray.qml
+NiriOutputSwitches 1.0 NiriOutputSwitches.qml
 NoticeBox 1.0 NoticeBox.qml
 NotificationActionButton 1.0 NotificationActionButton.qml
 NotificationAppIcon 1.0 NotificationAppIcon.qml

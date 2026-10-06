@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Quickshell
 import qs.services
 import qs.modules.common
+import qs.modules.common.widgets as CommonWidgets
 import qs.modules.waffle.looks
 import qs.modules.waffle.settings
 import "root:modules/common/functions/MonitorResolution.js" as MonitorResolution
@@ -575,6 +576,13 @@ WSettingsPage {
                 }
             }
         }
+    }
+
+    WSettingsCard {
+        visible: CompositorService.isNiri
+        title: Translation.tr("Display power")
+        icon: "desktop"
+        CommonWidgets.NiriOutputSwitches {}
     }
 
     WSettingsCard {

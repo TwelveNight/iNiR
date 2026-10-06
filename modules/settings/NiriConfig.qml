@@ -1405,6 +1405,10 @@ ContentPage {
         }
 
         SettingsGroup {
+            NiriOutputSwitches { controlsLocked: root.displayControlsLocked }
+        }
+
+        SettingsGroup {
             StyledText {
                 Layout.fillWidth: true
                 text: Translation.tr("Monitor changes are applied as a live preview first. If the new mode is incompatible, settings revert automatically after 15 seconds.")
