@@ -37,7 +37,7 @@ fi
 snapshot="$state_dir/install-backups/$(date +%Y%m%d-%H%M%S)-$$"
 umask 077
 mkdir -p "$snapshot/config" "$snapshot/state"
-for name in niri xdg-desktop-portal/niri-portals.conf systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.wants/inir.service systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d systemd/user/hyprland-session.target; do
+for name in niri xdg-desktop-portal/niri-portals.conf systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.d systemd/user/niri.service.wants/inir.service systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d systemd/user/hyprland-session.target hypr/hyprland/execs.lua hypr/custom/execs.lua hypr/custom/inir-session.lua systemd/user/skwd-walld.service.d systemd/user/ii-skwd-wall-theme.service.d systemd/user/graphical-session.target.wants/docker-desktop.service systemd/user/graphical-session.target.wants/app-dev.lizardbyte.app.Sunshine.service systemd/user/sunshine.service; do
     if [[ -e "$config_home/$name" || -L "$config_home/$name" ]]; then
         mkdir -p "$snapshot/config/$(dirname "$name")"
         cp -a "$config_home/$name" "$snapshot/config/$name"
@@ -80,6 +80,7 @@ fi
 cd "$repo"
 INIR_PERSONAL_INSTALL_STAGE=files ./setup install --skip-deps --skip-setups "$@"
 python3 "$repo/scripts/personal/configure-session.py"
+"$repo/scripts/personal/disable-autostart.sh"
 systemctl --user daemon-reload
 niri validate --config "$config_home/niri/config.kdl"
 [[ -x "$launcher" && -f "$config_dir/installed_true" ]] || { echo 'Incomplete launcher/config install' >&2; exit 1; }

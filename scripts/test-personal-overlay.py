@@ -159,13 +159,13 @@ printf '%s\\n' "$CONFIG_FILE" "$STATE_DIR"
                                 env=self.env, check=True, capture_output=True, text=True)
         self.assertEqual(result.stdout.strip(), self.env["INIR_CONFIG_DIR"])
 
-    def test_niri_session_imports_environment_without_switching_dm(self):
+    def test_niri_session_delegates_only_with_compositor_environment(self):
         binary = self.base / "mock-bin"
         binary.mkdir()
-        log = self.base / "systemctl.log"
-        systemctl = binary / "systemctl"
-        systemctl.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$MOCK_SYSTEMCTL_LOG"\n')
-        systemctl.chmod(0o755)
+        log = self.base / "session.log"
+        python = binary / "python3"
+        python.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$MOCK_SYSTEMCTL_LOG"\n')
+        python.chmod(0o755)
         listener = self.config / "quickshell/ii/scripts/colors/skwd-wall-theme-listener.sh"
         listener.parent.mkdir(parents=True)
         listener.write_text("#!/bin/sh\n")
@@ -175,13 +175,12 @@ printf '%s\\n' "$CONFIG_FILE" "$STATE_DIR"
                         XDG_CURRENT_DESKTOP="niri")
         subprocess.run(["bash", str(ROOT / "scripts/wallpaper/skwd-session.sh")], env=self.env, check=True)
         self.assertEqual(log.read_text().splitlines(), [
-            "--user import-environment WAYLAND_DISPLAY NIRI_SOCKET XDG_CURRENT_DESKTOP",
-            "--user restart skwd-walld.service", "--user start ii-skwd-wall-theme.service"])
+            str(ROOT / "scripts/wallpaper/../personal/desktop-session.py") + " start niri"])
         self.env.pop("NIRI_SOCKET")
         result = subprocess.run(["bash", str(ROOT / "scripts/wallpaper/skwd-session.sh")],
                                 env=self.env, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(len(log.read_text().splitlines()), 3)
+        self.assertEqual(len(log.read_text().splitlines()), 1)
 
     def test_real_skewd_state_and_command_logic(self):
         source = (ROOT / "services/skwdState.js").read_text().replace(".pragma library", "")
@@ -317,7 +316,7 @@ install-python-packages
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
-        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf"]:
+        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf", "niri-session-environment.conf", "disable-autostart.sh", "wallpaper-session.conf"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)

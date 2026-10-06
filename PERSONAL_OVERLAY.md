@@ -1,7 +1,7 @@
 # night/personal-overlay
 
 本分支基于 `origin/prerelease` 的 `db2233ce`，用于 Night 的 Hyprland + II / Niri + iNiR 双会话。
-本分支包含私有配置、共享 skwd-wall 与 GDM 安装适配；本轮尚未安装或推送。
+本分支包含私有配置、共享 skwd-wall 与 GDM 安装适配。
 
 ## 路径与共享范围
 
@@ -39,7 +39,9 @@ Waffle 的桌面选择也统一调用 skwd，桌面预览读取同一活动壁�
 
 沿用已有 `ii-skwd-wall-theme.service` 作为壁纸变更的配色生成者。iNiR 不因壁纸路径事件重复运行 Matugen。
 iNiR 里主动选择配色、深浅模式或预设仍可写共享输出，后一次写入对两边生效。
-Niri 启动脚本导入本会话的 Wayland 环境并重启 skwd-walld，使其重新连接当前合成器；再启动 II 的现有配色监听服务。
+两边的启动钩子调用 `scripts/personal/desktop-session.py`，确认真实合成器 IPC/Wayland socket 后，发布当前桌面的环境，清除另一桌面留下的身份和显卡变量，再重启 skwd-walld 与 II 的配色监听。壁纸内容、取色与数据库继续共享。
+
+helper 用独立的 systemd 临时服务和 pidfd 监听合成器退出，无需轮询或依赖 Lua shutdown 钩子。退出时停止旧 renderer/配色监听，清理对应会话环境；旧会话 watcher 不会停止已经接管的新会话。保留 skwd/II 配色服务的 default.target 启用关系，增加 `PartOf=graphical-session.target`，让标准 Niri 注销流程也能释放 renderer，下一次登录由相应桌面的 helper 重新启动。
 两套图形会话应依次切换，共享守护进程不提供同时登录两套桌面的隔离。
 
 ## GDM 与安装
@@ -61,6 +63,9 @@ Niri 的屏幕共享/截图接口仍指定 GNOME 后端；若它被屏蔽，这�
 若对应用户 unit 缺失，安装器补齐它与 `graphical-session.target` 的关联，
 让停止会话时停止 portal；已有 unit 或 mask 不覆盖，不改原 Hyprland 钩子。
 Niri 的标准 `niri-session` 入口会通过 `niri-shutdown.target` 停止图形会话。
+Hyprland 的个人钩子 `custom/inir-session.lua` 由 `custom/execs.lua` 加载；安装器移除本机已知的两条异步环境导入命令，并在旧壁纸恢复脚本不存在时移除其调用，其他启动项不变。遇到未知环境导入钩子则停止部署，先人工审查。Niri 服务单独用 drop-in 清除继承的桌面/GPU 变量，再运行原来的 `niri --session`。
+
+Docker Desktop 和 Sunshine 的用户服务取消自动启用，仍可手动启动；不修改 Docker Engine。个人安装器会保持这个启动策略，修改前备份原来的用户服务链接。
 用户服务管理器的 linger 不妨碍这些会话服务停止，但 D-Bus 后续请求仍可能再次激活 portal。
 
 无需修改 II 的 `installed_true`。它是存在性标记，不是布尔配置文件；iNiR 使用自己的标记。

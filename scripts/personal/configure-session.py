@@ -31,6 +31,50 @@ def configure_hyprland_session(config_home):
     target.write_text(Path(__file__).with_name("hyprland-session.target").read_text())
 
 
+def configure_desktop_sessions(config_home):
+    template_dir = Path(__file__).parent
+    dropin = config_home / "systemd/user/niri.service.d/30-session-environment.conf"
+    if dropin.is_symlink() or dropin.parent.is_symlink():
+        raise ValueError("Niri session drop-in must not be redirected")
+    dropin.parent.mkdir(parents=True, exist_ok=True)
+    dropin.write_text((template_dir / "niri-session-environment.conf").read_text())
+    for unit in ("skwd-walld.service", "ii-skwd-wall-theme.service"):
+        wallpaper = config_home / f"systemd/user/{unit}.d/30-desktop-session.conf"
+        if wallpaper.is_symlink() or wallpaper.parent.is_symlink():
+            raise ValueError("Wallpaper session drop-in must not be redirected")
+        wallpaper.parent.mkdir(parents=True, exist_ok=True)
+        wallpaper.write_text((template_dir / "wallpaper-session.conf").read_text())
+
+    hooks = config_home / "hypr/hyprland/execs.lua"
+    custom = config_home / "hypr/custom/execs.lua"
+    activation = config_home / "hypr/custom/inir-session.lua"
+    if not hooks.is_file() or not custom.is_file():
+        return
+    if any(path.is_symlink() or path.parent.is_symlink() for path in (hooks, custom, activation)):
+        raise ValueError("Hyprland session hooks must not be redirected")
+    text = hooks.read_text()
+    # Replace only the known asynchronous environment publishers. They race
+    # with shell startup, leak the other desktop's names, and never reconnect skwd.
+    obsolete = [
+        '    hl.exec_cmd("dbus-update-activation-environment --all")',
+        '    hl.exec_cmd("sleep 1 && dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE && systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE && systemctl --user start hyprland-session.target")',
+    ]
+    for line in obsolete:
+        text = text.replace(line + "\n", "")
+    if "dbus-update-activation-environment" in text or "import-environment" in text:
+        raise ValueError("Unknown Hyprland environment hook; review it before installing the session helper")
+    restore = '    hl.exec_cmd("$HOME/.config/hypr/custom/scripts/__restore_video_wallpaper.sh")\n'
+    if not (config_home / "hypr/custom/scripts/__restore_video_wallpaper.sh").exists():
+        text = text.replace(restore, "")
+    if text != hooks.read_text():
+        hooks.write_text(text)
+    activation.write_text((template_dir / "hyprland-session.lua").read_text())
+    require = 'require("custom.inir-session")'
+    custom_text = custom.read_text()
+    if require not in custom_text:
+        custom.write_text(custom_text.rstrip() + "\n\n-- Shared Niri/Hyprland session lifecycle.\n" + require + "\n")
+
+
 def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     paths = {
         "INIR_CONFIG_DIR": str(config_dir),
@@ -108,6 +152,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     bridge_template = Path(__file__).with_name("xwaylandvideobridge-autostart.conf")
     bridge_dropin.write_text(bridge_template.read_text())
     configure_hyprland_session(config_home)
+    configure_desktop_sessions(config_home)
 
 
 if __name__ == "__main__":
