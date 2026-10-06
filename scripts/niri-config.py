@@ -2744,6 +2744,7 @@ _KB_ACTION_MAP = {
     "maximize-window-to-edges": "Maximize to edges",
     "fullscreen-window": "Fullscreen",
     "toggle-window-floating": "Toggle floating",
+    "toggle-windowed-fullscreen": "Toggle windowed fullscreen",
     "switch-focus-between-floating-and-tiling": "Switch float/tile focus",
     "center-column": "Center column",
     "center-visible-columns": "Center visible columns",
@@ -2795,6 +2796,14 @@ _KB_IPC_MAP = {
     ("clipboard", "toggle"): "Clipboard",
     ("lock", "activate"): "Lock screen",
     ("region", "screenshot"): "Screenshot region",
+    ("region", "menu"): "Screenshot and OCR menu",
+    ("region", "recordWithSound"): "Record screen region with audio",
+    ("equalizer", "toggle"): "Toggle equalizer",
+    ("sidebarLeft", "toggle"): "Toggle left sidebar",
+    ("sidebarRight", "toggle"): "Toggle right sidebar",
+    ("bar", "toggle"): "Toggle bar",
+    ("osk", "toggle"): "Toggle on-screen keyboard",
+    ("session", "open"): "Power menu",
     ("region", "ocr"): "OCR region",
     ("region", "search"): "Reverse image search",
     ("wallpaperSelector", "toggle"): "Wallpaper selector",
@@ -2852,21 +2861,80 @@ def _kb_parse_inir_action(action: str):
     return None
 
 
+def _kb_spawn_args(action):
+    if not action.startswith("spawn "):
+        return []
+    return [json.loads(token) for token in re.findall(r'"(?:\\.|[^"\\])*"', action)]
+
+
+def _kb_special_metadata(action):
+    """Recognize personal wrappers by their action, never by the label's language."""
+    argv = _kb_spawn_args(action)
+    if not argv:
+        return None
+    app = Path(argv[0]).name
+    if app == "true":
+        return "Disabled (personal override)", "System"
+    if app == "bash" and len(argv) >= 3:
+        script = argv[-1]
+        if "scripts/personal/niri-actions.py" in script:
+            return {
+                "empty-move": ("Move window to empty workspace", "Workspaces"),
+                "empty-focus": ("Focus empty workspace", "Workspaces"),
+                "float": ("Toggle centered floating window", "Window Management"),
+                "tmux": ("Open or attach tmux session", "Applications"),
+                "files": ("File manager", "Applications"),
+            }.get(script.rsplit(None, 1)[-1])
+        if "xdg-open" in script and "75-personal-binds.kdl" in script:
+            return "Edit personal key bindings", "iNiR Shell"
+        if "xdg-open" in script and "config.json" in script:
+            return "Edit shell configuration", "iNiR Shell"
+    if app == "kitty" and "/usr/bin/btop" in argv:
+        return "System monitor (btop)", "Applications"
+    if app == "systemctl" and "suspend" in argv:
+        return "Suspend computer", "System"
+    if app == "fcitx5":
+        return "Restart input method", "System"
+    if app == "1password":
+        return ("1Password quick access" if "--quick-access" in argv else "Toggle 1Password"), "Applications"
+    if app == "rofi" and "filebrowser" in argv:
+        return "Browse files with Rofi", "Applications"
+    if app == "skwd-wall-v2":
+        return "Open wallpaper picker", "iNiR Shell"
+    if app == "env" and "gnome-control-center" in argv:
+        return "Open GNOME system settings", "Applications"
+    if app == "playerctl":
+        return {"play-pause": ("Play/Pause", "Media"), "next": ("Next track", "Media"),
+                "previous": ("Previous track", "Media")}.get(argv[-1])
+    return None
+
+
 def _kb_generate_comment(action: str) -> str:
     """Return a human-readable description for a niri action string."""
     action = action.strip()
+    special = _kb_special_metadata(action)
+    if special:
+        return special[0]
     if action in _KB_ACTION_MAP:
         return _KB_ACTION_MAP[action]
+    m = re.match(r"(next|previous)-window\b(.*)", action)
+    if m:
+        return ("Next" if m[1] == "next" else "Previous") + (" window of same app" if "app-id" in m[2] else " window")
+    m = re.match(r"move-window-to-workspace-(up|down)\b(.*)", action)
+    if m:
+        return ("Move window to previous workspace" if m[1] == "up" else "Move window to next workspace") + (" without following" if "focus=false" in m[2] else "")
     m = re.match(r"(focus-workspace|move-column-to-workspace)\s+(\d+)", action)
     if m:
         verb = "Focus" if "focus" in m.group(1) else "Move to"
         return f"{verb} workspace {m.group(2)}"
-    m = re.match(r'set-(column-width|window-height)\s+"([+-]\d+%?)"', action)
+    m = re.match(r'set-(column-width|window-width|window-height)\s+"([+-]\d+%?)"', action)
     if m:
         target = "column" if "column" in m.group(1) else "window"
         val = m.group(2)
         direction = "Shrink" if val.startswith("-") else "Grow"
-        return f"{direction} {target} {val.lstrip('+-')}"
+        dimension = "height" if m.group(1).endswith("height") else "width"
+        amount = val.lstrip("+-") + ("" if val.endswith("%") else " px")
+        return f"{direction} {target} {dimension} by {amount}"
     if action.startswith("spawn"):
         inir = _kb_parse_inir_action(action)
         if inir:
@@ -2905,6 +2973,9 @@ def _kb_generate_comment(action: str) -> str:
 
 def _kb_categorize(description: str, action: str) -> str:
     """Return the category name for a keybind given its description and action."""
+    special = _kb_special_metadata(action)
+    if special:
+        return special[1]
     desc = description.lower()
     act = action.lower()
 
@@ -2947,6 +3018,12 @@ def _kb_categorize(description: str, action: str) -> str:
             "session",
         ):
             return "iNiR Shell"
+        if target in ("sidebarLeft", "sidebarRight", "bar", "osk"):
+            return "iNiR Shell"
+        if target == "region":
+            return "Screenshots"
+        if target == "equalizer":
+            return "Media"
         if target == "altSwitcher":
             return "Window Switcher"
         if target in ("audio", "mpris"):
@@ -2958,7 +3035,7 @@ def _kb_categorize(description: str, action: str) -> str:
         act,
     ):
         return "iNiR Shell"
-    if "window" in desc and ("next" in desc or "previous" in desc):
+    if re.match(r"(?:next|previous)-window\b", action):
         return "Window Switcher"
     if "altswitcher" in act:
         return "Window Switcher"
@@ -3014,7 +3091,7 @@ def _kb_categorize(description: str, action: str) -> str:
         for x in ["shrink column", "grow column", "shrink window", "grow window"]
     ):
         return "Resize"
-    if any(x in act for x in ["set-column-width", "set-window-height"]):
+    if any(x in act for x in ["set-column-width", "set-window-width", "set-window-height"]):
         return "Resize"
     if "monitor" in desc:
         return "Monitors"
@@ -3145,11 +3222,11 @@ def _read_bind_entries(binds_file):
             continue
 
         key_combo = match.group(1)
-        # Strip hotkey-overlay-title from the options string — it's KDL metadata, not a bind option
+        # Native title metadata must survive editor round-trips.
         options_raw = match.group(2).strip()
-        options_clean = re.sub(
-            r'\s*hotkey-overlay-title="[^"]*"', "", options_raw
-        ).strip()
+        options_clean = options_raw
+        title_match = re.search(r'hotkey-overlay-title=("(?:\\.|[^"\\])*")', options_raw)
+        overlay_title = json.loads(title_match[1]) if title_match else None
         rest = match.group(3)
 
         line_number = base_line + i
@@ -3158,7 +3235,7 @@ def _read_bind_entries(binds_file):
         action = ""
         if re.search(r"\{[^}]*\}", rest):
             # Single-line: extract the content between { and }
-            m = re.search(r"\{\s*(.*?)\s*\}", rest)
+            m = re.search(r"\{\s*(.*)\s*\}", rest)
             if m:
                 action_raw = m.group(1).strip()
                 action = action_raw.rstrip(";")
@@ -3176,8 +3253,9 @@ def _read_bind_entries(binds_file):
             action_raw = " ".join(action_lines)
             action = " ".join(ln.rstrip(";") for ln in action_lines)
 
-        description = _kb_generate_comment(action)
-        category = _kb_categorize(description, action)
+        generated_description = _kb_generate_comment(action)
+        description = overlay_title if overlay_title is not None else generated_description
+        category = _kb_categorize(generated_description, action)
 
         all_binds.append(
             {

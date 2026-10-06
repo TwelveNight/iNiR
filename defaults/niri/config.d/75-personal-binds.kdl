@@ -6,102 +6,326 @@
 // Keep the upstream file unchanged; put future personal bindings here.
 // See PERSONAL_OVERLAY.md for behavior differences and unsupported actions.
 
+// Descriptions use Niri's native hotkey-overlay-title metadata.
+// iNiR categories are inferred from actions, not from these section comments.
+
 binds {
-    Ctrl+Shift+Escape repeat=false hotkey-overlay-title="System monitor (btop)" { spawn "/usr/bin/kitty" "--title" "btop" "/usr/bin/btop"; }
-    Ctrl+Alt+Delete repeat=false hotkey-overlay-title="Power menu" { spawn "inir" "session" "open"; }
-    // Close through the compositor directly, including XWayland windows.
-    Mod+Q repeat=false { close-window; }
+    // ═══════════════════════════════════════════════════════════════════════
+    // System
+    // ═══════════════════════════════════════════════════════════════════════
+
     // Hyprland custom frees Super+D; suppress the inherited maximize action.
     Mod+D repeat=false hotkey-overlay-title=null { spawn "/usr/bin/true"; }
-    // Personal Hyprland custom equivalents; see PERSONAL_OVERLAY.md for differences.
-    Alt+H { focus-column-left; }
-    Alt+L { focus-column-right; }
+
+    // Niri Overview.
+    Mod+Space repeat=false hotkey-overlay-title="Niri Overview" { toggle-overview; }
+
+    // Suspend computer.
+    Mod+Shift+BackSpace repeat=false hotkey-overlay-title="Suspend computer" { spawn "systemctl" "suspend"; }
+
+    // Quit Niri.
+    Mod+Ctrl+Alt+Escape repeat=false hotkey-overlay-title="Quit Niri" { quit; }
+
+    // Restart input method.
+    Mod+Alt+F repeat=false hotkey-overlay-title="Restart input method" { spawn "fcitx5" "--replace" "-d"; }
+
+    // Restart input method.
+    Ctrl+Mod+F repeat=false hotkey-overlay-title="Restart input method" { spawn "fcitx5" "--replace" "-d"; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // iNiR Shell
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Power menu.
+    Ctrl+Alt+Delete repeat=false hotkey-overlay-title="Power menu" { spawn "inir" "session" "open"; }
+
+    // Lock screen.
+    Mod+BackSpace repeat=false hotkey-overlay-title="Lock screen" { spawn "inir" "lock" "activate"; }
+
+    // Toggle left sidebar.
+    Mod+A repeat=false hotkey-overlay-title="Toggle left sidebar" { spawn "inir" "sidebarLeft" "toggle"; }
+
+    // Toggle right sidebar.
+    Mod+B repeat=false hotkey-overlay-title="Toggle right sidebar" { spawn "inir" "sidebarRight" "toggle"; }
+
+    // Toggle bar.
+    Mod+Shift+Alt+J repeat=false hotkey-overlay-title="Toggle bar" { spawn "inir" "bar" "toggle"; }
+
+    // Toggle on-screen keyboard.
+    Mod+Shift+Alt+K repeat=false hotkey-overlay-title="Toggle on-screen keyboard" { spawn "inir" "osk" "toggle"; }
+
+    // iNiR Overview.
+    Alt+Space repeat=false hotkey-overlay-title="iNiR Overview" { spawn "inir" "overview" "toggle"; }
+
+    // Settings.
+    Mod+I repeat=false hotkey-overlay-title="Settings" { spawn "inir" "settings"; }
+
+    // Open wallpaper picker.
+    Mod+Ctrl+W repeat=false hotkey-overlay-title="Open wallpaper picker" { spawn "skwd-wall-v2"; }
+
+    // Edit shell configuration.
+    Ctrl+Mod+Slash repeat=false hotkey-overlay-title="Edit shell configuration" { spawn "bash" "-c" "xdg-open \"$INIR_CONFIG_DIR/config.json\""; }
+
+    // Edit personal key bindings.
+    Ctrl+Mod+Alt+Slash repeat=false hotkey-overlay-title="Edit personal key bindings" { spawn "bash" "-c" "xdg-open \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/75-personal-binds.kdl\""; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Screenshots
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Screenshot region.
+    Ctrl+1 repeat=false hotkey-overlay-title="Screenshot region" { spawn "inir" "region" "screenshot"; }
+
+    // Screenshot region.
+    Ctrl+Alt+MouseLeft repeat=false hotkey-overlay-title="Screenshot region" { spawn "inir" "region" "screenshot"; }
+
+    // Screenshot and OCR menu.
+    Ctrl+Alt+MouseRight repeat=false hotkey-overlay-title="Screenshot and OCR menu" { spawn "inir" "region" "menu"; }
+
+    // Screenshot and OCR menu.
+    Ctrl+Alt+S repeat=false hotkey-overlay-title="Screenshot and OCR menu" { spawn "inir" "region" "menu"; }
+
+    // Screenshot and OCR menu.
+    Ctrl+Alt+A repeat=false hotkey-overlay-title="Screenshot and OCR menu" { spawn "inir" "region" "menu"; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Applications
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // System monitor (btop).
+    Ctrl+Shift+Escape repeat=false hotkey-overlay-title="System monitor (btop)" { spawn "/usr/bin/kitty" "--title" "btop" "/usr/bin/btop"; }
+
+    // Open or attach tmux session.
+    Ctrl+Shift+A repeat=false hotkey-overlay-title="Open or attach tmux session" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" tmux"; }
+
+    // File manager.
+    Super+E repeat=false hotkey-overlay-title="File manager" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" files"; }
+
+    // Browser.
+    Mod+F repeat=false hotkey-overlay-title="Browser" { spawn "inir" "browser"; }
+
+    // Toggle 1Password.
+    Ctrl+Shift+Z repeat=false hotkey-overlay-title="Toggle 1Password" { spawn "1password" "--toggle"; }
+
+    // 1Password quick access.
+    Ctrl+Shift+Space repeat=false hotkey-overlay-title="1Password quick access" { spawn "1password" "--quick-access"; }
+
+    // Open GNOME system settings.
+    Mod+Alt+I repeat=false hotkey-overlay-title="Open GNOME system settings" { spawn "env" "XDG_CURRENT_DESKTOP=GNOME" "XDG_SESSION_DESKTOP=gnome" "gnome-control-center"; }
+
+    // File manager.
+    Mod+Alt+E repeat=false hotkey-overlay-title="File manager" { spawn "env" "QT_QPA_PLATFORM=xcb" "pcmanfm-qt" "--profile" "xwayland" "--new-window"; }
+
+    // Browse files with Rofi.
+    Mod+Shift+E repeat=false hotkey-overlay-title="Browse files with Rofi" { spawn "rofi" "-show" "filebrowser"; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Window Management
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Close through the compositor directly, including XWayland windows.
+    Mod+Q repeat=false hotkey-overlay-title="Close window" { close-window; }
+
+    // Maximize column.
+    Mod+O repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
+
+    // Toggle windowed fullscreen.
+    Mod+Shift+O repeat=false hotkey-overlay-title="Toggle windowed fullscreen" { toggle-windowed-fullscreen; }
+
+    // Toggle windowed fullscreen.
+    Mod+Shift+MouseMiddle repeat=false hotkey-overlay-title="Toggle windowed fullscreen" { toggle-windowed-fullscreen; }
+
+    // Fullscreen.
+    Mod+Shift+F repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
+
+    // Fullscreen.
+    Mod+Alt+O repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
+
+    // Maximize column.
+    Mod+MouseMiddle repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
+
+    // Fullscreen.
+    Mod+Alt+MouseMiddle repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
+
+    // Toggle floating.
+    Ctrl+Mod+MouseRight repeat=false hotkey-overlay-title="Toggle floating" { toggle-window-floating; }
+
+    // Toggle centered floating window.
+    Super+W repeat=false hotkey-overlay-title="Toggle centered floating window" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" float"; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Resize
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Shrink window width by 30 px.
+    Mod+Shift+H hotkey-overlay-title="Shrink window width by 30 px" { set-window-width "-30"; }
+
+    // Grow window width by 30 px.
+    Mod+Shift+L hotkey-overlay-title="Grow window width by 30 px" { set-window-width "+30"; }
+
+    // Shrink window height by 30 px.
+    Mod+Shift+K hotkey-overlay-title="Shrink window height by 30 px" { set-window-height "-30"; }
+
+    // Grow window height by 30 px.
+    Mod+Shift+J hotkey-overlay-title="Grow window height by 30 px" { set-window-height "+30"; }
+
+    // Shrink window width by 30 px.
+    Mod+Minus hotkey-overlay-title="Shrink window width by 30 px" { set-window-width "-30"; }
+
+    // Grow window width by 30 px.
+    Mod+Equal hotkey-overlay-title="Grow window width by 30 px" { set-window-width "+30"; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Focus
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Focus left.
+    Alt+H hotkey-overlay-title="Focus left" { focus-column-left; }
+
+    // Focus right.
+    Alt+L hotkey-overlay-title="Focus right" { focus-column-right; }
+
     // Alt+wheel follows the horizontal column order; keep Shift+wheel for apps.
-    Alt+WheelScrollUp cooldown-ms=150 { focus-column-left; }
-    Alt+WheelScrollDown cooldown-ms=150 { focus-column-right; }
-    Alt+K { focus-window-up; }
-    Alt+J { focus-window-down; }
-    Mod+H { move-column-left; }
-    Mod+L { move-column-right; }
-    Mod+K { move-window-up; }
-    Mod+J { move-window-down; }
-    Mod+Shift+H { set-window-width "-30"; }
-    Mod+Shift+L { set-window-width "+30"; }
-    Mod+Shift+K { set-window-height "-30"; }
-    Mod+Shift+J { set-window-height "+30"; }
-    Mod+Minus { set-window-width "-30"; }
-    Mod+Equal { set-window-width "+30"; }
-    Mod+N repeat=false { focus-workspace-down; }
-    Mod+P repeat=false { focus-workspace-up; }
-    Mod+O repeat=false { maximize-column; }
-    Mod+Shift+O repeat=false { toggle-windowed-fullscreen; }
-    Mod+Shift+MouseMiddle repeat=false { toggle-windowed-fullscreen; }
-    Mod+Shift+F repeat=false { fullscreen-window; }
-    Mod+Alt+O repeat=false { fullscreen-window; }
-    Mod+MouseMiddle repeat=false { maximize-column; }
-    Mod+Alt+MouseMiddle repeat=false { fullscreen-window; }
-    Ctrl+Mod+MouseRight repeat=false { toggle-window-floating; }
-    Mod+Alt+N { move-window-to-workspace-down; }
-    Mod+Alt+P { move-window-to-workspace-up; }
-    Mod+Alt+H { move-window-to-workspace-up; }
-    Mod+Alt+L { move-window-to-workspace-down; }
-    Mod+Alt+Left { move-window-to-workspace-up; }
-    Mod+Alt+Right { move-window-to-workspace-down; }
-    Mod+Alt+Up { move-window-to-workspace-up; }
-    Mod+Alt+Down { move-window-to-workspace-down; }
-    Mod+Alt+WheelScrollUp cooldown-ms=150 { move-window-to-workspace-up; }
-    Mod+Alt+WheelScrollDown cooldown-ms=150 { move-window-to-workspace-down; }
-    Mod+Ctrl+Shift+H { move-window-to-workspace-up focus=false; }
-    Mod+Ctrl+Shift+L { move-window-to-workspace-down focus=false; }
-    Ctrl+Shift+MouseLeft { move-window-to-workspace-up focus=false; }
-    Ctrl+Shift+MouseRight { move-window-to-workspace-down focus=false; }
-    Mod+Shift+WheelScrollUp cooldown-ms=150 { move-column-left; }
-    Mod+Shift+WheelScrollDown cooldown-ms=150 { move-column-right; }
-    Mod+Ctrl+Shift+N repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
-    Mod+Ctrl+Shift+O repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
-    Alt+Shift+MouseLeft repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
-    Alt+Shift+MouseRight repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
-    Super+W repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" float"; }
-    Ctrl+Shift+A repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" tmux"; }
-    Super+E repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" files"; }
-    Mod+BackSpace repeat=false { spawn "inir" "lock" "activate"; }
-    Mod+A repeat=false { spawn "inir" "sidebarLeft" "toggle"; }
-    Mod+B repeat=false { spawn "inir" "sidebarRight" "toggle"; }
-    Mod+Shift+Alt+J repeat=false { spawn "inir" "bar" "toggle"; }
-    Mod+Shift+Alt+K repeat=false { spawn "inir" "osk" "toggle"; }
-    Alt+Space repeat=false { spawn "inir" "overview" "toggle"; }
-    Ctrl+1 repeat=false { spawn "inir" "region" "screenshot"; }
-    Ctrl+Alt+MouseLeft repeat=false { spawn "inir" "region" "screenshot"; }
-    Ctrl+Alt+MouseRight repeat=false { spawn "inir" "region" "menu"; }
-    Ctrl+Alt+S repeat=false { spawn "inir" "region" "menu"; }
-    Ctrl+Alt+A repeat=false { spawn "inir" "region" "menu"; }
-    Mod+Space repeat=false { toggle-overview; }
-    Mod+F repeat=false { spawn "inir" "browser"; }
-    Mod+I repeat=false { spawn "inir" "settings"; }
-    Mod+Shift+BackSpace repeat=false { spawn "systemctl" "suspend"; }
-    Mod+Ctrl+Alt+Escape repeat=false { quit; }
-    Ctrl+Alt+P allow-when-locked=true repeat=false { spawn "playerctl" "play-pause"; }
-    Ctrl+Alt+L allow-when-locked=true repeat=false { spawn "playerctl" "next"; }
-    Ctrl+Alt+Right allow-when-locked=true repeat=false { spawn "playerctl" "next"; }
-    Ctrl+Alt+H allow-when-locked=true repeat=false { spawn "playerctl" "previous"; }
-    Ctrl+Alt+Left allow-when-locked=true repeat=false { spawn "playerctl" "previous"; }
-    Ctrl+Alt+MouseBack allow-when-locked=true repeat=false { spawn "playerctl" "previous"; }
-    Ctrl+Alt+MouseForward allow-when-locked=true repeat=false { spawn "playerctl" "next"; }
-    Ctrl+Alt+M allow-when-locked=true repeat=false { spawn "wpctl" "set-mute" "@DEFAULT_SINK@" "toggle"; }
-    Ctrl+Alt+J allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
-    Ctrl+Alt+Down allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
-    Ctrl+Alt+K allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
-    Ctrl+Alt+Up allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
-    Ctrl+Alt+WheelScrollUp allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%+" "-l" "1.5"; }
-    Ctrl+Alt+WheelScrollDown allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%-" "-l" "1.5"; }
-    Ctrl+Shift+Z repeat=false { spawn "1password" "--toggle"; }
-    Ctrl+Shift+Space repeat=false { spawn "1password" "--quick-access"; }
-    Mod+Alt+F repeat=false { spawn "fcitx5" "--replace" "-d"; }
-    Ctrl+Mod+F repeat=false { spawn "fcitx5" "--replace" "-d"; }
-    Mod+Alt+I repeat=false { spawn "env" "XDG_CURRENT_DESKTOP=GNOME" "XDG_SESSION_DESKTOP=gnome" "gnome-control-center"; }
-    Mod+Alt+E repeat=false { spawn "env" "QT_QPA_PLATFORM=xcb" "pcmanfm-qt" "--profile" "xwayland" "--new-window"; }
-    Mod+Shift+E repeat=false { spawn "rofi" "-show" "filebrowser"; }
-    Mod+Ctrl+W repeat=false { spawn "skwd-wall-v2"; }
-    Ctrl+Mod+Slash repeat=false { spawn "bash" "-c" "xdg-open \"$INIR_CONFIG_DIR/config.json\""; }
-    Ctrl+Mod+Alt+Slash repeat=false { spawn "bash" "-c" "xdg-open \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/75-personal-binds.kdl\""; }
+    Alt+WheelScrollUp cooldown-ms=150 hotkey-overlay-title="Focus left" { focus-column-left; }
+
+    // Focus right.
+    Alt+WheelScrollDown cooldown-ms=150 hotkey-overlay-title="Focus right" { focus-column-right; }
+
+    // Focus up.
+    Alt+K hotkey-overlay-title="Focus up" { focus-window-up; }
+
+    // Focus down.
+    Alt+J hotkey-overlay-title="Focus down" { focus-window-down; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Move Windows
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Move left.
+    Mod+H hotkey-overlay-title="Move left" { move-column-left; }
+
+    // Move right.
+    Mod+L hotkey-overlay-title="Move right" { move-column-right; }
+
+    // Move up.
+    Mod+K hotkey-overlay-title="Move up" { move-window-up; }
+
+    // Move down.
+    Mod+J hotkey-overlay-title="Move down" { move-window-down; }
+
+    // Move left.
+    Mod+Shift+WheelScrollUp cooldown-ms=150 hotkey-overlay-title="Move left" { move-column-left; }
+
+    // Move right.
+    Mod+Shift+WheelScrollDown cooldown-ms=150 hotkey-overlay-title="Move right" { move-column-right; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Workspaces
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Next workspace.
+    Mod+N repeat=false hotkey-overlay-title="Next workspace" { focus-workspace-down; }
+
+    // Previous workspace.
+    Mod+P repeat=false hotkey-overlay-title="Previous workspace" { focus-workspace-up; }
+
+    // Move window to next workspace.
+    Mod+Alt+N hotkey-overlay-title="Move window to next workspace" { move-window-to-workspace-down; }
+
+    // Move window to previous workspace.
+    Mod+Alt+P hotkey-overlay-title="Move window to previous workspace" { move-window-to-workspace-up; }
+
+    // Move window to previous workspace.
+    Mod+Alt+H hotkey-overlay-title="Move window to previous workspace" { move-window-to-workspace-up; }
+
+    // Move window to next workspace.
+    Mod+Alt+L hotkey-overlay-title="Move window to next workspace" { move-window-to-workspace-down; }
+
+    // Move window to previous workspace.
+    Mod+Alt+Left hotkey-overlay-title="Move window to previous workspace" { move-window-to-workspace-up; }
+
+    // Move window to next workspace.
+    Mod+Alt+Right hotkey-overlay-title="Move window to next workspace" { move-window-to-workspace-down; }
+
+    // Move window to previous workspace.
+    Mod+Alt+Up hotkey-overlay-title="Move window to previous workspace" { move-window-to-workspace-up; }
+
+    // Move window to next workspace.
+    Mod+Alt+Down hotkey-overlay-title="Move window to next workspace" { move-window-to-workspace-down; }
+
+    // Move window to previous workspace.
+    Mod+Alt+WheelScrollUp cooldown-ms=150 hotkey-overlay-title="Move window to previous workspace" { move-window-to-workspace-up; }
+
+    // Move window to next workspace.
+    Mod+Alt+WheelScrollDown cooldown-ms=150 hotkey-overlay-title="Move window to next workspace" { move-window-to-workspace-down; }
+
+    // Move window to previous workspace without following.
+    Mod+Ctrl+Shift+H hotkey-overlay-title="Move window to previous workspace without following" { move-window-to-workspace-up focus=false; }
+
+    // Move window to next workspace without following.
+    Mod+Ctrl+Shift+L hotkey-overlay-title="Move window to next workspace without following" { move-window-to-workspace-down focus=false; }
+
+    // Move window to previous workspace without following.
+    Ctrl+Shift+MouseLeft hotkey-overlay-title="Move window to previous workspace without following" { move-window-to-workspace-up focus=false; }
+
+    // Move window to next workspace without following.
+    Ctrl+Shift+MouseRight hotkey-overlay-title="Move window to next workspace without following" { move-window-to-workspace-down focus=false; }
+
+    // Move window to empty workspace.
+    Mod+Ctrl+Shift+N repeat=false hotkey-overlay-title="Move window to empty workspace" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
+
+    // Focus empty workspace.
+    Mod+Ctrl+Shift+O repeat=false hotkey-overlay-title="Focus empty workspace" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
+
+    // Move window to empty workspace.
+    Alt+Shift+MouseLeft repeat=false hotkey-overlay-title="Move window to empty workspace" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
+
+    // Focus empty workspace.
+    Alt+Shift+MouseRight repeat=false hotkey-overlay-title="Focus empty workspace" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Media
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Play/Pause.
+    Ctrl+Alt+P allow-when-locked=true repeat=false hotkey-overlay-title="Play/Pause" { spawn "playerctl" "play-pause"; }
+
+    // Next track.
+    Ctrl+Alt+L allow-when-locked=true repeat=false hotkey-overlay-title="Next track" { spawn "playerctl" "next"; }
+
+    // Next track.
+    Ctrl+Alt+Right allow-when-locked=true repeat=false hotkey-overlay-title="Next track" { spawn "playerctl" "next"; }
+
+    // Previous track.
+    Ctrl+Alt+H allow-when-locked=true repeat=false hotkey-overlay-title="Previous track" { spawn "playerctl" "previous"; }
+
+    // Previous track.
+    Ctrl+Alt+Left allow-when-locked=true repeat=false hotkey-overlay-title="Previous track" { spawn "playerctl" "previous"; }
+
+    // Previous track.
+    Ctrl+Alt+MouseBack allow-when-locked=true repeat=false hotkey-overlay-title="Previous track" { spawn "playerctl" "previous"; }
+
+    // Next track.
+    Ctrl+Alt+MouseForward allow-when-locked=true repeat=false hotkey-overlay-title="Next track" { spawn "playerctl" "next"; }
+
+    // Mute toggle.
+    Ctrl+Alt+M allow-when-locked=true repeat=false hotkey-overlay-title="Mute toggle" { spawn "wpctl" "set-mute" "@DEFAULT_SINK@" "toggle"; }
+
+    // Volume down.
+    Ctrl+Alt+J allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
+
+    // Volume down.
+    Ctrl+Alt+Down allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
+
+    // Volume up.
+    Ctrl+Alt+K allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
+
+    // Volume up.
+    Ctrl+Alt+Up allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
+
+    // Volume up.
+    Ctrl+Alt+WheelScrollUp allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%+" "-l" "1.5"; }
+
+    // Volume down.
+    Ctrl+Alt+WheelScrollDown allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%-" "-l" "1.5"; }
 }

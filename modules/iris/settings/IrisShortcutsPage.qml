@@ -31,7 +31,7 @@ Flickable {
     ScrollBar.vertical: IrisScrollBar {}
 
     function displayCategoryName(name: string): string {
-        return name === "ii Shell" ? Translation.tr("iNiR Shell") : name
+        return Translation.tr(name === "ii Shell" ? "iNiR Shell" : name)
     }
     function categoryGlyph(name: string): string {
         const glyphs = {
@@ -86,7 +86,7 @@ Flickable {
         return root.allCategories.map(category => ({
             name: category.name,
             binds: category.binds.filter(bind => {
-                const text = [bind.action, bind.keyCombo, ...bind.mods, bind.key, root.displayCategoryName(category.name)].join(" ").toLowerCase()
+                const text = [bind.action, Translation.tr(bind.action), bind.keyCombo, ...bind.mods, bind.key, root.displayCategoryName(category.name)].join(" ").toLowerCase()
                 return terms.every(term => text.includes(term))
             })
         })).filter(category => category.binds.length > 0)
@@ -361,7 +361,7 @@ Flickable {
             anchors.right: tools.left
             anchors.rightMargin: 10 * root.d
             y: Math.round((Math.round(40 * root.d) - height) / 2)
-            text: bindRow.modelData.action + (bindRow.modelData.disabled ? "  " + Translation.tr("(off)") : "")
+            text: Translation.tr(bindRow.modelData.action) + (bindRow.modelData.disabled ? "  " + Translation.tr("(off)") : "")
             color: bindRow.modelData.disabled ? IrisStyle.muted : IrisStyle.text
             font.pixelSize: IrisStyle.typeLabel
             elide: Text.ElideRight
