@@ -9,6 +9,12 @@
 // Descriptions use Niri's native hotkey-overlay-title metadata.
 // iNiR categories are inferred from actions, not from these section comments.
 
+// Opening the lid clears a session-only off override on this laptop's panel.
+// Keep the saved mode, scale and position; Niri still handles lid close itself.
+switch-events {
+    lid-open { spawn "niri" "msg" "output" "eDP-2" "on"; }
+}
+
 binds {
     // ═══════════════════════════════════════════════════════════════════════
     // System

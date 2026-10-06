@@ -164,6 +164,12 @@ Waffle 的显示器设置也提供相同入口。关闭后仍保留列表入口�
 重新登录或更改输出配置可能重置开关。窗口会按 Niri 的规则迁移到剩余屏幕。
 此功能仅对 Niri 生效，不修改 Hyprland/II。
 
+个人 `75-personal-binds.kdl` 为本机的 `eDP-2` 添加 `lid-open` 事件：开盖时清除
+当前会话的关闭状态，不改模式、缩放和位置。合盖仍由 Niri 自己处理。
+iRiS 的每个 Dock 独立持有窗口排序 lease，移除内屏 Dock 不再清空外屏的运行应用。
+`python3 scripts/test-iris-dock-hotplug.py` 通过实际排序服务验证合盖、开盖、
+外屏断开和最后一个 Dock 释放的行为。
+
 ### 显示器热插拔兼容（2026-10-06）
 
 - `inir-output-wallpaper.service` 仅随 Niri 启停。输出变化稳定 3 秒后检查实际

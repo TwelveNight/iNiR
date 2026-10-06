@@ -201,8 +201,9 @@ Item {
     readonly property real slotSpacing: 2 * root.d
     readonly property real magnifyGain: Math.max(0.1, Math.min(1, (Number(root.options?.magnifySize ?? 150) - 100) / 100))
     readonly property real iconOversample: root.magnify ? 1 + root.magnifyGain : 1
-    Component.onCompleted: CompositorService.setSortingConsumer("irisDock", true)
-    Component.onDestruction: CompositorService.setSortingConsumer("irisDock", false)
+    // Each output owns a lease; removing one Dock must not disable the others.
+    Component.onCompleted: CompositorService.acquireSortingConsumer()
+    Component.onDestruction: CompositorService.releaseSortingConsumer()
 
     readonly property var urgentWindowIds: (NiriService.windows ?? []).filter(w => w.is_urgent).map(w => w.id)
     function appUrgent(app): bool {
