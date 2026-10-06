@@ -64,12 +64,14 @@ def publish_environment(desktop, env):
         env.pop(name, None)
     names = IDENTITY + GPU + TOOLKIT
     missing = [name for name in names if name not in env]
-    if missing:
-        run("systemctl", "--user", "unset-environment", *missing)
     # D-Bus cannot unset variables: clear missing names explicitly, then import
     # only present names into systemd. Never publish Shell-only Mesa overrides.
     run("dbus-update-activation-environment",
         *(f"{name}={env.get(name, '')}" for name in names))
+    # dbus-broker can mirror even the non --systemd update into systemd.
+    # Remove empty placeholders afterward; GLVND/Mesa distinguish unset from "".
+    if missing:
+        run("systemctl", "--user", "unset-environment", *missing)
     present = [name for name in names if name in env]
     run("systemctl", "--user", "import-environment", *present, env=env)
 
@@ -93,8 +95,8 @@ def retire(identity):
     run("systemctl", "--user", "stop", "ii-skwd-wall-theme.service", "skwd-walld.service")
     if identity["desktop"] == "hyprland":
         run("systemctl", "--user", "stop", "hyprland-session.target")
-    run("systemctl", "--user", "unset-environment", *(IDENTITY + GPU + TOOLKIT))
     run("dbus-update-activation-environment", *(f"{name}=" for name in IDENTITY + GPU + TOOLKIT))
+    run("systemctl", "--user", "unset-environment", *(IDENTITY + GPU + TOOLKIT))
     print(f"desktop-session: retired {identity['desktop']} pid={identity['pid']}", flush=True)
 
 
@@ -132,7 +134,7 @@ def main():
             watcher = f"inir-desktop-watch-{identity['pid']}.service"
             watch_active = unit_active(watcher)
             if state.exists() and json.loads(state.read_text()) == identity:
-                if watch_active and unit_active("skwd-walld.service"):
+                if watch_active and unit_active("skwd-walld.service") and not args.adopt:
                     return
             publish_environment(args.desktop, env)
             if not watch_active:

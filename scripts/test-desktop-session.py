@@ -36,6 +36,9 @@ class SessionTests(unittest.TestCase):
                 self.manager.pop(name, None)
         if args[:3] == ("systemctl", "--user", "import-environment"):
             self.manager.update({name: env[name] for name in args[3:]})
+        if args[0] == "dbus-update-activation-environment":
+            # The host's dbus-broker mirrors updates back into the user manager.
+            self.manager.update(dict(arg.split("=", 1) for arg in args[1:]))
         return subprocess.CompletedProcess(args, 0, output, "")
 
     def test_niri_replaces_hyprland_gpu_and_identity_without_leaking_private_environment(self):
