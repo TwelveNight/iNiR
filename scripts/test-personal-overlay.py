@@ -317,7 +317,7 @@ install-python-packages
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
-        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf"]:
+        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)
@@ -342,6 +342,9 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         bridge = self.config / "systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d/20-inir-session.conf"
         bridge.parent.mkdir(parents=True)
         bridge.write_text("previous bridge override")
+        portals = self.config / "xdg-desktop-portal/niri-portals.conf"
+        portals.parent.mkdir()
+        portals.write_text("previous Niri portal config")
         desktop = Path(self.env["XDG_DATA_HOME"]) / "applications/inir.desktop"
         desktop.parent.mkdir(parents=True)
         desktop.write_text("previous desktop entry")
@@ -385,6 +388,9 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.assertEqual((snapshots[0] / "config" / bridge.relative_to(self.config)).read_text(),
                          "previous bridge override")
         self.assertIn("ConditionEnvironment=!XDG_CURRENT_DESKTOP=niri", bridge.read_text())
+        self.assertEqual((snapshots[0] / "config/xdg-desktop-portal/niri-portals.conf").read_text(),
+                         "previous Niri portal config")
+        self.assertIn("org.freedesktop.impl.portal.FileChooser=gtk;", portals.read_text())
         self.assertIn(str(private), niri.read_text())
         self.assertNotIn("$HOME", niri.read_text())
         self.assertTrue((self.ii / "installed_true").exists())
@@ -436,6 +442,38 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
                        check=True, capture_output=True)
         dropin = (self.config / "systemd/user/inir.service.d/20-personal-paths.conf").read_text()
         self.assertIn(str(self.state / "private state"), dropin)
+
+    def test_niri_portal_routing_preserves_hyprland_and_service_masks(self):
+        import configparser
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("session_config", ROOT / "scripts/personal/configure-session.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        directory = self.config / "xdg-desktop-portal"
+        directory.mkdir()
+        hyprland = directory / "hyprland-portals.conf"
+        generic = directory / "portals.conf"
+        hyprland.write_text("[preferred]\ndefault=hyprland;gtk;\n")
+        generic.write_text("keep generic routing")
+        mask = self.config / "systemd/user/xdg-desktop-portal-gnome.service"
+        mask.parent.mkdir(parents=True)
+        mask.symlink_to("/dev/null")
+        module.configure_portals(self.config)
+        parser = configparser.ConfigParser()
+        parser.optionxform = str
+        parser.read(directory / "niri-portals.conf")
+        for interface in ["FileChooser", "AppChooser", "Settings"]:
+            self.assertEqual(parser["preferred"]["org.freedesktop.impl.portal." + interface], "gtk;")
+        self.assertEqual(parser["preferred"]["default"], "gtk;")
+        self.assertEqual(parser["preferred"]["org.freedesktop.impl.portal.ScreenCast"], "gnome;")
+        self.assertEqual(hyprland.read_text(), "[preferred]\ndefault=hyprland;gtk;\n")
+        self.assertEqual(generic.read_text(), "keep generic routing")
+        self.assertEqual(mask.readlink(), Path("/dev/null"))
+        (directory / "niri-portals.conf").unlink()
+        (directory / "niri-portals.conf").symlink_to(hyprland)
+        with self.assertRaises(ValueError):
+            module.configure_portals(self.config)
+        self.assertEqual(hyprland.read_text(), "[preferred]\ndefault=hyprland;gtk;\n")
 
     def test_orphan_cleanup_only_signals_inir_thumbnail_workers(self):
         source = (ROOT / "scripts/inir").read_text()

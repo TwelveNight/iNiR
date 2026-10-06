@@ -6,6 +6,16 @@ from pathlib import Path
 import re
 
 
+def configure_portals(config_home):
+    directory = config_home / "xdg-desktop-portal"
+    target = directory / "niri-portals.conf"
+    if directory.is_symlink() or target.is_symlink():
+        raise ValueError("Niri portal config must not redirect to another desktop's files")
+    template = Path(__file__).with_name("niri-portals.conf")
+    directory.mkdir(parents=True, exist_ok=True)
+    target.write_text(template.read_text())
+
+
 def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     paths = {
         "INIR_CONFIG_DIR": str(config_dir),
@@ -15,6 +25,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     }
     if any(not Path(value).is_absolute() or "\n" in value for value in paths.values()):
         raise ValueError("iNiR paths must be absolute, single-line paths")
+    configure_portals(config_home)
     niri = config_home / "niri"
     # Install the separate personal layer once; preserve subsequent user edits.
     root_config = niri / "config.kdl"

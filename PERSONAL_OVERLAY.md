@@ -49,6 +49,12 @@ Niri 启动脚本导入本会话的 Wayland 环境并重启 skwd-walld，使其�
 GDM 登录时选择 **Niri**。标准入口通过 `niri.service` 启动；`inir.service` 仅挂在它的 wants 下，不随 Hyprland 启动。
 不需要新增登录条目。`.deskto` 后缀的旧自定义条目通常不会被 GDM 识别。
 
+Portal 按桌面分别配置：安装器备份并写入 `~/.config/xdg-desktop-portal/niri-portals.conf`，
+让 Niri 的文件/目录选择、应用选择及设置读取使用 GTK 后端。
+原有 `hyprland-portals.conf`、通用 `portals.conf` 和后端服务的 enable/mask 状态保持原样。
+Niri 的屏幕共享/截图接口仍指定 GNOME 后端；若它被屏蔽，这些捕获接口需要另行配置，
+不影响 GTK 文件选择器。当前会话更新路由后需重启 `xdg-desktop-portal.service`，新登录会自动读取。
+
 无需修改 II 的 `installed_true`。它是存在性标记，不是布尔配置文件；iNiR 使用自己的标记。
 
 部署入口（与官方命令一致，当前个人分支会自动进入隔离流程）：
