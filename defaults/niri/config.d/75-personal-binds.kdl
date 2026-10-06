@@ -54,8 +54,8 @@ binds {
     Mod+Ctrl+Shift+L { move-window-to-workspace-down focus=false; }
     Ctrl+Shift+MouseLeft { move-window-to-workspace-up focus=false; }
     Ctrl+Shift+MouseRight { move-window-to-workspace-down focus=false; }
-    Mod+Shift+WheelScrollUp cooldown-ms=150 { move-window-to-workspace-up; }
-    Mod+Shift+WheelScrollDown cooldown-ms=150 { move-window-to-workspace-down; }
+    Mod+Shift+WheelScrollUp cooldown-ms=150 { move-column-left; }
+    Mod+Shift+WheelScrollDown cooldown-ms=150 { move-column-right; }
     Mod+Ctrl+Shift+N repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
     Mod+Ctrl+Shift+O repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-focus"; }
     Alt+Shift+MouseLeft repeat=false { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" empty-move"; }
