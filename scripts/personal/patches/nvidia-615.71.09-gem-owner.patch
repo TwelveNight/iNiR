@@ -1,0 +1,24 @@
+--- a/nvidia/nv-dma.c
++++ b/nvidia/nv-dma.c
+@@ -1005,6 +1005,8 @@
+     struct drm_gem_object *gem
+ )
+ {
++    struct module *owner;
++
+     if (gem == NULL)
+     {
+         return;
+@@ -1013,9 +1015,11 @@
+     // Do nothing with SGT, it will be unmapped and unpinned by the exporter
+     WARN_ON(sgt == NULL);
+ 
++    // The final GEM reference can free gem. Cache its owner before dropping it.
++    owner = gem->dev->driver->fops->owner;
+     nv_dma_gem_object_put_unlocked(gem);
+ 
+-    module_put(gem->dev->driver->fops->owner);
++    module_put(owner);
+ }
+ 
+ #else
