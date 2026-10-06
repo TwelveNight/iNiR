@@ -316,7 +316,7 @@ install-python-packages
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
-        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf", "niri-session-environment.conf", "disable-autostart.sh", "wallpaper-session.conf", "inir-output-wallpaper.service"]:
+        for name in ["install.sh", "preflight.sh", "configure-session.py", "configure-autostart.py", "dependencies.py", "xwaylandvideobridge-autostart.conf", "niri-portals.conf", "niri-session-environment.conf", "disable-autostart.sh", "wallpaper-session.conf", "inir-output-wallpaper.service"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)
@@ -335,6 +335,10 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         niri = self.config / "niri/config.kdl"
         niri.parent.mkdir()
         niri.write_text("previous niri")
+        autostart = self.config / "autostart/org.kde.kgpg.desktop"
+        autostart.parent.mkdir()
+        previous_autostart = "[Desktop Entry]\nType=Application\nName=KGpg\nExec=kgpg\nHidden=false\n"
+        autostart.write_text(previous_autostart)
         old_wants = self.config / "systemd/user/default.target.wants/inir.service"
         old_wants.parent.mkdir(parents=True)
         old_wants.symlink_to("../inir.service")
@@ -368,6 +372,7 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
                        check=True, capture_output=True, text=True)
         self.assertFalse((self.state / "inir/install-backups").exists())
         self.assertEqual(niri.read_text(), "previous niri")
+        self.assertEqual(autostart.read_text(), previous_autostart)
         # A failed preflight must stop before backups or setup starts.
         (binary / "systemctl").write_text("#!/bin/sh\nexit 1\n")
         failed = subprocess.run(["bash", str(entry), "--quiet"], env=self.env, capture_output=True)
@@ -379,6 +384,8 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
                        check=True, capture_output=True, text=True)
         snapshots = list((self.state / "inir/install-backups").iterdir())
         self.assertEqual(len(snapshots), 1)
+        self.assertEqual((snapshots[0] / "config/autostart/org.kde.kgpg.desktop").read_text(), previous_autostart)
+        self.assertIn("Hidden=true", autostart.read_text())
         self.assertEqual((snapshots[0] / "config/niri/config.kdl").read_text(), "previous niri")
         self.assertEqual((snapshots[0] / "inir-config/config.json").read_text(), "private config")
         self.assertEqual((snapshots[0] / "config/systemd/user/default.target.wants/inir.service").readlink(),

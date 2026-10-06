@@ -169,6 +169,14 @@ Niri 光标和启动应用的 `XCURSOR_THEME/SIZE` 使用现有的黑色
 
 Fcitx5、1Password 已在现有 XDG autostart 中，由 Niri/systemd 启动，避免重复添加。
 CC Switch 不随 Niri 登录自动启动，按需手动打开。
+KGpg、KDE 日历提醒（kalendarac）和 KDE 时钟后台（kclockd）的用户级 XDG 启动项
+设为 `Hidden=true`，两种桌面都保留手动打开和原有数据。KGpg 是密钥管理界面，
+关闭它的自启动不影响 gpg/gpg-agent；其 KDE 专用启动条件在 Niri 下会直接放行，
+因此使用标准 XDG 覆盖而不依赖该条件。II 的日历使用 khal/ICS，便签、闹钟和提醒
+使用自己的数据与定时器，不依赖 Akonadi/KNotes/kclockd；手机功能使用的 KDE Connect 保留。
+残留 ToDesk 用户启动项增加 `TryExec=/opt/todesk/bin/ToDesk`，程序不存在时跳过，
+重新安装到原路径后仍可自启动。上述策略由 `scripts/personal/configure-autostart.py`
+维护，安装器先备份原启动项。不卸载旧 KDE 包、不改 Akonadi 数据或系统库。
 自定义启动文件中已注释的 Clash Verge、HyprGlass、插件加载命令不迁移；
 原有其他 XDG 应用仍按各自启动项运行。
 用户已明确不再需要 libinput-gestures：本机的 XDG 项设为 `Hidden=true`，
