@@ -38,8 +38,20 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
             template = Path(__file__).resolve().parents[2] / "defaults/niri/config.d/75-personal-binds.kdl"
             personal.write_text(template.read_text())
         if personal_include not in root_text:
-            root_config.write_text(root_text.replace(upstream_include,
-                                   upstream_include + "\n" + personal_include, 1))
+            root_text = root_text.replace(upstream_include,
+                                         upstream_include + "\n" + personal_include, 1)
+    upstream_rules = 'include "config.d/30-window-rules.kdl"'
+    personal_rules_include = 'include "config.d/35-personal-window-rules.kdl"'
+    if upstream_rules in root_text:
+        personal_rules = niri / "config.d/35-personal-window-rules.kdl"
+        if not personal_rules.exists():
+            template = Path(__file__).resolve().parents[2] / "defaults/niri/config.d/35-personal-window-rules.kdl"
+            personal_rules.write_text(template.read_text())
+        if personal_rules_include not in root_text:
+            root_text = root_text.replace(upstream_rules,
+                                         upstream_rules + "\n" + personal_rules_include, 1)
+    if root_config.read_text() != root_text:
+        root_config.write_text(root_text)
     env_file = niri / "config.d/40-environment.kdl"
     if not env_file.is_file():
         env_file = niri / "config.kdl"

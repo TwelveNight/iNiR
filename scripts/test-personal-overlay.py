@@ -419,11 +419,26 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         shutil.copytree(ROOT / "defaults/niri", self.config / "niri")
+        # Existing installations predate the personal dialog layer.
+        root_config = self.config / "niri/config.kdl"
+        root_config.write_text(root_config.read_text().replace(
+            'include "config.d/35-personal-window-rules.kdl"\n', ''))
+        personal_rules = self.config / "niri/config.d/35-personal-window-rules.kdl"
+        personal_rules.unlink()
+        upstream_rules = (self.config / "niri/config.d/30-window-rules.kdl").read_bytes()
         args = (self.config, self.inir, self.state / "private state", self.state / "private state/.venv", self.base / "bin dir")
         module.configure(*args)
+        self.assertEqual(personal_rules.read_bytes(),
+                         (ROOT / "defaults/niri/config.d/35-personal-window-rules.kdl").read_bytes())
+        personal_rules.write_text(personal_rules.read_text() + "\n// keep my dialog edit\n")
+        saved_rules = personal_rules.read_bytes()
         env_file = self.config / "niri/config.d/40-environment.kdl"
         first = env_file.read_text()
         module.configure(*args)
+        self.assertEqual(personal_rules.read_bytes(), saved_rules)
+        self.assertEqual((self.config / "niri/config.d/30-window-rules.kdl").read_bytes(), upstream_rules)
+        self.assertEqual(root_config.read_text().count(
+            'include "config.d/35-personal-window-rules.kdl"'), 1)
         self.assertEqual(first, env_file.read_text())
         self.assertNotIn("$HOME", first)
         binds = (self.config / "niri/config.d/70-binds.kdl").read_text()

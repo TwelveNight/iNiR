@@ -8,6 +8,7 @@
 //   10  Input, touchpad, mouse, cursor
 //   20  Layout, gaps, borders, shadows, overview
 //   30  Window rules (corner radius, per-app tweaks)
+//   35  Personal window rules (portal dialogs)
 //   40  Environment variables (Qt, XDG, theming)
 //   50  Processes spawned at login
 //   60  Animations (spring physics tuning)
@@ -44,6 +45,7 @@ screenshot-path "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
 include "config.d/10-input-and-cursor.kdl"
 include "config.d/20-layout-and-overview.kdl"
 include "config.d/30-window-rules.kdl"
+include "config.d/35-personal-window-rules.kdl"
 include "config.d/40-environment.kdl"
 include "config.d/50-startup.kdl"
 include "config.d/60-animations.kdl"

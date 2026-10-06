@@ -54,6 +54,9 @@ Portal 按桌面分别配置：安装器备份并写入 `~/.config/xdg-desktop-p
 原有 `hyprland-portals.conf`、通用 `portals.conf` 和后端服务的 enable/mask 状态保持原样。
 Niri 的屏幕共享/截图接口仍指定 GNOME 后端；若它被屏蔽，这些捕获接口需要另行配置，
 不影响 GTK 文件选择器。当前会话更新路由后需重启 `xdg-desktop-portal.service`，新登录会自动读取。
+文件/目录选择与“打开方式”等 portal 辅助窗口由独立的
+`config.d/35-personal-window-rules.kdl` 设为浮动，初始尺寸为 960×700 逻辑像素。
+安装器补齐这个规则层并保留后续个人编辑；原上游 `30-window-rules.kdl` 保持独立。
 
 无需修改 II 的 `installed_true`。它是存在性标记，不是布尔配置文件；iNiR 使用自己的标记。
 
