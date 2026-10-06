@@ -57,6 +57,11 @@ Niri 的屏幕共享/截图接口仍指定 GNOME 后端；若它被屏蔽，这�
 文件/目录选择与“打开方式”等 portal 辅助窗口由独立的
 `config.d/35-personal-window-rules.kdl` 设为浮动，初始尺寸为 960×700 逻辑像素。
 安装器补齐这个规则层并保留后续个人编辑；原上游 `30-window-rules.kdl` 保持独立。
+本机 Hyprland 的启动/退出钩子已经管理 `hyprland-session.target`。
+若对应用户 unit 缺失，安装器补齐它与 `graphical-session.target` 的关联，
+让停止会话时停止 portal；已有 unit 或 mask 不覆盖，不改原 Hyprland 钩子。
+Niri 的标准 `niri-session` 入口会通过 `niri-shutdown.target` 停止图形会话。
+用户服务管理器的 linger 不妨碍这些会话服务停止，但 D-Bus 后续请求仍可能再次激活 portal。
 
 无需修改 II 的 `installed_true`。它是存在性标记，不是布尔配置文件；iNiR 使用自己的标记。
 

@@ -16,6 +16,21 @@ def configure_portals(config_home):
     target.write_text(template.read_text())
 
 
+def configure_hyprland_session(config_home):
+    # The personal Hyprland config already starts/stops this target. Restore
+    # only a missing unit; retain any user's existing unit or service mask.
+    hooks = config_home / "hypr/hyprland/execs.lua"
+    target = config_home / "systemd/user/hyprland-session.target"
+    if target.exists() or target.is_symlink():
+        return
+    if not hooks.is_file() or "hyprland-session.target" not in hooks.read_text():
+        return
+    if target.parent.is_symlink():
+        raise ValueError("Hyprland session unit directory must not be redirected")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(Path(__file__).with_name("hyprland-session.target").read_text())
+
+
 def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     paths = {
         "INIR_CONFIG_DIR": str(config_dir),
@@ -83,6 +98,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     bridge_dropin.parent.mkdir(parents=True, exist_ok=True)
     bridge_template = Path(__file__).with_name("xwaylandvideobridge-autostart.conf")
     bridge_dropin.write_text(bridge_template.read_text())
+    configure_hyprland_session(config_home)
 
 
 if __name__ == "__main__":

@@ -490,6 +490,32 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
             module.configure_portals(self.config)
         self.assertEqual(hyprland.read_text(), "[preferred]\ndefault=hyprland;gtk;\n")
 
+    def test_missing_hyprland_session_unit_is_restored_only_for_existing_hooks(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("session_config", ROOT / "scripts/personal/configure-session.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        target = self.config / "systemd/user/hyprland-session.target"
+        module.configure_hyprland_session(self.config)
+        self.assertFalse(target.exists())
+        hooks = self.config / "hypr/hyprland/execs.lua"
+        hooks.parent.mkdir(parents=True)
+        hooks.write_text('start hyprland-session.target\nstop hyprland-session.target\n')
+        original = hooks.read_bytes()
+        module.configure_hyprland_session(self.config)
+        self.assertEqual(target.read_bytes(), (ROOT / "scripts/personal/hyprland-session.target").read_bytes())
+        self.assertIn("BindsTo=graphical-session.target", target.read_text())
+        self.assertIn("PropagatesStopTo=graphical-session.target", target.read_text())
+        self.assertIn("ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland", target.read_text())
+        target.write_text("my existing session unit")
+        module.configure_hyprland_session(self.config)
+        self.assertEqual(target.read_text(), "my existing session unit")
+        target.unlink()
+        target.symlink_to("/dev/null")
+        module.configure_hyprland_session(self.config)
+        self.assertEqual(target.readlink(), Path("/dev/null"))
+        self.assertEqual(hooks.read_bytes(), original)
+
     def test_orphan_cleanup_only_signals_inir_thumbnail_workers(self):
         source = (ROOT / "scripts/inir").read_text()
         body = source[source.index("cleanup_orphans() {"):source.index("kill_shell() {")]

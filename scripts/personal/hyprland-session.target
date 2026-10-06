@@ -1,0 +1,9 @@
+# Used by the existing hyprland.start / hyprland.shutdown hooks.
+[Unit]
+Description=Hyprland graphical session
+BindsTo=graphical-session.target
+Before=graphical-session.target
+PropagatesStopTo=graphical-session.target
+ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
