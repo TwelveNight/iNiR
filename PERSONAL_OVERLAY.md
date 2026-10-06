@@ -102,6 +102,11 @@ Fcitx5、1Password 已在现有 XDG autostart 中，由 Niri/systemd 启动，�
 用户已明确不再需要 libinput-gestures：本机的 XDG 项设为 `Hidden=true`，
 用户服务已禁用并停止，保留程序和配置以便恢复。没有添加 Niri 特例或更改 Hyprland 原生手势。
 
+Niri 下跳过系统的 Xwayland Video Bridge XDG 自启动项，避免捕获辅助窗口进入平铺布局。
+通过生成服务的 `20-inir-session.conf` drop-in 检查桌面环境实现，不修改系统 desktop 文件，
+其他桌面仍沿用原启动行为。已有的 `xwayland-satellite` 和 Niri 屏幕共享 portal 不受影响。
+启用鼠标悬停聚焦，鼠标进入部分可见窗口时也允许对应列滚动到视野内。
+
 个人键位独立放在 `defaults/niri/config.d/75-personal-binds.kdl`，上游 `70-binds.kdl` 保持原样。
 主配置先加载 70，再加载 75，最后加载用户自留的 90。Niri 26.04 的后续同键定义会替换旧动作，
 等效于先解除旧绑定再重绑，不会同时触发两个动作；它不支持 Hyprland 的独立 `unbind` 指令。
@@ -110,6 +115,7 @@ Fcitx5、1Password 已在现有 XDG autostart 中，由 Niri/systemd 启动，�
 
 | 快捷键 | Niri 行为 |
 |---|---|
+| Super+Q | Niri 原生关闭窗口，不经过 Shell 关闭脚本 |
 | Alt+H/J/K/L | 左右聚焦列，上下聚焦列内窗口 |
 | Super+H/J/K/L | 左右移动列，上下移动列内窗口 |
 | Super+Shift+H/J/K/L；Super+-/= | 调整窗口宽高，每次 30 像素 |

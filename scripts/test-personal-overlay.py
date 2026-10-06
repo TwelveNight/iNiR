@@ -317,7 +317,7 @@ install-python-packages
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())
-        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py"]:
+        for name in ["install.sh", "preflight.sh", "configure-session.py", "dependencies.py", "xwaylandvideobridge-autostart.conf"]:
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)
@@ -339,6 +339,9 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         old_wants = self.config / "systemd/user/default.target.wants/inir.service"
         old_wants.parent.mkdir(parents=True)
         old_wants.symlink_to("../inir.service")
+        bridge = self.config / "systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d/20-inir-session.conf"
+        bridge.parent.mkdir(parents=True)
+        bridge.write_text("previous bridge override")
         desktop = Path(self.env["XDG_DATA_HOME"]) / "applications/inir.desktop"
         desktop.parent.mkdir(parents=True)
         desktop.write_text("previous desktop entry")
@@ -379,6 +382,9 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.assertEqual((snapshots[0] / "config/systemd/user/default.target.wants/inir.service").readlink(),
                          Path("../inir.service"))
         self.assertEqual((snapshots[0] / "data/applications/inir.desktop").read_text(), "previous desktop entry")
+        self.assertEqual((snapshots[0] / "config" / bridge.relative_to(self.config)).read_text(),
+                         "previous bridge override")
+        self.assertIn("ConditionEnvironment=!XDG_CURRENT_DESKTOP=niri", bridge.read_text())
         self.assertIn(str(private), niri.read_text())
         self.assertNotIn("$HOME", niri.read_text())
         self.assertTrue((self.ii / "installed_true").exists())

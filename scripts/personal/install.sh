@@ -37,7 +37,7 @@ fi
 snapshot="$state_dir/install-backups/$(date +%Y%m%d-%H%M%S)-$$"
 umask 077
 mkdir -p "$snapshot/config" "$snapshot/state"
-for name in niri systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.wants/inir.service; do
+for name in niri systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.wants/inir.service systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d; do
     if [[ -e "$config_home/$name" || -L "$config_home/$name" ]]; then
         mkdir -p "$snapshot/config/$(dirname "$name")"
         cp -a "$config_home/$name" "$snapshot/config/$name"

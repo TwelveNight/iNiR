@@ -7,6 +7,8 @@
 // See PERSONAL_OVERLAY.md for behavior differences and unsupported actions.
 
 binds {
+    // Close through the compositor directly, including XWayland windows.
+    Mod+Q repeat=false { close-window; }
     // Hyprland custom frees Super+D; suppress the inherited maximize action.
     Mod+D repeat=false hotkey-overlay-title=null { spawn "/usr/bin/true"; }
     // Personal Hyprland custom equivalents; see PERSONAL_OVERLAY.md for differences.

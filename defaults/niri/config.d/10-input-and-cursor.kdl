@@ -68,8 +68,8 @@ input {
     // warp-mouse-to-focus
 
     // Focus windows automatically when the mouse enters them.
-    // max-scroll-amount="0%" limits it to windows already fully on screen.
-    // focus-follows-mouse max-scroll-amount="0%"
+    // Allow partially visible columns to scroll into view when hovered too.
+    focus-follows-mouse max-scroll-amount="100%"
 }
 
 // ── Gestures ────────────────────────────────────────────────────────────────

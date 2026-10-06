@@ -94,6 +94,7 @@ class KeybindIsolationTests(unittest.TestCase):
             listing = command("get-binds")
             active = {b["key_combo"]: b for b in listing["binds"] if not b["commented"]}
             self.assertEqual(active["Mod+H"]["action"], "move-column-left")
+            self.assertEqual(active["Mod+Q"]["action"], "close-window")
             self.assertIn('"browser"', active["Mod+F"]["action"])
             self.assertIn("75-personal-binds.kdl", listing["config_file"])
             self.assertEqual(active["Mod+Shift+O"]["action"], "toggle-windowed-fullscreen")

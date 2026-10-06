@@ -56,6 +56,11 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
         "Environment=" + json.dumps(name + "=" + value.replace("%", "%%"), ensure_ascii=False) + "\n"
         for name, value in paths.items()))
 
+    bridge_dropin = config_home / "systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d/20-inir-session.conf"
+    bridge_dropin.parent.mkdir(parents=True, exist_ok=True)
+    bridge_template = Path(__file__).with_name("xwaylandvideobridge-autostart.conf")
+    bridge_dropin.write_text(bridge_template.read_text())
+
 
 if __name__ == "__main__":
     home = Path.home()
