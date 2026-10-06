@@ -10,6 +10,7 @@ import select
 import socket
 import struct
 import subprocess
+import time
 
 # Neither systemd nor D-Bus drops names omitted by import-environment.
 IDENTITY = ("WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP",
@@ -99,6 +100,36 @@ def manager_owns(identity):
                    ("NIRI_SOCKET", "HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY"))
 
 
+def ready_environment(directory, expected):
+    """Validate the compositor, not just a target or a reusable socket name."""
+    values = dict(line.split("=", 1) for line in
+                  run("systemctl", "--user", "show-environment").stdout.splitlines() if "=" in line)
+    if values.get("XDG_CURRENT_DESKTOP", "").lower() != expected:
+        raise ValueError("The new compositor has not published its environment")
+    identity = session_identity(expected, values)
+    state = json.loads((directory / "desktop-session.json").read_text())
+    if state != identity:
+        raise ValueError("The compositor startup hook has not completed the handoff")
+    return values
+
+
+def wait_ready(directory, env, unit, timeout=30):
+    # app-.service.d also matches ordinary application services. Only gate XDG
+    # autostarts on our two desktops; leave unrelated user services unchanged.
+    expected = env.get("XDG_CURRENT_DESKTOP", "").lower()
+    if not unit.endswith("@autostart.service") or expected not in ("niri", "hyprland"):
+        return
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            ready_environment(directory, expected)
+            return
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            if time.monotonic() >= deadline:
+                raise ValueError(f"{unit}: no ready {expected} session; refusing to launch against a dead display")
+            time.sleep(0.1)
+
+
 def unit_active(unit):
     return subprocess.run(["systemctl", "--user", "is-active", "--quiet", unit],
                           capture_output=True).returncode == 0
@@ -107,6 +138,7 @@ def unit_active(unit):
 def retire(identity):
     # A watcher for an old session must never stop a newer session's wallpaper.
     if not manager_owns(identity):
+        print(f"desktop-session: skipped stale cleanup for {identity['desktop']} pid={identity['pid']}", flush=True)
         return
     run("systemctl", "--user", "stop", "ii-skwd-wall-theme.service", "skwd-walld.service")
     if identity["desktop"] == "hyprland":
@@ -118,16 +150,28 @@ def retire(identity):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("start", "watch"))
-    parser.add_argument("desktop", choices=("niri", "hyprland"))
+    parser.add_argument("action", choices=("start", "watch", "wait"))
+    parser.add_argument("desktop", choices=("niri", "hyprland"), nargs="?")
     parser.add_argument("--identity", help=argparse.SUPPRESS)
+    parser.add_argument("--identity-file", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--unit", default="", help=argparse.SUPPRESS)
     parser.add_argument("--adopt", action="store_true", help="Monitor the live session without restarting its wallpaper")
     args = parser.parse_args()
     env = dict(os.environ)
     directory = Path(env["XDG_RUNTIME_DIR"]) / "inir"
+    if args.action == "wait":
+        wait_ready(directory, env, args.unit)
+        return
+    if args.desktop is None:
+        parser.error("start/watch requires a desktop")
     directory.mkdir(mode=0o700, exist_ok=True)
     state = directory / "desktop-session.json"
-    identity = json.loads(args.identity) if args.action == "watch" else session_identity(args.desktop, env)
+    if args.action == "watch":
+        identity = json.loads(args.identity_file.read_text() if args.identity_file else args.identity)
+    else:
+        identity = session_identity(args.desktop, env)
+    if identity["desktop"] != args.desktop:
+        raise ValueError("Watcher identity belongs to a different desktop")
     # Open the pidfd before publishing any state; it also prevents PID reuse.
     try:
         fd = os.fdopen(os.pidfd_open(identity["pid"]), "rb", buffering=0)
@@ -141,26 +185,44 @@ def main():
         with (directory / "desktop-session.lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             if args.action == "watch":
+                print(f"desktop-session: compositor exited {args.desktop} pid={identity['pid']}", flush=True)
                 if state.exists() and json.loads(state.read_text()) == identity:
                     retire(identity)
                     state.unlink()
+                else:
+                    print("desktop-session: newer handoff replaced the exited session", flush=True)
                 return
             if select.select([pidfd], [], [], 0)[0]:
                 raise ValueError("Compositor exited before session activation")
-            watcher = f"inir-desktop-watch-{identity['pid']}.service"
+            watcher = "inir-hyprland-watch.service" if args.desktop == "hyprland" else f"inir-desktop-watch-{identity['pid']}.service"
             watch_active = unit_active(watcher)
+            if args.desktop == "hyprland" and watch_active:
+                previous = json.loads((directory / "hyprland-session.json").read_text())
+                if previous != identity:
+                    try:
+                        with os.fdopen(os.pidfd_open(previous["pid"]), "rb", buffering=0) as old:
+                            if not select.select([old], [], [], 0)[0]:
+                                raise ValueError("Another Hyprland compositor is still running")
+                    except ProcessLookupError:
+                        pass
+                    # Retire a delayed monitor before reusing the bound unit.
+                    run("systemctl", "--user", "stop", watcher)
+                    watch_active = False
             if state.exists() and json.loads(state.read_text()) == identity:
                 if watch_active and unit_active("skwd-walld.service") and not args.adopt:
                     return
             publish_environment(args.desktop, env)
-            if not watch_active:
+            state.write_text(json.dumps(identity) + "\n")
+            if args.desktop == "hyprland":
+                # The target binds to this monitor so even a missed Lua shutdown
+                # hook or skipped environment cleanup cannot leave it active.
+                (directory / "hyprland-session.json").write_text(json.dumps(identity) + "\n")
+                run("systemctl", "--user", "start", "hyprland-session.target")
+            elif not watch_active:
                 run("systemd-run", "--user", "--collect",
                     f"--unit={watcher}", "--property=Slice=background.slice",
                     "/usr/bin/python3", str(Path(__file__).resolve()), "watch", args.desktop,
                     "--identity", json.dumps(identity))
-            state.write_text(json.dumps(identity) + "\n")
-            if args.desktop == "hyprland":
-                run("systemctl", "--user", "start", "hyprland-session.target")
             if not args.adopt:
                 run("systemctl", "--user", "restart", "skwd-walld.service")
                 config = Path(env.get("XDG_CONFIG_HOME") or Path.home() / ".config")

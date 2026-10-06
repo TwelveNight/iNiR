@@ -89,6 +89,51 @@ class SessionTests(unittest.TestCase):
             session.retire(identity)
         self.assertEqual(len(self.calls), 1)
 
+    def test_ready_requires_current_compositor_and_completed_handoff(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory)
+            identity = dict(desktop="niri", pid=123, key="NIRI_SOCKET", value="new", wayland="wayland-1")
+            self.manager = dict(XDG_CURRENT_DESKTOP="niri", NIRI_SOCKET="new", WAYLAND_DISPLAY="wayland-1")
+            state = runtime / "desktop-session.json"
+            state.write_text(json.dumps(dict(identity, value="old")))
+            with patch.object(session, "run", self.fake_run), patch.object(session, "session_identity", return_value=identity):
+                with self.assertRaises(ValueError):
+                    session.ready_environment(runtime, "niri")
+                state.write_text(json.dumps(identity))
+                self.assertEqual(session.ready_environment(runtime, "niri"), self.manager)
+                self.manager["XDG_CURRENT_DESKTOP"] = "Hyprland"
+                with self.assertRaises(ValueError):
+                    session.ready_environment(runtime, "niri")
+
+    def test_autostart_waits_for_new_display_instead_of_using_active_old_target(self):
+        directory = Path("/unused")
+        env = dict(XDG_CURRENT_DESKTOP="niri", WAYLAND_DISPLAY="stale-display")
+        with patch.object(session, "ready_environment", side_effect=[FileNotFoundError(), ValueError(), {}]) as ready, patch.object(session.time, "sleep"):
+            session.wait_ready(directory, env, "app-kdeconnect@autostart.service")
+        self.assertEqual(ready.call_count, 3)
+
+    def test_autostart_timeout_refuses_dead_display_and_other_services_are_untouched(self):
+        with patch.object(session, "ready_environment", side_effect=ValueError()) as ready:
+            session.wait_ready(Path("/unused"), dict(XDG_CURRENT_DESKTOP="niri"), "app-custom.service")
+            session.wait_ready(Path("/unused"), dict(XDG_CURRENT_DESKTOP="GNOME"), "app-custom@autostart.service")
+            ready.assert_not_called()
+            with self.assertRaisesRegex(ValueError, "refusing to launch"):
+                session.wait_ready(Path("/unused"), dict(XDG_CURRENT_DESKTOP="Hyprland"), "app-kdeconnect@autostart.service", timeout=0)
+
+    def test_hyprland_target_starts_with_persisted_identity_for_bound_monitor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            identity = dict(desktop="hyprland", pid=os.getpid(), key="HYPRLAND_INSTANCE_SIGNATURE", value="own", wayland="wayland-1")
+            argv = ["desktop-session.py", "start", "hyprland", "--adopt"]
+            def target_run(*args, env=None):
+                if args == ("systemctl", "--user", "start", "hyprland-session.target"):
+                    for name in ("desktop-session.json", "hyprland-session.json"):
+                        self.assertEqual(json.loads((Path(directory) / "inir" / name).read_text()), identity)
+                return self.fake_run(*args, env=env)
+            with patch.dict(os.environ, XDG_RUNTIME_DIR=directory), patch("sys.argv", argv), patch.object(session, "session_identity", return_value=identity), patch.object(session, "unit_active", return_value=False), patch.object(session, "run", target_run):
+                session.main()
+            self.assertIn(("systemctl", "--user", "start", "hyprland-session.target"), self.calls)
+            self.assertFalse(any(call[0] == "systemd-run" for call in self.calls))
+
     def test_compositor_exit_stops_wallpaper_before_clearing_environment(self):
         self.manager = {"HYPRLAND_INSTANCE_SIGNATURE": "own", "WAYLAND_DISPLAY": "wayland-2", "AQ_DRM_DEVICES": "nvidia"}
         identity = dict(desktop="hyprland", pid=123, key="HYPRLAND_INSTANCE_SIGNATURE", value="own", wayland="wayland-2")
@@ -146,8 +191,17 @@ class SessionTests(unittest.TestCase):
                 '    hl.exec_cmd("dbus-update-activation-environment --all")\n'
                 '    hl.exec_cmd("$HOME/.config/hypr/custom/scripts/__restore_video_wallpaper.sh")\nend)\n')
             custom.write_text('hl.exec_cmd("my-custom-app")\n')
+            target = base / "systemd/user/hyprland-session.target"
+            target.parent.mkdir(parents=True)
+            original_target = '[Unit]\nDescription=Personal target\nPropagatesStopTo=graphical-session.target\nBindsTo=graphical-session.target\n'
+            target.write_text(original_target)
             config.configure_desktop_sessions(base)
             first = hooks.read_text(), custom.read_text()
+            self.assertTrue((base / "systemd/user/inir-hyprland-watch.service").exists())
+            dropin = (base / "systemd/user/hyprland-session.target.d/40-compositor-lifetime.conf").read_text()
+            self.assertIn("BindsTo=inir-hyprland-watch.service", dropin)
+            self.assertNotIn("PropagatesStopTo", dropin)
+            self.assertEqual(target.read_text(), original_target.replace('PropagatesStopTo=graphical-session.target\n', ''))
             self.assertIn('hl.exec_cmd("my-app")', first[0])
             self.assertNotIn("dbus-update", first[0])
             self.assertNotIn("__restore_video", first[0])

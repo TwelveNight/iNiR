@@ -41,7 +41,9 @@ Waffle 的桌面选择也统一调用 skwd，桌面预览读取同一活动壁�
 iNiR 里主动选择配色、深浅模式或预设仍可写共享输出，后一次写入对两边生效。
 两边的启动钩子调用 `scripts/personal/desktop-session.py`，确认真实合成器 IPC/Wayland socket 后，发布当前桌面的环境，清除另一桌面留下的身份和显卡变量，再重启 skwd-walld 与 II 的配色监听。壁纸内容、取色与数据库继续共享。
 
-helper 用独立的 systemd 临时服务和 pidfd 监听合成器退出，无需轮询或依赖 Lua shutdown 钩子。退出时停止旧 renderer/配色监听，清理对应会话环境；旧会话 watcher 不会停止已经接管的新会话。保留 skwd/II 配色服务的 default.target 启用关系，增加 `PartOf=graphical-session.target`，让标准 Niri 注销流程也能释放 renderer，下一次登录由相应桌面的 helper 重新启动。
+helper 用独立的 systemd 服务和 pidfd 监听合成器退出，无需轮询或依赖 Lua shutdown 钩子。Niri 使用临时 watcher；Hyprland 使用 `inir-hyprland-watch.service`，个人 target drop-in 将 `hyprland-session.target` 绑定到 watcher 的存活期。退出时停止旧 renderer/配色监听，清理对应会话环境；旧会话 watcher 不会停止已经接管的新会话。保留 skwd/II 配色服务的 default.target 启用关系，增加 `PartOf=graphical-session.target`，让标准 Niri 注销流程也能释放 renderer，下一次登录由相应桌面的 helper 重新启动。
+
+安装器只从已有个人 Hyprland target 移除已知的 `PropagatesStopTo=graphical-session.target` 指令（systemd 依赖无法通过空 drop-in 清除），其他指令保留；由 `graphical-session.target` 的 `StopWhenUnneeded` 在最后一个 compositor 退出时停止图形服务。新的 Niri 会话已经接管时，清理残留 Hyprland target 不会停止它。`app-.service.d/40-desktop-ready.conf` 为 XDG 自启动应用增加就绪检查，仅在 Niri/Hyprland 生效：验证 compositor IPC 的真实 PID、Wayland socket 和本次 handoff 状态，最多等待 30 秒，超时不启动应用。systemd 在检查后重新读取主进程环境，避免 1Password、KDE Connect、输入法和托盘连接上一会话的显示地址；应用命令和 Portal 路由不变。其他普通应用服务和其他桌面不等待。
 两套图形会话应依次切换，共享守护进程不提供同时登录两套桌面的隔离。
 
 ## GDM 与安装

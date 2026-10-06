@@ -1,0 +1,7 @@
+[Unit]
+Description=Monitor the actual Hyprland compositor lifetime
+
+[Service]
+Type=exec
+Slice=background.slice
+ExecStart=/usr/bin/python3 %h/.config/quickshell/inir/scripts/personal/desktop-session.py watch hyprland --identity-file %t/inir/hyprland-session.json

@@ -33,6 +33,31 @@ def configure_hyprland_session(config_home):
 
 def configure_desktop_sessions(config_home):
     template_dir = Path(__file__).parent
+    # Dependency directives are additive: an empty drop-in cannot remove
+    # PropagatesStopTo. Migrate only our known personal target directive before
+    # binding the target to the monitor.
+    session_target = config_home / "systemd/user/hyprland-session.target"
+    if session_target.is_symlink() or session_target.parent.is_symlink():
+        raise ValueError("Hyprland session target must not be redirected")
+    if session_target.exists():
+        text = session_target.read_text()
+        known = "PropagatesStopTo=graphical-session.target"
+        for line in text.splitlines():
+            if line.strip().startswith("PropagatesStopTo=") and line.strip() != known:
+                raise ValueError("Unknown Hyprland stop propagation; review before binding the monitor")
+        updated = "\n".join(line for line in text.splitlines() if line.strip() != known) + "\n"
+        if text != updated:
+            session_target.write_text(updated)
+    for relative, template in (
+        ("systemd/user/inir-hyprland-watch.service", "inir-hyprland-watch.service"),
+        ("systemd/user/hyprland-session.target.d/40-compositor-lifetime.conf", "hyprland-session-lifetime.conf"),
+        ("systemd/user/app-.service.d/40-desktop-ready.conf", "autostart-desktop-ready.conf"),
+    ):
+        target = config_home / relative
+        if target.is_symlink() or target.parent.is_symlink():
+            raise ValueError("Desktop lifecycle units must not be redirected")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text((template_dir / template).read_text())
     dropin = config_home / "systemd/user/niri.service.d/30-session-environment.conf"
     if dropin.is_symlink() or dropin.parent.is_symlink():
         raise ValueError("Niri session drop-in must not be redirected")
