@@ -79,8 +79,18 @@ def publish_environment(desktop, env):
 def manager_owns(identity):
     values = dict(line.split("=", 1) for line in
                   run("systemctl", "--user", "show-environment").stdout.splitlines() if "=" in line)
-    return (values.get(identity["key"]) == identity["value"]
-            and values.get("WAYLAND_DISPLAY") == identity["wayland"])
+    desktop = values.get("XDG_CURRENT_DESKTOP", "")
+    expected = "niri" if identity["desktop"] == "niri" else "Hyprland"
+    if desktop and desktop != expected:
+        return False
+    if (values.get(identity["key"]) == identity["value"]
+            and values.get("WAYLAND_DISPLAY") == identity["wayland"]):
+        return True
+    # niri-session may clear its identity before this watcher gets scheduled.
+    # The lock/state still belongs to this exited compositor; finish cleanup
+    # only when no newer desktop has published an identity/display.
+    return not any(values.get(name) for name in
+                   ("NIRI_SOCKET", "HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY"))
 
 
 def unit_active(unit):

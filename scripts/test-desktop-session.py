@@ -86,6 +86,20 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(self.calls[2], ("systemctl", "--user", "stop", "hyprland-session.target"))
         self.assertEqual(self.manager, {})
 
+    def test_standard_niri_logout_clears_identity_before_watcher_without_leaking_gpu_values(self):
+        self.manager = {"__GLX_VENDOR_LIBRARY_NAME": "nvidia", "__NV_PRIME_RENDER_OFFLOAD": "1"}
+        identity = dict(desktop="niri", pid=123, key="NIRI_SOCKET", value="own", wayland="wayland-1")
+        with patch.object(session, "run", self.fake_run):
+            session.retire(identity)
+        self.assertEqual(self.manager, {})
+
+    def test_reused_wayland_socket_with_stale_identity_cannot_stop_new_desktop(self):
+        self.manager = {"HYPRLAND_INSTANCE_SIGNATURE": "old", "WAYLAND_DISPLAY": "wayland-1", "XDG_CURRENT_DESKTOP": "niri"}
+        identity = dict(desktop="hyprland", pid=123, key="HYPRLAND_INSTANCE_SIGNATURE", value="old", wayland="wayland-1")
+        with patch.object(session, "run", self.fake_run):
+            session.retire(identity)
+        self.assertEqual(len(self.calls), 1)
+
     def test_pidfd_wakes_on_actual_process_exit_without_polling_or_pid_reuse(self):
         child = subprocess.Popen(["sleep", "0.1"])
         try:
