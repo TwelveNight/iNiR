@@ -117,7 +117,7 @@ Niri 光标和启动应用的 `XCURSOR_THEME/SIZE` 使用现有的黑色
 输入法使用 Wayland text-input，XWayland 保留 `XMODIFIERS=@im=fcitx`。
 
 Fcitx5、1Password 已在现有 XDG autostart 中，由 Niri/systemd 启动，避免重复添加。
-新增 CC Switch 登录启动，先有限等待托盘，并检查当前用户是否已有实例。
+CC Switch 不随 Niri 登录自动启动，按需手动打开。
 自定义启动文件中已注释的 Clash Verge、HyprGlass、插件加载命令不迁移；
 原有其他 XDG 应用仍按各自启动项运行。
 用户已明确不再需要 libinput-gestures：本机的 XDG 项设为 `Hidden=true`，
