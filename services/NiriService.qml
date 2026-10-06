@@ -37,6 +37,26 @@ Singleton {
     signal configLoadFinished(bool ok, string error)
 
     property var outputs: ({})
+
+    // Niri 26.04 has no OutputsChanged IPC event. Qt's live screen signals
+    // cover hotplug and geometry/scale changes without polling the desktop.
+    Connections {
+        target: Quickshell
+        enabled: CompositorService.isNiri
+        function onScreensChanged(): void { root.fetchOutputs() }
+    }
+
+    Instantiator {
+        model: Quickshell.screens
+        delegate: Connections {
+            required property var modelData
+            target: modelData
+            enabled: CompositorService.isNiri
+            function onGeometryChanged(): void { root.fetchOutputs() }
+            function onPhysicalPixelDensityChanged(): void { root.fetchOutputs() }
+        }
+    }
+
     property var windows: []
     property var displayScales: ({})
     property var mruWindowIds: []
@@ -755,8 +775,10 @@ Singleton {
         configLoadFailed = !!failed
         configError = (failed && data && data.error) ? data.error : ""
 
-        if (!failed)
+        if (!failed) {
+            fetchOutputs()
             refreshOverviewHotCorners()
+        }
 
         configLoadFinished(!failed, configError)
     }

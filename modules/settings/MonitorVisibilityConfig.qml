@@ -153,7 +153,7 @@ ContentPage {
             ? monitorLayoutSnapshot : (NiriService.outputs ?? ({}))
         return Object.keys(source).filter(name => {
             const entry = source[name]
-            return entry?.logical !== undefined || entry?.width !== undefined
+            return entry?.logical != null || Number(entry?.width ?? 0) > 0
         })
             .sort((a, b) => {
                 const ao = niriLogicalRect(a)
@@ -464,7 +464,11 @@ ContentPage {
         }
     }
 
-    Component.onCompleted: Qt.callLater(() => root.syncMonitorLayoutSnapshot(false))
+    onVisibleChanged: if (visible) NiriService.fetchOutputs()
+    Component.onCompleted: {
+        NiriService.fetchOutputs()
+        Qt.callLater(() => root.syncMonitorLayoutSnapshot(false))
+    }
 
     function desktopWidgetOutputNames(): var {
         const names = connectedScreenNames().slice()
