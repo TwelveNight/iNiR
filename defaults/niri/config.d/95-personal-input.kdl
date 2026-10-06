@@ -1,0 +1,7 @@
+// Personal touchpad preferences. Included by 90-user-extra.kdl.
+// Match the natural scrolling used in the personal Hyprland session.
+input {
+    touchpad {
+        natural-scroll
+    }
+}

@@ -428,6 +428,7 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         personal_rules = self.config / "niri/config.d/35-personal-window-rules.kdl"
         personal_rules.unlink()
         upstream_rules = (self.config / "niri/config.d/30-window-rules.kdl").read_bytes()
+        upstream_input = (self.config / "niri/config.d/10-input-and-cursor.kdl").read_bytes()
         args = (self.config, self.inir, self.state / "private state", self.state / "private state/.venv", self.base / "bin dir")
         module.configure(*args)
         self.assertEqual(personal_gpu.read_bytes(),
@@ -449,6 +450,16 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.assertEqual(root_config.read_text().count(
             'include "config.d/35-personal-window-rules.kdl"'), 1)
         self.assertEqual(first, env_file.read_text())
+        self.assertEqual((self.config / "niri/config.d/10-input-and-cursor.kdl").read_bytes(), upstream_input)
+        personal_input = self.config / "niri/config.d/95-personal-input.kdl"
+        self.assertIn("natural-scroll", personal_input.read_text())
+        self.assertEqual((self.config / "niri/config.d/90-user-extra.kdl").read_text().count(
+            'include "95-personal-input.kdl"'), 1)
+        personal_input.write_text(personal_input.read_text() + "\n// keep my touchpad edit\n")
+        saved_input = personal_input.read_bytes()
+        module.configure(*args)
+        self.assertEqual(personal_input.read_bytes(), saved_input)
+
         self.assertNotIn("$HOME", first)
         binds = (self.config / "niri/config.d/70-binds.kdl").read_text()
         self.assertNotIn('spawn "inir"', binds)

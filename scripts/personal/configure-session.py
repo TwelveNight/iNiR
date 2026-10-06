@@ -84,6 +84,25 @@ def configure_desktop_sessions(config_home):
         custom.write_text(custom_text.rstrip() + "\n\n-- Shared Niri/Hyprland session lifecycle.\n" + require + "\n")
 
 
+def configure_personal_input(niri):
+    """Wire personal input through the user-owned entry, leaving upstream intact."""
+    root = niri / "config.kdl"
+    if 'include "config.d/90-user-extra.kdl"' not in root.read_text():
+        return
+    extra = niri / "config.d/90-user-extra.kdl"
+    target = niri / "config.d/95-personal-input.kdl"
+    if extra.is_symlink() or target.is_symlink() or target.parent.is_symlink():
+        raise ValueError("Personal input config must not redirect to another file")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not target.exists():
+        template = Path(__file__).resolve().parents[2] / "defaults/niri/config.d/95-personal-input.kdl"
+        target.write_text(template.read_text())
+    text = extra.read_text() if extra.exists() else ""
+    include = 'include "95-personal-input.kdl"'
+    if not re.search(r'^\s*include\s+"95-personal-input\.kdl"\s*(?://.*)?$', text, re.MULTILINE):
+        extra.write_text(text.rstrip() + "\n\n// Personal input preferences; keep upstream input untouched.\n" + include + "\n")
+
+
 def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     paths = {
         "INIR_CONFIG_DIR": str(config_dir),
@@ -98,6 +117,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
     # Install the separate personal layer once; preserve subsequent user edits.
     root_config = niri / "config.kdl"
     root_text = root_config.read_text()
+    configure_personal_input(niri)
     gpu_anchor = 'include "config.d/10-input-and-cursor.kdl"'
     gpu_include = 'include "config.d/05-personal-gpu.kdl"'
     if gpu_anchor in root_text:

@@ -96,6 +96,12 @@ Docker Desktop 和 Sunshine 的用户服务取消自动启用，仍可手动启�
 更新上游前先检查工作区并保存未提交修改。个人分支保持基于 `origin/prerelease`，后续更新需审查并解决个人补丁冲突。
 已经部署后，使用 `inir update --local` 同步本地工作区；个人分支还没有远端对应分支，不要直接执行会拉取同名远端分支的普通更新。
 
+## 触控板方向
+
+`config.d/95-personal-input.kdl` 单独启用触控板 `natural-scroll`，与个人 Hyprland
+习惯一致。由用户文件 `90-user-extra.kdl` 引入；不改 `10-input-and-cursor.kdl`，
+也不改鼠标滚轮方向、光标样式或多指工作区手势。安装器保留此文件后续个人修改。
+
 ## 显示屏开关
 
 “显示器 → 输出 → 显示屏开关”和“合成器 → 显示器”可单独开关连接的屏幕，
