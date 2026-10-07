@@ -1,5 +1,8 @@
 # Quickshell field binding optimization, 2026-10-07
 
+This records the CPU pass before the subsequent
+[first-open latency and startup prewarm work](PANEL-LATENCY-20261007.md).
+
 Applied the [upstream optimization guide](https://github.com/snowarch/iNiR/wiki/OPTIMIZATION)
 to Quickshell only. No Niri window settings, renderer selection, kernel,
 display modes, session services or visual effects were changed. Music frame

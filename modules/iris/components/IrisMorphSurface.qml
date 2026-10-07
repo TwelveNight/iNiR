@@ -125,6 +125,7 @@ Item {
         return Qt.rect(p.x, p.y, item.width * item.scale, item.height * item.scale)
     }
     property bool armed: false
+    property int activationCount: 0
     property bool launched: false
     // The first frame a body's content is drawn in builds its whole scene (text, grids, images): measured
     // at 47 ms on the gallery, and the morph jumped from 0 to a fifth, faded in at 80 %, in one frame.
@@ -138,9 +139,14 @@ Item {
         enabled: root.armed && !root.launched
         // One frame is enough: it is the warm frame that built the content. A still window draws no second
         // one, so waiting for two always fell through to the timer (90 ms of nothing).
-        function onFrameSwapped(): void { if (++root.launchFrames >= 1) root.launched = true }
+        function onFrameSwapped(): void {
+            if (++root.launchFrames >= 1) {
+                root.markLaunch("warm-frame")
+                root.launched = true
+            }
+        }
     }
-    Timer { interval: 90; running: root.armed && !root.launched; onTriggered: root.launched = true }
+    Timer { interval: 90; running: root.armed && !root.launched; onTriggered: { root.markLaunch("warm-timeout"); root.launched = true } }
     onLaunchedChanged: if (root.launched && IrisMotionMeter.watching(root.motionSurface)) IrisMotionMeter.mark("launched")
     readonly property alias presentation: presentationSpring.value
     IrisSpring {
@@ -176,6 +182,7 @@ Item {
                 && (IrisStyle.glassy || root.surfaceMaterial === "glass")
             IrisMotionMeter.sample({
                 source: root,
+                activationCount: root.activationCount,
                 presentation: root.presentation,
                 rect: { x: at.x + root.windowOffset.x, y: at.y + root.windowOffset.y, width: chassis.width, height: chassis.height },
                 opacity: !(root.armed || root.presentation > 0) ? 0 : root.fieldBacked ? 1 : root.drawsOwnField ? root.emergence * fieldStrip.opacity : chassis.opacity,
@@ -209,30 +216,42 @@ Item {
         }
     }
     readonly property bool canArm: root.open && root.contentReady && root.width > 0 && root.height > 0
+    function markLaunch(stage: string): void {
+        if (IrisMotionMeter.watching(root.motionSurface)) IrisMotionMeter.mark(stage)
+    }
     function arm(): void {
+        root.markLaunch("arm-enter")
         if (!root.canArm || root.armed) return
         if (root.presentation <= 0) {
             root.captureOrigin()
             root.launched = false
             root.launchFrames = 0
         }
+        root.markLaunch("origin-captured")
         root.armed = true
         if (IrisMotionMeter.watching(root.motionSurface)) IrisMotionMeter.mark("armed")
     }
-    // Timers, not Qt.callLater: a Place unloads with its loader and a queued call would outlive it.
-    Timer { id: armLater; interval: 0; onTriggered: root.arm() }
+    // A QML Timer follows Qt's animation clock. When remapping a quiet window,
+    // even interval 0 can wait for its first render (measured ~75 ms). The
+    // content/geometry gate and warm-frame gate already cover readiness, so
+    // prepare synchronously and let frameSwapped release the actual motion.
+    // The origin refresh on close remains lifetime-bound to this component.
     Timer { id: captureLater; interval: 0; onTriggered: root.captureOrigin() }
-    onCanArmChanged: if (root.canArm) armLater.restart()
+    onCanArmChanged: if (root.canArm) { root.markLaunch("can-arm"); root.arm() }
     onOpenChanged: {
+        if (root.open) {
+            root.activationCount++
+            root.markLaunch(root.contentReady ? "open-ready" : "open-unready")
+        }
         if (!root.open) {
             root.armed = false
             if (root.settles) return
             if (root.fromIsland && root.originOwner.length === 0) captureLater.restart()
         } else {
-            armLater.restart()
+            root.arm()
         }
     }
-    Component.onCompleted: armLater.restart()
+    Component.onCompleted: root.arm()
 
     function lerp(a: real, b: real): real { return a + (b - a) * Math.min(1, root.presentation) }
     readonly property bool pullsAcross: Math.abs(root.width / 2 - root.start.x - root.start.width / 2)

@@ -41,7 +41,9 @@ TestCase {
     property bool open: false
     property bool pinned: false
     property bool peek: false
+    property bool keepSurfaceWarm: false
     QtObject { id: frame; property real progress: 0 }
+    readonly property bool presenting: SIDEBAR_PRESENTING
     QtObject { id: ownMask }
     QtObject { id: emptyMask }
     QtObject { id: emptyRegion }
@@ -98,10 +100,32 @@ TestCase {
         islandLoader.item = {morphing: false}
         compare(barMask, chassisRegion)
     }
+    function test_retained_native_surface_never_keeps_input() {
+        root.keepSurfaceWarm = true
+        root.open = false
+        frame.progress = 0
+        verify(mapped, "native surface stays ready between opens")
+        verify(!presenting, "idle residency must not pin the target output")
+        compare(inputMask, emptyMask)
+        compare(keyboard, WlrKeyboardFocus.None)
+        root.open = true
+        verify(presenting)
+        compare(inputMask, ownMask)
+        root.open = false
+        frame.progress = 0.5
+        verify(presenting, "hold output through the closing animation")
+        compare(inputMask, emptyMask)
+        compare(keyboard, WlrKeyboardFocus.None)
+        frame.progress = 0
+        verify(!presenting)
+        root.keepSurfaceWarm = false
+        verify(!mapped)
+    }
 }
 '''
     for key, value in {
         "SIDEBAR_VISIBLE": binding(sidebar, "visible"),
+        "SIDEBAR_PRESENTING": binding(sidebar, "readonly property bool presenting"),
         "SIDEBAR_MASK": binding(sidebar, "mask"),
         "SIDEBAR_KEYBOARD": binding(sidebar, "WlrLayershell.keyboardFocus"),
         "BAR_MASK": binding(bar, "mask"),

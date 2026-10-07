@@ -117,6 +117,7 @@ Singleton {
             case "prepare":
                 root.begin("open")
                 t.open()
+                root.mark("open-returned")
                 root.phase = "open"
                 step.interval = 1400
                 step.restart()
@@ -133,6 +134,7 @@ Singleton {
                 root.finish()
                 root.begin("reverse")
                 t.open()
+                root.mark("open-returned")
                 root.phase = "reverseOpen"
                 reverseWatch.restart()
                 step.interval = 2000
@@ -203,7 +205,7 @@ Singleton {
 
     function analyse(run: var): var {
         const frames = run.frames
-        const out = { kind: run.kind, frames: frames.length, marks: run.marks ?? {} }
+        const out = { kind: run.kind, frames: frames.length, activation: frames[0]?.activationCount ?? null, marks: run.marks ?? {} }
         if (frames.length < 2) return Object.assign(out, { error: "no frames" })
         const vb = root.vblank
         // 1. Pace: frame intervals while moving, and the time from the request to the first moved frame.

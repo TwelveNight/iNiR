@@ -23,6 +23,8 @@ PanelWindow {
     readonly property bool left: root.side === "left"
     readonly property var options: Config.options?.iris?.sidebars?.[root.side] ?? ({})
     readonly property bool open: root.left ? GlobalStates.sidebarLeftOpen : GlobalStates.sidebarRightOpen
+    readonly property bool keepSurfaceWarm: Config.options?.iris?.keepPanelsLoaded ?? false
+    readonly property bool presenting: root.open || frame.progress > 0
     readonly property bool pinned: root.options.pinned ?? false
     readonly property real d: IrisStyle.density
     readonly property string outputName: root.left ? GlobalStates.sidebarLeftTargetOutput : GlobalStates.sidebarRightTargetOutput
@@ -32,6 +34,12 @@ PanelWindow {
     property bool editing: false
     property bool contentSettled: false
     Timer { id: settle; interval: 80; onTriggered: root.contentSettled = true }
+
+    IrisSidebarWarmup {
+        active: root.keepSurfaceWarm && (root.options.sections ?? []).includes("mixer")
+        paused: root.presenting || GlobalStates.sidebarLeftOpen || GlobalStates.sidebarRightOpen
+        onFinished: (count, elapsed) => console.info("[IrisWarmup] " + root.side + " mixer identities: " + count + " in " + elapsed + "ms")
+    }
 
     property Item settingsOrigin: null
     function publishSettingsOrigin(): void {
@@ -83,10 +91,13 @@ PanelWindow {
     IrisOutputHold {
         id: outputHold
         wanted: Quickshell.screens.find(s => s.name === root.outputName) ?? GlobalStates.focusedScreen
-        live: root.visible
+        live: root.presenting
     }
     screen: outputHold.output
-    visible: root.open || frame.progress > 0
+    // Retaining only the QML objects still remaps the native window on every
+    // open (~80 ms before its first frame on NVIDIA). A retained, closed
+    // surface draws nothing and keeps an empty input mask / no keyboard grab.
+    visible: root.keepSurfaceWarm || root.presenting
     color: "transparent"
     anchors { left: true; right: true; top: true; bottom: true }
     exclusionMode: ExclusionMode.Ignore
