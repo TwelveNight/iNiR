@@ -22,8 +22,8 @@ input {
             layout "us"
         }
 
-        // Enable numlock at login. Remove to leave it off.
-        // numlock
+        // Enable Num Lock at login so the keypad's number keys are active.
+        numlock
 
         // How quickly held keys start repeating (ms) and how fast (chars/s).
         repeat-delay 250
