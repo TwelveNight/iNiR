@@ -45,6 +45,9 @@ binds {
     // Toggle Orbit; replace the upstream Mod+Tab Niri overview action.
     Mod+Tab repeat=false hotkey-overlay-title="Orbit" { spawn "inir" "orbit" "toggle"; }
 
+    // Toggle the iRiS Control Center from the Island.
+    Mod+S repeat=false hotkey-overlay-title="Control Center" { spawn "inir" "iris" "controlCenter" "toggle"; }
+
     // Power menu.
     Ctrl+Alt+Delete repeat=false hotkey-overlay-title="Power menu" { spawn "inir" "session" "open"; }
 
