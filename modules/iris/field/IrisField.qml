@@ -22,6 +22,51 @@ Item {
     property real cornerRadius: IrisFrame.cornerRadius
     readonly property int capacity: 20
     readonly property int shadowSlots: root.capacity
+    // Each uniform/shadow depends on its own slot, rather than on the entire
+    // shapes array. A moving body must not invalidate the other 19 bodies.
+    component ShapeSlot: QtObject { property var shape: null }
+    readonly property list<QtObject> shapeSlots: [
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {},
+        ShapeSlot {}
+    ]
+    function sameShape(a: var, b: var): bool {
+        if (a === b) return true
+        if (!a || !b) return false
+        const keys = ["x", "y", "width", "height", "radius", "id", "fuse", "paints", "glass"]
+        for (const key of keys) if (a[key] !== b[key]) return false
+        const aj = a.joins ?? "", bj = b.joins ?? ""
+        if (aj === bj) return true
+        if (!Array.isArray(aj) || !Array.isArray(bj) || aj.length !== bj.length) return false
+        for (let i = 0; i < aj.length; i++) if (aj[i] !== bj[i]) return false
+        return true
+    }
+    function publishShapes(): void {
+        const list = root.shapes ?? [], slots = root.shapeSlots
+        for (let i = 0; i < slots.length; i++) {
+            const next = list[i] ?? null
+            if (!root.sameShape(slots[i].shape, next)) slots[i].shape = next
+        }
+    }
+    onShapesChanged: root.publishShapes()
+    Component.onCompleted: root.publishShapes()
     readonly property real reach: root.smoothing + 2
     property bool compositorAllowed: false
     // A field that does not cover its output: its window's position on the output and the output's size.
@@ -109,15 +154,16 @@ Item {
         if (root.framed) return Qt.rect(0, 0, root.width, root.height)
         const list = root.shapes ?? []
         if (list.length === 0) return Qt.rect(0, 0, 0, 0)
+        const reach = root.reach
         let left = Infinity;
         let top = Infinity;
         let right = -Infinity;
         let bottom = -Infinity;
         for (const s of list) {
-            left = Math.min(left, s.x - root.reach)
-            top = Math.min(top, s.y - root.reach)
-            right = Math.max(right, s.x + s.width + root.reach)
-            bottom = Math.max(bottom, s.y + s.height + root.reach)
+            left = Math.min(left, s.x - reach)
+            top = Math.min(top, s.y - reach)
+            right = Math.max(right, s.x + s.width + reach)
+            bottom = Math.max(bottom, s.y + s.height + reach)
         }
         const x = Math.max(0, Math.floor(left));
         const y = Math.max(0, Math.floor(top))
@@ -129,7 +175,7 @@ Item {
     component Shade: RectangularShadow {
         id: shade
         required property int index
-        readonly property var shape: root.shapes[shade.index] ?? null
+        readonly property var shape: root.shapeSlots[shade.index].shape ?? null
         visible: shade.shape !== null && !shade.shape.paints
         x: shade.shape ? shade.shape.x : 0
         y: shade.shape ? shade.shape.y : 0
@@ -159,34 +205,39 @@ Item {
         blending: true
 
         function shapeAt(i: int): var {
-            const s = root.shapes[i]
+            const s = root.shapeSlots[i].shape
             return s ? Qt.vector4d(s.x + s.width / 2, s.y + s.height / 2, s.width / 2, s.height / 2)
                 : Qt.vector4d(0, 0, 0, 0)
         }
         function radiusBlock(block: int): var {
             const r = i => {
-                const s = root.shapes[block * 4 + i]
+                const s = root.shapeSlots[block * 4 + i].shape
                 return s ? Number(s.radius ?? 0) : 0
             }
             return Qt.vector4d(r(0), r(1), r(2), r(3))
         }
         function fuseBlock(block: int): var {
             const k = i => {
-                const s = root.shapes[block * 4 + i]
+                const s = root.shapeSlots[block * 4 + i].shape
                 return s ? Number(s.fuse ?? root.smoothing) : 0
             }
             return Qt.vector4d(k(0), k(1), k(2), k(3))
         }
+        readonly property var indexMemo: ({ map: {} })
         readonly property var indexOf: {
             const map = {}
             const list = root.shapes ?? []
             for (let i = 0; i < Math.min(list.length, root.capacity); i++)
                 if (list[i]?.id) map[list[i].id] = i
+            const held = pass.indexMemo.map
+            const keys = Object.keys(map)
+            if (keys.length === Object.keys(held).length && keys.every(key => held[key] === map[key])) return held
+            pass.indexMemo.map = map
             return map
         }
         function joinBlock(block: int, which: int): var {
             const j = i => {
-                const s = root.shapes[block * 4 + i]
+                const s = root.shapeSlots[block * 4 + i].shape
                 const list = !s || !s.joins ? [] : Array.isArray(s.joins) ? s.joins : [s.joins]
                 const name = list[which]
                 if (!name) return 0
@@ -198,7 +249,7 @@ Item {
         }
         function paintsBlock(block: int): var {
             const f = i => {
-                const s = root.shapes[block * 4 + i]
+                const s = root.shapeSlots[block * 4 + i].shape
                 return s && s.paints ? 1 : 0
             }
             return Qt.vector4d(f(0), f(1), f(2), f(3))
@@ -265,7 +316,7 @@ Item {
         readonly property vector4d paintsD: pass.paintsBlock(3)
         readonly property vector4d paintsE: pass.paintsBlock(4)
         function glassBlock(block: int): var {
-            const g = i => root.glassOf(root.shapes[block * 4 + i])
+            const g = i => root.glassOf(root.shapeSlots[block * 4 + i].shape)
             return Qt.vector4d(g(0), g(1), g(2), g(3))
         }
         readonly property vector4d glassA: pass.glassBlock(0)
