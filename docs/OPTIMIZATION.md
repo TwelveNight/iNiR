@@ -300,6 +300,13 @@ Game Mode activation; they resume from the same configuration afterward.
 
 ## Tools
 
+Direct file icons in `SmartAppIcon` decode asynchronously at their requested
+source size. Missing-image fallback is published by an image-owned zero timer:
+even a cached error cannot change the Loader's component while it is being
+created, and replacing or destroying the image cancels an obsolete fallback.
+Run `python scripts/test-smart-app-icon.py` to exercise missing, cached,
+replaced and destroyed images with the real Qt/KDE icon components.
+
 - **QML Profiler** (Qt Creator): Find slow bindings and functions
 - **GammaRay**: Analyze QML scenes
 - **Hotspot**: CPU profiling

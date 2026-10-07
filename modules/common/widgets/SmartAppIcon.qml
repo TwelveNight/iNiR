@@ -1,6 +1,5 @@
 import QtQuick
 import org.kde.kirigami as Kirigami
-import Quickshell
 import qs.modules.common
 import qs.services
 
@@ -29,13 +28,13 @@ Item {
     property bool useFluent: false
 
     // === Layout ===
-    implicitWidth: iconSize
-    implicitHeight: iconSize
+    implicitWidth: root.iconSize
+    implicitHeight: root.iconSize
 
 
     // === Logic ===
     readonly property string resolvedSource: AppSearch.resolveIcon(root.icon, root.fallback)
-    readonly property bool isFileUrl: resolvedSource.startsWith("file://")
+    readonly property bool isFileUrl: root.resolvedSource.startsWith("file://")
     
     // Error handling state
     property bool _imageError: false
@@ -54,7 +53,9 @@ Item {
     Component {
         id: imageKind
         Image {
+            id: image
             source: root.resolvedSource
+            asynchronous: true
             sourceSize.width: root.iconSize
             sourceSize.height: root.iconSize
             fillMode: Image.PreserveAspectFit
@@ -67,9 +68,14 @@ Item {
             // If monochrome is requested for an Image, we rely on layer effect?
             // Expensive. Use OpacityMask if strictly needed, but rare for App Icons.
             
-            onStatusChanged: {
-                if (status === Image.Error) {
-                    print(`[SmartAppIcon] Failed to load image: ${root.resolvedSource}`)
+            // A cached error can arrive during Loader creation even with async
+            // decoding. Publish after creation; destroying/changing the image
+            // cancels the pending fallback, so it cannot replace a newer icon.
+            Timer {
+                interval: 0
+                running: image.status === Image.Error
+                onTriggered: {
+                    if (image.status !== Image.Error || String(image.source) !== root.resolvedSource) return
                     root._imageError = true
                 }
             }
