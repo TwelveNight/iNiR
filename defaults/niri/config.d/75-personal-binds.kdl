@@ -342,3 +342,12 @@ binds {
     // Volume down.
     Ctrl+Alt+WheelScrollDown allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%-" "-l" "1.5"; }
 }
+
+// Personal native switcher shortcuts, restricted to the current workspace.
+// Hold Alt to cycle through recent windows; releasing Alt confirms selection.
+recent-windows {
+    binds {
+        Alt+N hotkey-overlay-title="Next window in current workspace" { next-window scope="workspace"; }
+        Alt+P hotkey-overlay-title="Previous window in current workspace" { previous-window scope="workspace"; }
+    }
+}
