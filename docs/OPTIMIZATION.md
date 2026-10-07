@@ -307,6 +307,13 @@ created, and replacing or destroying the image cancels an obsolete fallback.
 Run `python scripts/test-smart-app-icon.py` to exercise missing, cached,
 replaced and destroyed images with the real Qt/KDE icon components.
 
+Icon existence probes cache both hits and misses (at most 256 names), clearing
+when the application index, selected/system icon theme or light/dark variant
+changes. Media identity matching normalizes desktop metadata once per index
+revision. This avoids repeating theme filesystem searches and name parsing
+for each mixer delegate during the first panel opening. Regression checks:
+`python scripts/test-app-identity-cache.py`.
+
 - **QML Profiler** (Qt Creator): Find slow bindings and functions
 - **GammaRay**: Analyze QML scenes
 - **Hotspot**: CPU profiling

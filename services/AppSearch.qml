@@ -418,10 +418,24 @@ Singleton {
         return false
     }
 
-    function iconExists(iconName) {
-        if (!iconName || iconName.length == 0) return false;
-        return (Quickshell.iconPath(iconName, true).length > 0) 
-            && !iconName.includes("image-missing");
+    // A missing icon can walk the whole theme hierarchy. Normalized guesses
+    // and multiple mixer delegates repeat the same misses during one opening.
+    readonly property var iconExistsCache: {
+        void root.desktopLookupCache;
+        void Config.options?.appearance?.iconTheme;
+        void IconThemeService.currentTheme;
+        void Appearance.m3colors.darkmode;
+        return new Map();
+    }
+
+    function iconExists(iconName: string): bool {
+        if (!iconName || iconName.length === 0 || iconName.includes("image-missing")) return false;
+        const cache = root.iconExistsCache;
+        if (cache.has(iconName)) return cache.get(iconName);
+        const exists = Quickshell.iconPath(iconName, true).length > 0;
+        if (cache.size >= 256) cache.delete(cache.keys().next().value);
+        cache.set(iconName, exists);
+        return exists;
     }
 
     function getReverseDomainNameAppName(str) {

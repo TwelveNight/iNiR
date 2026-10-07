@@ -1311,6 +1311,22 @@ Singleton {
 		return new Map();
 	}
 
+	// Normalize application metadata once per index revision, not for each
+	// unknown PipeWire hint encountered when the mixer first opens.
+	readonly property var desktopHintIndex: {
+		void root.desktopHintCache;
+		const indexed = [];
+		for (const entry of DesktopEntries.applications.values ?? []) {
+			if (!entry || entry.noDisplay) continue;
+			const command = Array.from(entry.command ?? []);
+			const values = [entry.id, entry.name, entry.genericName, entry.startupClass, command.length > 0 ? command[0] : ""];
+			indexed.push({ entry: entry, candidates: values.map(value => ({
+				key: root._volumeKey(value), tokens: root._volumeTokens(value)
+			})) });
+		}
+		return indexed;
+	}
+
 	function _desktopEntryForHint(value): var {
 		const hint = root._cleanDisplayName(value);
 		if (!hint.length) return null;
@@ -1329,19 +1345,16 @@ Singleton {
 		const hintTokens = root._volumeTokens(hint);
 		let best = null;
 		let bestScore = 0;
-		for (const entry of DesktopEntries.applications.values ?? []) {
-			if (!entry || entry.noDisplay) continue;
-			const command = Array.from(entry.command ?? []);
-			const values = [entry.id, entry.name, entry.genericName, entry.startupClass, command.length > 0 ? command[0] : ""];
+		for (const indexed of root.desktopHintIndex) {
 			let score = 0;
-			for (const candidate of values) {
-				const candidateKey = root._volumeKey(candidate);
+			for (const candidate of indexed.candidates) {
+				const candidateKey = candidate.key;
 				if (!candidateKey) continue;
 				if (candidateKey === hintKey) score = Math.max(score, 100);
 				else if (hintKey.length >= 5 && candidateKey.length >= 5
 						&& (hintKey.includes(candidateKey) || candidateKey.includes(hintKey)))
 					score = Math.max(score, 60);
-				const candidateTokens = root._volumeTokens(candidate);
+				const candidateTokens = candidate.tokens;
 				let overlap = 0;
 				for (const token of hintTokens) {
 					if (candidateTokens.includes(token)
@@ -1353,7 +1366,7 @@ Singleton {
 			}
 			if (score > bestScore) {
 				bestScore = score;
-				best = entry;
+				best = indexed.entry;
 			}
 		}
 		return bestScore >= 36 ? best : null;
