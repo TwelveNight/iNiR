@@ -60,7 +60,7 @@ Singleton {
         try { return JSON.parse(root.seedsFile.text()) } catch (e) { return null }
     }
     readonly property FileView seedsFile: FileView {
-        path: `${Directories.stateUserPath}/generated/iris-seeds.json`
+        path: `${Directories.sharedGeneratedPath}/iris-seeds.json`
         watchChanges: true
         printErrors: false
         onFileChanged: this.reload()

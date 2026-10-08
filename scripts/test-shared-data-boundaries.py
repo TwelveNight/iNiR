@@ -167,6 +167,38 @@ ShellRoot {
         self.assertFalse((self.base / "font-sync-called").exists())
         self.assertTrue(json.loads((self.base / "state/inir/user/todo.json").read_text())[0]["done"])
 
+    def test_iris_washi_reads_shared_wallpaper_seeds_but_keeps_private_cache(self):
+        self.copy_singleton("modules/iris/style/IrisWashi.qml", "services/IrisWashi.qml")
+        (self.base / "services/ThemeService.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject { property string currentTheme: "auto"; property string appsSurfaceSeed: "" }
+''')
+        (self.base / "modules/common/Appearance.qml").write_text('''pragma Singleton
+import QtQuick
+QtObject {
+ property color wallpaperDominantColor: "#123456"
+ property var colors: ({colPrimary:"#111111", colSecondary:"#222222", colTertiary:"#333333"})
+ property QtObject m3colors: QtObject { property color m3background: "#000000" }
+}
+''')
+        shared = self.palette.parent / "iris-seeds.json"
+        seeds = {"primary": "#abcdef", "secondary": "#556677", "tertiary": "#8899aa", "background": "#112233"}
+        shared.write_text(json.dumps(seeds))
+        private = self.base / "state/inir/user/generated/iris-seeds.json"
+        private.parent.mkdir(parents=True, exist_ok=True)
+        private.write_text('{"primary":"#badbad"}')
+        solver = self.base / "scripts/colors/washi.sh"
+        solver.parent.mkdir(parents=True, exist_ok=True)
+        solver.write_text('#!/bin/sh\nexit 0\n')
+        self.qml('Config.ready; IrisWashi.requestJson;', '''
+            verify(IrisWashi.appsWearPalette, "fixture should use wallpaper seeds")
+            verify(IrisWashi.wallpaperSeeds?.primary === "#abcdef", "Washi read private or missing seeds")
+            verify(JSON.parse(IrisWashi.requestJson).seeds.primary === "#abcdef", "solver request used wrong seeds")
+            verify(IrisWashi.cachePath === Directories.stateUserPath + "/generated/iris-washi.json", "Washi cache must remain private")
+        ''')
+        self.assertEqual(json.loads(shared.read_text()), seeds)
+        self.assertEqual(private.read_text(), '{"primary":"#badbad"}')
+
     def test_icon_startup_reads_shared_choice_without_restoring_private_setting(self):
         self.copy_singleton("services/IconThemeService.qml")
         icon_service = self.base / "services/IconThemeService.qml"

@@ -416,11 +416,9 @@ switch() {
             # Extract first frame for thumbnail (used for color generation)
             # Use md5sum hash of full path to avoid collisions between videos with same basename
             thumbnail="$THUMBNAIL_DIR/$(echo -n "$imgpath" | md5sum | cut -d' ' -f1).jpg"
-            config_thumbnail="${cfg_thumbnail_path#file://}"
-
-            if has_valid_file "$config_thumbnail"; then
-                thumbnail="$config_thumbnail"
-            elif ! has_valid_file "$thumbnail"; then
+            # A saved Shell thumbnail may belong to an old wallpaper after an
+            # external skwd change. Only reuse the active path's keyed preview.
+            if ! has_valid_file "$thumbnail"; then
                 extract_representative_frame "$imgpath" "$thumbnail"
             fi
 
@@ -474,38 +472,11 @@ switch() {
 
     # Shell/UI colors follow the requested real mode.
     # Terminal colors may optionally force dark mode, but that must not darken the shell palette.
-    # If useBackdropForColors is enabled, override color source to use backdrop wallpaper
-    # Respects active panel family: ii reads from background.backdrop, waffle from waffles.background.backdrop
-    if [[ "$color_flag" != "1" ]]; then
-        if [[ "$cfg_use_backdrop" == "true" ]]; then
-            local backdrop_use_main=""
-            local backdrop_path=""
-
-            if [[ "$cfg_panel_family" == "waffle" ]]; then
-                backdrop_use_main="$cfg_waffle_backdrop_use_main"
-                backdrop_path="$cfg_waffle_backdrop_path"
-            else
-                backdrop_use_main="$cfg_ii_backdrop_use_main"
-                backdrop_path="$cfg_ii_backdrop_path"
-            fi
-
-            if [[ "$backdrop_use_main" != "true" && -n "$backdrop_path" && -f "$backdrop_path" ]]; then
-                echo "[switchwall.sh] Using backdrop wallpaper for color generation ($cfg_panel_family): $backdrop_path"
-                # Check if backdrop is a video - use its thumbnail instead
-                if is_video "$backdrop_path"; then
-                    local backdrop_thumb="$THUMBNAIL_DIR/$(echo -n "$backdrop_path" | md5sum | cut -d' ' -f1).jpg"
-                    if [[ -f "$backdrop_thumb" ]]; then
-                        generate_colors_material_args=(--path "$backdrop_thumb")
-                    fi
-                else
-                    generate_colors_material_args=(--path "$backdrop_path")
-                fi
-            fi
-        fi
-    fi
+    # skwd owns the desktop: a saved Shell backdrop must never replace the
+    # daemon's active wallpaper (or an explicit palette-only image request).
 
     # The mode comes after the source is chosen, and Auto reads the very image the palette is drawn from (a video's
-    # thumbnail, the backdrop), never a different one. -alpha off: `fx:mean` averages the alpha channel in, so every
+    # thumbnail), never a different one. -alpha off: `fx:mean` averages the alpha channel in, so every
     # PNG that carries one, opaque or not, read at least half bright and turned light.
     if [[ -z "$mode_flag" && "$cfg_auto_dark_light" == "true" ]] && command -v magick >/dev/null 2>&1; then
         local lum_source="$imgpath" lum_index
