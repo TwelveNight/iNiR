@@ -249,7 +249,7 @@ case "${SKIP_NIRI}" in
       log_success "Niri config installed (dots)"
     fi
 
-    # Patch config.kdl: detect polkit agent
+    # Patch the Niri config: startup extras and the Qt platform theme
     NIRI_CFG="${XDG_CONFIG_HOME}/niri/config.kdl"
     NIRI_ENV_CFG="${XDG_CONFIG_HOME}/niri/config.d/40-environment.kdl"
     NIRI_STARTUP_CFG="${XDG_CONFIG_HOME}/niri/config.d/50-startup.kdl"
@@ -263,13 +263,7 @@ case "${SKIP_NIRI}" in
     [[ -f "$NIRI_BINDS_CFG" ]] && NIRI_BINDS_TARGET="$NIRI_BINDS_CFG"
 
     if [[ -f "$NIRI_CFG" ]]; then
-      POLKIT_AGENT="$(get-polkit-agent)"
-      if [[ -n "$POLKIT_AGENT" ]]; then
-        sed -i "s|spawn-at-startup \"/usr/lib/mate-polkit/polkit-mate-authentication-agent-1\"|spawn-at-startup \"${POLKIT_AGENT}\"|" "$NIRI_STARTUP_TARGET"
-        log_success "Polkit agent: $(basename "$(dirname "$POLKIT_AGENT")")/$(basename "$POLKIT_AGENT")"
-      else
-        log_warning "No polkit agent found — sudo dialogs may not work"
-      fi
+      # No polkit agent is spawned: the shell is the agent (migration 044 retires the line older setups wrote).
 
       if [[ "${INSTALL_FIRSTRUN}" == true && "${OS_SPECIFIC_ID:-}" == "cachyos" ]] \
           && command -v niri-focused-booster >/dev/null 2>&1 \
@@ -323,12 +317,6 @@ fi
 
 # Shared app base configs are optional; theme generators still write shared colours.
 if [[ "${INIR_INSTALL_SHARED_APP_CONFIGS:-false}" == true ]]; then
-# Fuzzel (launcher)
-if [[ -d "dots/.config/fuzzel" ]]; then
-  install_dir__sync "dots/.config/fuzzel" "${XDG_CONFIG_HOME}/fuzzel"
-  log_success "Fuzzel config installed"
-fi
-
 # Starship (prompt)
 if [[ -f "defaults/starship/starship.toml" ]]; then
   install_file__auto_backup "defaults/starship/starship.toml" "${XDG_CONFIG_HOME}/starship.toml"
@@ -967,7 +955,6 @@ if [[ "${INIR_WALLPAPER_BACKEND:-skwd-wall}" != skwd-wall && "${INSTALL_FIRSTRUN
   mkdir -p "${XDG_STATE_HOME}/quickshell/user/generated/wallpaper"
   mkdir -p "${XDG_CONFIG_HOME}/gtk-3.0"
   mkdir -p "${XDG_CONFIG_HOME}/gtk-4.0"
-  mkdir -p "${XDG_CONFIG_HOME}/fuzzel"
 
   # Update config.json with default wallpaper path
   shell_config_json="${DOTS_CORE_CONFDIR}/config.json"
@@ -1116,7 +1103,6 @@ if ! ${quiet:-false}; then
     in "${XDG_CONFIG_HOME}/niri/config.kdl:Niri config" \
        "${DOTS_CORE_CONFDIR}/config.json:iNiR config" \
        "${DOTS_CORE_CONFDIR}/matugen:Theming templates" \
-       "${XDG_CONFIG_HOME}/fuzzel:Fuzzel config" \
        "${XDG_STATE_HOME}/quickshell/user/generated/colors.json:Theme colors"; do
     _cfg_file="${_cfg_path%%:*}"
     _cfg_label="${_cfg_path##*:}"

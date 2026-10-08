@@ -72,7 +72,6 @@ check_dependencies() {
         "cliphist:cliphist"
         "wl-copy:wl-clipboard"
         "wl-paste:wl-clipboard"
-        "fuzzel:fuzzel"
         "skwd-helm:skwd-wall"
         "hyprpicker:hyprpicker"
         "playerctl:playerctl"

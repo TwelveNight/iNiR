@@ -28,6 +28,8 @@ Item {
     readonly property alias frame: frame
     readonly property var screen: root.QsWindow.window?.screen ?? null
     property string section: "general"
+    // The main-list row that holds the selection, for the travelling wash in the sidebar.
+    property Item travelRow: null
     property int advancedPage: -1
     property string query: ""
     property string group: ""
@@ -109,10 +111,24 @@ Item {
     }
     readonly property var shownGroups: root.searching ? root.groups
         : root.openGroup.length > 0 ? root.groups.filter(entry => entry.title === root.openGroup) : []
+    // A section's groups in named blocks, by what someone came to change (IrisOptions.groupClusters); a section without
+    // blocks is cut into even cards. Groups a block does not name close the page in a last block of their own.
     readonly property var groupChunks: {
-        const size = root.groups.length > 7 ? Math.ceil(root.groups.length / Math.ceil(root.groups.length / 6)) : root.groups.length
+        const clusters = IrisOptions.groupClusters[root.section] ?? []
         const out = []
-        for (let i = 0; i < root.groups.length; i += Math.max(1, size)) out.push(root.groups.slice(i, i + size))
+        if (clusters.length > 0) {
+            const placed = new Set()
+            for (const cluster of clusters) {
+                const groups = cluster.groups.map(key => root.groups.find(entry => entry.key === key)).filter(entry => entry !== undefined)
+                groups.forEach(entry => placed.add(entry.key))
+                if (groups.length > 0) out.push({ caption: Translation.tr(cluster.caption), groups: groups, flow: cluster.flow ?? false })
+            }
+            const rest = root.groups.filter(entry => !placed.has(entry.key))
+            if (rest.length > 0) out.push({ caption: out.length > 0 ? Translation.tr("More") : "", groups: rest })
+            return out
+        }
+        const size = root.groups.length > 7 ? Math.ceil(root.groups.length / Math.ceil(root.groups.length / 6)) : root.groups.length
+        for (let i = 0; i < root.groups.length; i += Math.max(1, size)) out.push({ caption: "", groups: root.groups.slice(i, i + size) })
         return out
     }
     function valueText(spec: var): string {
@@ -129,7 +145,8 @@ Item {
         case "icon": return String(value ?? "").length > 0 ? Translation.tr("Custom") : ""
         case "zone":
         case "choice":
-            if (spec.fallback === "" && value === "") return ""
+            // "None" says nothing in a group's summary ("Graphite, None"): only what is there is named.
+            if ((spec.fallback === "" && value === "") || value === "none") return ""
             return Translation.tr(String(IrisOptions.choicesOf(spec).find(choice => IrisOptions.same(choice.value, value))?.label ?? ""))
         case "range":
             if (spec.fallback !== undefined && IrisOptions.same(value, spec.fallback)) return ""
@@ -345,12 +362,15 @@ Item {
     Shortcut { sequences: ["Alt+Right", "Ctrl+]"]; enabled: GlobalStates.settingsOverlayOpen; onActivated: root.goForward() }
     MouseArea { anchors.fill: parent; enabled: !root.windowed; onClicked: GlobalStates.settingsOverlayOpen = false }
 
+    // Afterglow's bevel must follow the corners Niri clips the window to.
+    readonly property bool windowField: root.windowed && IrisStyle.afterglow
+    onWindowFieldChanged: if (root.windowField) IrisNiri.reload(["window-rules"])
     // In a window Niri owns the shape, the corners and the open motion: the body fills it, already open.
     IrisMorphSurface {
         motionSurface: "settings"
         settles: true
         windowOffset: Qt.point(IrisFrame.band, IrisFrame.band)
-        ownField: !root.windowed
+        ownField: !root.windowed || root.windowField
         // A window cannot know where it sits on screen, so it never samples the wallpaper: Blur asks Niri, else solid.
         glass: !root.windowed || IrisStyle.glassCompositor
         id: frame
@@ -358,7 +378,8 @@ Item {
         open: root.windowed || GlobalStates.settingsOverlayOpen
         color: IrisStyle.surface
         light: IrisStyle.surfaceLight("settings", IrisStyle.wallpaperLight)
-        radius: root.windowed ? 0 : IrisStyle.surfaceRadius("settings", IrisStyle.radiusPanel)
+        radius: root.windowField ? Number(IrisNiri.data["window-rules"]?.corner_radius ?? 16)
+            : root.windowed ? 0 : IrisStyle.surfaceRadius("settings", IrisStyle.radiusPanel)
         onClosed: GlobalStates.irisMorphOwner = ""
         x: root.windowed ? 0 : (parent.width - width) / 2
         y: root.windowed ? 0 : (parent.height - height) / 2
@@ -505,6 +526,32 @@ Item {
                             maskSource: sidebarFade
                             maskThresholdMin: 0.5
                             maskSpreadAtMin: 1
+                        }
+
+                        // Where you are travels from row to row on the morph curve (the gallery's ring does the same) instead of
+                        // fading out on one row and in on the next. Under the rows; the footer keeps its own wash.
+                        Rectangle {
+                            id: travelWash
+                            readonly property Item row: root.travelRow
+                            readonly property bool shown: travelWash.row !== null && travelWash.row.selected
+                            property bool travels: false
+                            x: sidebarColumn.x
+                            width: sidebarColumn.width
+                            y: travelWash.row ? sidebarColumn.y + travelWash.row.y + travelWash.row.height - travelWash.row.rowHeight : 0
+                            height: travelWash.row ? travelWash.row.rowHeight : 0
+                            radius: travelWash.row ? travelWash.row.washRadius : 0
+                            color: IrisStyle.tintFillHover(travelWash.row?.compact ? travelWash.row.modelData.tint : IrisStyle.accent)
+                            opacity: travelWash.shown ? 1 : 0
+                            // It lands where it first appears and travels from then on. Moving the selection hides it for a
+                            // moment (the old row lets go before the new one takes it): only a hide that lasts stops the travel.
+                            onShownChanged: if (travelWash.shown) { washDisarm.stop(); if (!travelWash.travels) washArm.restart() }
+                                else washDisarm.restart()
+                            Timer { id: washArm; interval: 0; onTriggered: travelWash.travels = IrisStyle.motionEnabled }
+                            Timer { id: washDisarm; interval: 150; onTriggered: if (!travelWash.shown) travelWash.travels = false }
+                            Behavior on y { enabled: travelWash.travels; NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
+                            Behavior on height { enabled: travelWash.travels; NumberAnimation { duration: IrisStyle.morphDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: IrisStyle.morphCurve } }
+                            Behavior on opacity { NumberAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
+                            Behavior on color { ColorAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
                         }
 
                         Column {
@@ -1014,6 +1061,12 @@ Item {
         readonly property bool clusterStart: sectionRow.gapAbove && (sectionRow.index === 0
             || sectionRow.list[sectionRow.index - 1]?.cluster !== sectionRow.modelData.cluster)
         readonly property bool selected: !root.searching && root.section === sectionRow.modelData.id
+        // Main-list rows hand their selection to the travelling wash (travelWash); footer rows paint their own.
+        readonly property bool travels: sectionRow.gapAbove
+        readonly property real washRadius: Math.min(sectionRow.rowHeight / 2, IrisStyle.iconRadius(sectionMark.width) + sectionMark.x)
+        onSelectedChanged: if (sectionRow.selected && sectionRow.travels) root.travelRow = sectionRow
+        Component.onCompleted: if (sectionRow.selected && sectionRow.travels) root.travelRow = sectionRow
+        Component.onDestruction: if (root.travelRow === sectionRow) root.travelRow = null
         readonly property bool dimmed: root.searching && !root.matchedSections.has(sectionRow.modelData.id)
         readonly property bool compact: root.railLayout
         readonly property real rowHeight: Math.round((sectionRow.compact ? 36 : 27) * root.d * Math.max(1, IrisStyle.typeScale))
@@ -1037,8 +1090,11 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: sectionRow.rowHeight
-            radius: IrisStyle.radiusRow
-            color: sectionRow.selected ? (sectionRow.compact ? IrisStyle.tintFill(sectionRow.modelData.tint) : IrisStyle.accent)
+            // Concentric with the mark it holds; where you are is a wash of the accent, as light as a hover, never a
+            // solid block heavier than the buttons around it.
+            radius: sectionRow.washRadius
+            color: sectionRow.selected && !sectionRow.travels ? IrisStyle.tintFillHover(sectionRow.compact ? sectionRow.modelData.tint : IrisStyle.accent)
+                : sectionRow.selected ? "transparent"
                 : sectionRow.containsMouse ? IrisStyle.fillHover : "transparent"
             Behavior on color { ColorAnimation { duration: IrisStyle.duration(110); easing.type: IrisStyle.feedbackEasing } }
             IrisSquircle {
@@ -1058,7 +1114,7 @@ Item {
                 anchors.rightMargin: 8 * root.d
                 anchors.verticalCenter: parent.verticalCenter
                 text: Translation.tr(sectionRow.modelData.title)
-                color: sectionRow.selected ? IrisStyle.inkOnAccent : IrisStyle.text
+                color: IrisStyle.text
                 font.pixelSize: IrisStyle.typeLabel
                 font.weight: IrisStyle.weight(sectionRow.selected ? Font.DemiBold : Font.Medium)
                 elide: Text.ElideRight
@@ -1109,6 +1165,9 @@ Item {
                     font.family: IrisStyle.fontTitle
                     font.pixelSize: IrisStyle.typeHeadline
                     font.weight: IrisStyle.weight(Font.DemiBold)
+                    // A half-screen window leaves the title beside the scene a third of the page: it wraps, never cuts.
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 2
                     elide: Text.ElideRight
                 }
                 IrisText {
@@ -1142,19 +1201,43 @@ Item {
         }
     }
 
-    component GroupList: Rectangle {
+    component GroupList: ColumnLayout {
         id: list
         required property var modelData
         Layout.fillWidth: true
-        implicitHeight: listColumn.implicitHeight
-        radius: IrisStyle.radiusTile
-        color: IrisStyle.readingCard
-        Column {
-            id: listColumn
-            width: parent.width
-            Repeater {
-                model: ScriptModel { objectProp: "title"; values: list.modelData }
-                GroupRow { last: index === list.modelData.length - 1 }
+        spacing: 6 * root.d
+        IrisText {
+            visible: text.length > 0
+            Layout.leftMargin: 16 * root.d
+            text: list.modelData.caption
+            color: IrisStyle.label
+            font.family: IrisStyle.fontTitle
+            font.pixelSize: IrisStyle.typeMeta
+            font.weight: IrisStyle.weight(Font.DemiBold)
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: listColumn.implicitHeight
+            radius: IrisStyle.radiusTile
+            color: IrisStyle.readingCard
+            // A block whose groups feed one another (colour: source, mode, accent, material, apps) threads its marks
+            // together, under them, from the first to the last.
+            Rectangle {
+                visible: list.modelData.flow ?? false
+                x: Math.round(27 * root.d - width / 2)
+                y: Math.round(23 * root.d)
+                width: Math.max(1, Math.round(2 * root.d))
+                height: Math.max(0, parent.height - 46 * root.d)
+                radius: width / 2
+                color: IrisStyle.hairlineStrong
+            }
+            Column {
+                id: listColumn
+                width: parent.width
+                Repeater {
+                    model: ScriptModel { objectProp: "title"; values: list.modelData.groups }
+                    GroupRow { last: index === list.modelData.groups.length - 1 }
+                }
             }
         }
     }
@@ -1376,25 +1459,50 @@ Item {
                 }
             }
         }
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: groupRows.implicitHeight
-            radius: IrisStyle.radiusTile
-            color: IrisStyle.readingCard
+        // A long group reads as captioned cards, one per `part` its rows name; search shows one card. Keyed by caption,
+        // so a write (a slider mid-drag) never rebuilds a card under the pointer.
+        function partOf(spec: var): string { return root.searching ? "" : String(spec.part ?? "") }
+        readonly property var parts: [...new Set(group.modelData.rows.map(spec => group.partOf(spec)))]
+        Repeater {
+            model: ScriptModel { values: group.parts }
             ColumnLayout {
-                id: groupRows
-                anchors.left: parent.left
-                anchors.right: parent.right
-                spacing: 0
-                Repeater {
-                    model: ScriptModel { objectProp: "modelKey"; values: group.modelData.rows }
-                    IrisSetting {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        spec: modelData
-                        highlight: root.query
-                        last: index === group.modelData.rows.length - 1
+                id: part
+                required property string modelData
+                required property int index
+                readonly property var rows: group.modelData.rows.filter(spec => group.partOf(spec) === part.modelData)
+                Layout.fillWidth: true
+                Layout.topMargin: part.index > 0 ? 12 * root.d : 0
+                spacing: 6 * root.d
+                IrisText {
+                    visible: text.length > 0
+                    Layout.leftMargin: 16 * root.d
+                    text: part.modelData.length > 0 ? Translation.tr(part.modelData) : ""
+                    color: IrisStyle.label
+                    font.family: IrisStyle.fontTitle
+                    font.pixelSize: IrisStyle.typeMeta
+                    font.weight: IrisStyle.weight(Font.DemiBold)
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: groupRows.implicitHeight
+                    radius: IrisStyle.radiusTile
+                    color: IrisStyle.readingCard
+                    ColumnLayout {
+                        id: groupRows
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: 0
+                        Repeater {
+                            model: ScriptModel { objectProp: "modelKey"; values: part.rows }
+                            IrisSetting {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                spec: modelData
+                                highlight: root.query
+                                last: index === part.rows.length - 1
+                            }
+                        }
                     }
                 }
             }

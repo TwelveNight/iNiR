@@ -9,6 +9,7 @@ import qs
 import qs.services
 import qs.modules.common
 import qs.modules.iris.style
+import qs.modules.iris.background
 
 Item {
     id: root
@@ -51,6 +52,9 @@ Item {
     readonly property bool videoWallpaper: Wallpapers.isVideoFile(root.wallpaperPath.toLowerCase())
     readonly property bool gifWallpaper: root.wallpaperPath.toLowerCase().endsWith(".gif")
     readonly property string wallpaperSource: Wallpapers.stillUrlFor(root.wallpaperPath)
+    // Afterglow's "Grade the wallpaper": the whole screen matches, the lock included (the desktop's own filter).
+    readonly property bool graded: String(Config.options?.iris?.appearance?.texture ?? "solid") === "afterglow"
+        && (Config.options?.iris?.appearance?.afterglow?.wallpaper ?? true)
     readonly property int fillMode: String(root.scene?.fit ?? "cover") === "contain"
         ? Image.PreserveAspectFit : Image.PreserveAspectCrop
     readonly property real vignette: Math.max(0, Math.min(1, Number(root.scene?.vignette ?? 0) / 100))
@@ -58,6 +62,7 @@ Item {
         && IrisStyle.motionEnabled
     readonly property real blur: Math.max(0, Math.min(1, Number(root.scene?.blur ?? 100) / 100))
     readonly property real dim: Math.max(0, Math.min(1, Number(root.scene?.dim ?? 0) / 100))
+    readonly property real colourLeft: Math.max(0, Math.min(1, Number(root.scene?.saturation ?? 15) / 100))
     readonly property real scrimStrength: Math.max(0, Math.min(2, Number(root.scene?.scrimStrength ?? 100) / 100))
     readonly property string scrimStyle: String(root.scene?.scrim ?? "gradient")
     readonly property bool painted: root.source !== "colour"
@@ -157,35 +162,49 @@ Item {
             Translate { id: driftShift }
         ]
 
-        Image {
-            id: wallpaper
+        // What the picture is; Afterglow, when it grades the wallpaper, draws it graded over itself inside the
+        // scenery, so drift, blur and the washes still see one item.
+        Item {
+            id: sceneryContent
             anchors.fill: parent
-            source: root.painted ? root.wallpaperSource : ""
-            sourceSize: Qt.size(root.width, root.height)
-            fillMode: root.fillMode
-            asynchronous: false
-            cache: false
-        }
-        Loader {
-            anchors.fill: parent
-            active: root.playsGif
-            sourceComponent: AnimatedImage {
-                source: root.wallpaperSource
+            Image {
+                id: wallpaper
+                anchors.fill: parent
+                source: root.painted ? root.wallpaperSource : ""
+                sourceSize: Qt.size(root.width, root.height)
                 fillMode: root.fillMode
+                asynchronous: false
                 cache: false
-                playing: true
+            }
+            Loader {
+                anchors.fill: parent
+                active: root.playsGif
+                sourceComponent: AnimatedImage {
+                    source: root.wallpaperSource
+                    fillMode: root.fillMode
+                    cache: false
+                    playing: true
+                }
+            }
+            Loader {
+                anchors.fill: parent
+                active: root.playsVideo
+                sourceComponent: Video {
+                    source: "file://" + root.wallpaperPath
+                    fillMode: root.fillMode === Image.PreserveAspectFit
+                        ? VideoOutput.PreserveAspectFit : VideoOutput.PreserveAspectCrop
+                    loops: MediaPlayer.Infinite
+                    muted: true
+                    autoPlay: true
+                }
             }
         }
         Loader {
             anchors.fill: parent
-            active: root.playsVideo
-            sourceComponent: Video {
-                source: "file://" + root.wallpaperPath
-                fillMode: root.fillMode === Image.PreserveAspectFit
-                    ? VideoOutput.PreserveAspectFit : VideoOutput.PreserveAspectCrop
-                loops: MediaPlayer.Infinite
-                muted: true
-                autoPlay: true
+            active: root.graded && root.painted
+            sourceComponent: IrisAfterglowWallpaper {
+                source: sceneryContent
+                live: root.playsVideo || root.playsGif
             }
         }
     }
@@ -217,7 +236,8 @@ Item {
         blurEnabled: true
         blur: root.presence
         blurMax: Math.round(48 * root.blur)
-        saturation: 1 - (1 - Math.max(0, Math.min(1, Number(root.scene?.saturation ?? 15) / 100))) * root.presence
+        // MultiEffect's 0 leaves the colour as it is and -1 is grey: "colour left" 0 % is graphite, 100 % the picture.
+        saturation: (root.colourLeft - 1) * root.presence
     }
     Item {
         anchors.fill: parent
@@ -292,7 +312,8 @@ Item {
             blurEnabled: true
             blur: 1
             blurMax: 64
-            saturation: 0.35
+            // The plates keep the scene's colour left, a little more vivid, never a coloured window into a grey scene.
+            saturation: (root.colourLeft - 1) * root.presence + 0.35 * root.colourLeft
         }
     }
 

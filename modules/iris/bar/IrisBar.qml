@@ -40,6 +40,21 @@ Scope {
     signal pieceTapRequested(string kind)
     property bool pieceTapped: false
     property string editScreen: ""
+    // The update overlay is Material's; under iRiS its details live in the New iNiR card.
+    Connections {
+        target: ShellUpdates
+        function onOverlayOpenChanged(): void {
+            if (!ShellUpdates.overlayOpen) return
+            ShellUpdates.closeOverlay()
+            if (!ShellUpdates.hasUpdate && !ShellUpdates.isUpdating) {
+                const page = SettingsPageRegistry.pages.findIndex(entry => entry.key === "about")
+                if (page >= 0) GlobalStates.openSettingsPage(page, "")
+                return
+            }
+            GlobalStates.irisBubbleCardRequest = ""
+            GlobalStates.irisBubbleCardRequest = "shellUpdate"
+        }
+    }
     Connections {
         target: GlobalStates
         function onIrisEditChanged(): void {
@@ -379,6 +394,7 @@ Scope {
             Config.setNestedValue("iris.appearance.adaptive", Math.max(0, Math.min(100, value)))
             return String(Math.max(0, Math.min(100, value)))
         }
+        function tokens(): string { return JSON.stringify(IrisStyle.audit()) }
         function palette(id: string): string {
             const known = IrisOptions.colourThemeIds
             if (id === "list") return JSON.stringify(known)

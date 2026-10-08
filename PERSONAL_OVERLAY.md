@@ -98,6 +98,40 @@ Docker Desktop 和 Sunshine 的用户服务取消自动启用，仍可手动启�
 更新上游前先检查工作区并保存未提交修改。个人分支保持基于 `origin/prerelease`，后续更新需审查并解决个人补丁冲突。
 已经部署后，使用 `inir update --local` 同步本地工作区；个人分支还没有远端对应分支，不要直接执行会拉取同名远端分支的普通更新。
 
+### 合并 prerelease 后更新 live
+
+对于当前 `repo-copy` 安装，从本仓库执行更新，不重新 clone，也不使用 `--realign` 或覆盖式安装：
+
+```sh
+cd /home/night/Template/github/niri-dots/iNiR
+git status --short --branch
+./setup install --check
+
+# 自动更新快照只备份 Niri 的 config.kdl，不包括整套 config.d；额外保存完整目录。
+backup="${INIR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/inir}/manual-backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup"
+cp -a "${XDG_CONFIG_HOME:-$HOME/.config}/niri" "$backup/niri"
+printf 'Niri backup: %s\n' "$backup/niri"
+
+./setup update --local
+niri validate --config "${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
+inir version
+```
+
+`--local` 跳过远端拉取，把已经审查合并的代码同步到 `~/.config/quickshell/inir`，刷新启动器和已有服务，并执行迁移、重启 Shell。iNiR 的 `config.json` 不作为源码覆盖，但迁移可能改动指定字段或 Niri 启动项。更新不等同于复制整个 `defaults/niri`：其他 live Niri 个性层保持原样，新模板设置需另行按 include 链审查。
+
+如果发现 runtime 本地修改，选择 **Preserve & Continue** 会先保存副本再安装新代码，不会自动把旧修改合并回来。副本在 `${INIR_STATE_DIR:-~/.local/state/inir}/user-mods/`；更新快照在同一状态目录的 `snapshots/`，最多保留 10 份。不要把“保存副本”理解为更新后仍应用旧文件。
+
+更新失败时先保留日志。`./setup rollback` 会恢复快照，也可能对源码仓库执行 checkout/reset；自动快照中的 `commit_before` 在本地同步时取当前源码 HEAD，不一定是旧 live 的提交。回退前先保存源码工作区与分支，不把它当作完整 Niri/systemd 回退；整套 Niri 使用上面的额外备份。
+
+上游迁移 044 停用安装器写入的已知外部 polkit 启动行，改用 Shell 内置认证窗口。已经运行的旧 agent 不会因此立刻退出，更新后应注销并重新登录 Niri。自定义 agent 启动脚本或个人额外配置不由该迁移删除。
+
+### skwd-wall 与上游壁纸功能
+
+个人分支仍由 `skwd-wall` 唯一绘制桌面，壁纸路径和显示器预览读取 daemon 的实际状态；不因上游新增 scaling/span/Afterglow 而启用第二个 QML/GIF/video 桌面渲染器。iNiR 的壁纸应用请求交给 `skwd-helm apply`，保留已有共享配色监听链路，避免重复取色。
+
+Shell 的 `background.fillMode`、parallax 和桌面效果不等同于 skwd 的控制命令，因此相关设置按后端隐藏，缩放、播放和过渡在 skwd 设置中管理。Afterglow 的 Shell 外观仍保留，但壁纸调色选项在 skwd 模式明确只作用于 Shell 锁屏，不会改变 skwd 桌面。浏览器配色仅使用已有可写 policy 目录；不会自动提权、改权限或编辑真实浏览器 profile。
+
 ## 触控板方向
 
 `config.d/95-personal-input.kdl` 单独启用触控板 `natural-scroll`，与个人 Hyprland

@@ -2883,6 +2883,7 @@ def _kb_special_metadata(action):
                 "empty-move": ("Move window to empty workspace", "Workspaces"),
                 "empty-focus": ("Focus empty workspace", "Workspaces"),
                 "float": ("Toggle centered floating window", "Window Management"),
+                "hud-focus": ("Toggle Hermes HUD focus", "Applications"),
                 "tmux": ("Open or attach tmux session", "Applications"),
                 "files": ("File manager", "Applications"),
             }.get(script.rsplit(None, 1)[-1])
@@ -3017,6 +3018,7 @@ def _kb_categorize(description: str, action: str) -> str:
             "settings",
             "cheatsheet",
             "panelFamily",
+            "iris",
             "session",
         ):
             return "iNiR Shell"

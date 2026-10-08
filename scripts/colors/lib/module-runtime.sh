@@ -4,6 +4,7 @@ set -euo pipefail
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="$XDG_STATE_HOME/quickshell"
 
@@ -133,6 +134,58 @@ run_module_script() {
 
 list_theming_modules() {
   find "$MODULES_DIR" -maxdepth 1 -type f -name '*.sh' | sort
+}
+
+# Profile roots of the Firefox family (Firefox, LibreWolf, Floorp, Waterfox, Zen), native and Flatpak.
+firefox_profile_roots() {
+  printf '%s\n' \
+    "$XDG_CONFIG_HOME/mozilla/firefox" "$HOME/.mozilla/firefox" \
+    "$HOME/.var/app/org.mozilla.firefox/config/mozilla/firefox" "$HOME/.var/app/org.mozilla.firefox/.mozilla/firefox" \
+    "$HOME/.librewolf" "$XDG_CONFIG_HOME/librewolf/librewolf" "$HOME/.var/app/io.gitlab.librewolf-community/.librewolf" \
+    "$HOME/.floorp" "$HOME/.var/app/one.ablaze.floorp/.floorp" \
+    "$HOME/.waterfox" "$HOME/.var/app/net.waterfox.waterfox/.waterfox" \
+    "$HOME/.zen" "$XDG_CONFIG_HOME/zen" "$HOME/.var/app/app.zen_browser.zen/.zen"
+}
+
+# Chromium-family browsers, one per line: "<managed policy dir>|<user data dir>|<how to tell it is installed>".
+# Installed means a command on PATH or `flatpak:<id>` installed, never a data dir: one left behind by a removed browser
+# (or an AppImage tried once) must not activate a policy writer. Flatpak Chrome and Brave link the host's /etc policies at launch; Flatpak Chromium reads an extension point, which
+# flatpak also looks for under the user's data dir, so that one needs no root.
+chromium_browsers() {
+  local ext="${FLATPAK_USER_DIR:-$XDG_DATA_HOME/flatpak}/extension" arch var="$HOME/.var/app"
+  arch="$(uname -m)"
+  printf '%s\n' \
+    "/etc/opt/chrome/policies/managed|$XDG_CONFIG_HOME/google-chrome|google-chrome-stable google-chrome" \
+    "/etc/opt/chrome/policies/managed|$XDG_CONFIG_HOME/google-chrome-beta|google-chrome-beta" \
+    "/etc/opt/chrome/policies/managed|$XDG_CONFIG_HOME/google-chrome-unstable|google-chrome-unstable" \
+    "/etc/chromium/policies/managed|$XDG_CONFIG_HOME/chromium|chromium chromium-browser" \
+    "/etc/brave/policies/managed|$XDG_CONFIG_HOME/BraveSoftware/Brave-Browser|brave brave-browser" \
+    "/etc/chromium/policies/managed|$XDG_CONFIG_HOME/net.imput.helium|helium helium-browser" \
+    "/etc/chromium/policies/managed|$XDG_CONFIG_HOME/thorium|thorium-browser thorium" \
+    "/etc/opt/chrome/policies/managed|$var/com.google.Chrome/config/google-chrome|flatpak:com.google.Chrome" \
+    "/etc/brave/policies/managed|$var/com.brave.Browser/config/BraveSoftware/Brave-Browser|flatpak:com.brave.Browser" \
+    "$ext/org.chromium.Chromium.Extension.inir/$arch/1/policies/managed|$var/org.chromium.Chromium/config/chromium|flatpak:org.chromium.Chromium" \
+    "$ext/io.github.ungoogled_software.ungoogled_chromium.Extension.inir/$arch/1/policies/managed|$var/io.github.ungoogled_software.ungoogled_chromium/config/chromium|flatpak:io.github.ungoogled_software.ungoogled_chromium"
+}
+
+# The entries of chromium_browsers that are installed here. Always returns 0: it runs inside the applycolor
+# fingerprint pipeline, under `set -e -o pipefail`.
+installed_chromium_browsers() {
+  local entry marker found
+  while IFS= read -r entry; do
+    for marker in ${entry##*|}; do
+      case "$marker" in
+        flatpak:*) found="$XDG_DATA_HOME/flatpak/app/${marker#flatpak:}"
+          if [[ ! -d "$found" ]]; then found="/var/lib/flatpak/app/${marker#flatpak:}"; fi ;;
+        *) found="$(command -v "$marker" 2>/dev/null || true)" ;;
+      esac
+      if [[ -n "$found" && -e "$found" ]]; then
+        printf '%s\n' "$entry"
+        break
+      fi
+    done
+  done < <(chromium_browsers)
+  return 0
 }
 
 list_theming_target_manifests() {

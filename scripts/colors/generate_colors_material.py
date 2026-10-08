@@ -148,6 +148,18 @@ parser.add_argument(
     help="hex colour the neutral surfaces are anchored to (the shell's own material); accents stay from the source",
 )
 parser.add_argument(
+    "--accent-seed",
+    type=str,
+    default=None,
+    help="hex colour the accents are drawn from instead of the source (the shell's own accent)",
+)
+parser.add_argument(
+    "--washi-roles",
+    type=str,
+    default=None,
+    help="iris-surface.json whose 'roles' are iRiS's solved palette in Material role names: the apps wear them as they are",
+)
+parser.add_argument(
     "--render-templates",
     type=str,
     default=None,
@@ -554,7 +566,8 @@ def build_app_palette(base_palette: dict[str, str]) -> dict[str, str]:
     outline_variant = base_palette.get("outline_variant") or mix_hex(layer1, outline, 0.72)
 
     on_layer0 = readable_hex(on_surface, layer0, 4.5)
-    on_layer1 = readable_hex(on_surface_variant, layer1, 4.5)
+    # Body text is onSurface on every layer; the variant is for secondary text (app_subtext), never the main ink.
+    on_layer1 = readable_hex(on_surface, layer1, 4.5)
     on_layer2 = readable_hex(on_surface, layer2, 4.5)
     on_layer3 = readable_hex(on_surface, layer3, 4.5)
     on_layer4 = readable_hex(on_surface, layer4, 4.5)
@@ -686,6 +699,10 @@ elif args.color is not None:
     argb = hex_to_argb(args.color)
     hct = Hct.from_int(argb)
 
+if args.accent_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.accent_seed.strip()):
+    argb = hex_to_argb("#" + args.accent_seed.strip().lstrip("#"))
+    hct = Hct.from_int(argb)
+
 # Complementary palette: rotate seed hue 180° before scheme generation.
 # The motor recalculates optimal tones for the complementary hue, producing
 # a natural palette rather than a flat hue-shift of the generated colors.
@@ -799,6 +816,9 @@ SURFACE_RAMP = [
     "surfaceContainerLowest", "surfaceContainerLow", "surfaceContainer",
     "surfaceContainerHigh", "surfaceContainerHighest",
 ]
+# The scheme's own background before the shell's surface moves it: iRiS's "Theme" material is read from this, never
+# from the paper it handed over (each pass would carry the person's tone again).
+seed_background = material_colors.get("background", "")
 if args.surface_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.surface_seed.strip()):
     seed_hct = Hct.from_int(hex_to_argb("#" + args.surface_seed.strip().lstrip("#")))
     # A seed of the other polarity is a scheme change still on its way: ignore it.
@@ -841,6 +861,38 @@ if args.surface_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.surface_seed.str
                 argb = ensure_contrast(hex_to_argb(material_colors[key]), worst, 3.0, bool(darkmode), 94.0 if darkmode else 8.0)
                 argb = ensure_contrast(argb, background, 4.5, bool(darkmode), 94.0 if darkmode else 8.0)
                 material_colors[key] = argb_to_hex(argb)
+
+# iRiS: the shell's palette (scripts/colors/washi) already solved every role against every surface of its ramp. The apps
+# wear it as it is, so window, sidebar, text and accent are the shell's own colours, not a second reading of the seed.
+if args.washi_roles:
+    # The shell's "theme" and "wallpaper" colours are read from these, never from the roles it handed over (a loop
+    # that kept whatever accent once passed through).
+    try:
+        seeds_path = os.path.join(os.path.dirname(args.washi_roles), "iris-seeds.json")
+        seeds = {k: material_colors.get(k, "") for k in ("primary", "secondary", "tertiary")}
+        seeds["background"] = seed_background
+        seeds_text = json.dumps(seeds)
+        try:
+            with open(seeds_path) as f:
+                unchanged = f.read() == seeds_text
+        except OSError:
+            unchanged = False
+        if not unchanged:
+            with open(seeds_path + ".tmp", "w") as f:
+                f.write(seeds_text)
+            os.replace(seeds_path + ".tmp", seeds_path)
+    except OSError:
+        pass
+    try:
+        with open(args.washi_roles) as f:
+            washi_roles = json.load(f).get("roles") or {}
+        background = washi_roles.get("background", "")
+        if re.fullmatch(r"#[0-9A-Fa-f]{6}", background) and (Hct.from_int(hex_to_argb(background)).tone < 50) == bool(darkmode):
+            for key, value in washi_roles.items():
+                if re.fullmatch(r"#[0-9A-Fa-f]{6}", str(value)):
+                    material_colors[key] = value
+    except (OSError, ValueError):
+        pass
 
 # Terminal Colors
 if args.termscheme is not None:
@@ -997,12 +1049,12 @@ if args.termscheme is not None:
                 grey = Hct.from_hct(bg_hct.hue, grey_chroma, start_tone).to_int()
                 term_colors[color] = argb_to_hex(ensure_contrast(grey, bg_argb, ratio, darkmode))
 
-        # Bright semantic colors: lighter contrast requirement (3.5:1) to preserve vibrancy
+        # Brights: 3.5:1 in dark; on paper they are text (strings, types, ls) and need 4.5:1.
         bright_colors = ["term9", "term10", "term11", "term12", "term13", "term14"]
         for color in bright_colors:
             if color in term_colors:
                 fg_argb = hex_to_argb(term_colors[color])
-                adjusted = ensure_contrast(fg_argb, bg_argb, 3.5, darkmode)
+                adjusted = ensure_contrast(fg_argb, bg_argb, 3.5 if darkmode else 4.5, darkmode)
                 term_colors[color] = argb_to_hex(adjusted)
 
     if darkmode and "term0" in term_colors and "term15" in term_colors:
@@ -1129,6 +1181,10 @@ def build_palette_json():
         "success_container": material_colors.get("successContainer", ""),
         "on_success_container": material_colors.get("onSuccessContainer", ""),
     }
+    # iRiS's filled alert (badges): a pigment that is a shape, not text. Absent outside iRiS; readers fall back to error.
+    if material_colors.get("errorFill"):
+        palette["error_fill"] = material_colors["errorFill"]
+        palette["on_error_fill"] = material_colors.get("onErrorFill", "")
     return palette
 
 
@@ -1160,6 +1216,9 @@ theme_meta = {
     "blend_bg_fg": args.blend_bg_fg,
     "surface_seed": ("#" + args.surface_seed.strip().lstrip("#").lower())
     if args.surface_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.surface_seed.strip())
+    else "",
+    "accent_seed": ("#" + args.accent_seed.strip().lstrip("#").lower())
+    if args.accent_seed and re.fullmatch(r"#?[0-9A-Fa-f]{6}", args.accent_seed.strip())
     else "",
     "generated_by": "generate_colors_material.py",
 }
@@ -1457,17 +1516,4 @@ if args.render_templates:
     if rendered_count > 0:
         print(
             f"[render-templates] Rendered {rendered_count} template(s)", file=sys.stderr
-        )
-
-    # SDDM sync post-hook: run only if script and theme exist
-    sddm_sync = os.path.expanduser("~/.local/bin/sync-pixel-sddm.py")
-    sddm_theme = "/usr/share/sddm/themes/ii-pixel"
-    active_dm = Path("/etc/systemd/system/display-manager.service").resolve().name
-    if active_dm == "sddm.service" and os.path.isfile(sddm_sync) and os.path.isdir(sddm_theme):
-        import subprocess
-
-        subprocess.Popen(
-            ["python3", sddm_sync],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
         )

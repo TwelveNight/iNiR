@@ -1360,72 +1360,43 @@ rules = [
 
 
 def generate_fuzzel_config(colors, output_path):
-    """Generate Fuzzel launcher theme from material colors"""
-    bg = colors.get("background", colors.get("term0", "#282828"))
-    fg = colors.get("onBackground", colors.get("term15", "#EBDBB2"))
-    surface_var = colors.get("surfaceVariant", colors.get("term8", "#928374"))
-    on_surface_var = colors.get("onSurfaceVariant", colors.get("term7", "#A89984"))
-    primary = colors.get("primary", "#458588")
+    """Fuzzel colours from the app palette; every key is set, or fuzzel paints its own Solarized defaults."""
 
-    # Strip '#' and add 'ff' alpha
-    def hex_alpha(c):
-        return c[1:] + "ff" if c.startswith("#") else c + "ff"
+    def rgba(key, fallback):
+        return (colors.get(key) or colors.get(fallback) or "#808080").lstrip("#")[:6].lower() + "ff"
 
-    def hex_alpha_dim(c):
-        return c[1:] + "dd" if c.startswith("#") else c + "dd"
-
+    fg = rgba("app_foreground", "on_surface")
+    subtext = rgba("app_subtext", "on_surface_variant")
+    accent = rgba("app_accent", "primary")
     config = f"""[colors]
-background={hex_alpha(bg)}
-text={hex_alpha(fg)}
-selection={hex_alpha(surface_var)}
-selection-text={hex_alpha(on_surface_var)}
-border={hex_alpha_dim(surface_var)}
-match={hex_alpha(primary)}
-selection-match={hex_alpha(primary)}
+background={rgba("app_popover_bg", "surface_container")}
+text={fg}
+input={fg}
+prompt={accent}
+placeholder={subtext}
+message={subtext}
+counter={subtext}
+match={accent}
+selection={rgba("app_selection", "secondary_container")}
+selection-text={rgba("app_on_selection", "on_secondary_container")}
+selection-match={accent}
+border={rgba("app_border_subtle", "outline_variant")}
 """
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w") as f:
-        f.write(config)
-    print(f"\u2713 Generated Fuzzel theme")
-
-
-def generate_pywalfox_config(colors, output_path):
-    """Generate Pywalfox-compatible JSON from material colors"""
-    import json
-
-    bg = colors.get("background", colors.get("term0", "#282828"))
-    fg = colors.get("onBackground", colors.get("term15", "#EBDBB2"))
-    primary = colors.get("primary", "#458588")
-
-    # Build 16-color palette from term colors
-    palette = {}
-    for i in range(16):
-        palette[f"color{i}"] = colors.get(f"term{i}", "#000000")
-
-    # Read wallpaper path if available
-    wallpaper = ""
-    wp_path = os.path.expanduser(
-        "~/.local/state/quickshell/user/generated/wallpaper/path.txt"
+    path = Path(output_path)
+    if not path.exists() or path.read_text() != config:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(config)
+    # fuzzel reads only fuzzel.ini: the theme reaches it through an include at the top (main section)
+    if os.environ.get("INIR_INSTALL_SHARED_APP_CONFIGS", "false") != "true":
+        print("✓ Updated shared colors; preserved application preferences")
+        return
+    ensure_line_in_file(
+        path.parent / "fuzzel.ini",
+        f"include={path}",
+        check_pattern=rf"(?m)^\s*include\s*=.*{re.escape(path.name)}",
+        at_top=True,
     )
-    if os.path.exists(wp_path):
-        with open(wp_path) as f:
-            wallpaper = f.read().strip()
-
-    pywalfox_data = {
-        "wallpaper": wallpaper,
-        "alpha": "100",
-        "colors": palette,
-        "special": {
-            "background": bg,
-            "foreground": fg,
-            "cursor": primary,
-        },
-    }
-
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w") as f:
-        json.dump(pywalfox_data, f, indent=2)
-    print(f"\u2713 Generated Pywalfox colors")
+    print("\u2713 Generated Fuzzel theme")
 
 
 def main():
@@ -1472,6 +1443,7 @@ def main():
             "btop",
             "lazygit",
             "yazi",
+            "fuzzel",
             "all",
         ],
         default=None,
@@ -1519,6 +1491,7 @@ def main():
         "btop",
         "lazygit",
         "yazi",
+        "fuzzel",
     ]
     if args.terminals is None:
         terminals = [] if (args.zed or args.vscode) else all_terminals
@@ -1593,6 +1566,9 @@ def main():
         generate_yazi_config(
             colors, f"{config_home}/yazi/flavors/ii-auto.yazi/flavor.toml"
         )
+
+    if "fuzzel" in terminals:
+        generate_fuzzel_config(colors, f"{config_home}/fuzzel/fuzzel_theme.ini")
 
     if args.zed:
         generate_zed_config(

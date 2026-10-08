@@ -295,6 +295,18 @@ Super+Alt+L allow-when-locked=true { spawn "inir" "lock" "activate"; }
 
 ---
 
+### loginScreen
+
+The login screen you see after starting the computer. It copies the lock screen and follows your colours.
+
+| Function | Description |
+|----------|-------------|
+| `set <look>` | `auto` (the iRiS lock while you use iRiS, Classic otherwise), `classic` or `iris` |
+| `status` | Print the choice and the look it gives (e.g. `auto (iris)`), or `not installed` |
+| `sync` | Copy the current lock, colours and wallpaper to the login screen now |
+
+---
+
 ### memory
 
 Memory pressure monitoring for JSGCHeap accumulation (Qt V4 memfd leak). Notifies user when memory is high, lets them decide when to restart.
@@ -521,6 +533,7 @@ Wallpaper picker with grid, coverflow and compact launcher styles.
 | `preview <path>` | Show a wallpaper on the desktop without applying it: no config write, no recoloring |
 | `cancelPreview` | Drop the preview and go back to the applied wallpaper |
 | `kind <name>` | Show only one kind of wallpaper in the library: `all`, `still`, `live` (videos) or `gif`. iRiS only; the filter also sits beside the search field whenever the folder holds more than one kind |
+| `move <step>` | Move the gallery's selection by that many tiles, as the arrow keys do (negative goes back); the ring and the row glide and the desktop preview follows. iRiS only, while the picker is open |
 | `browse <source> <query>` | Open the picker on a source — `library`, `wallhaven` or `live` (anime live wallpapers) — with a search, a folder to open (`~/Videos`), or `-` for none. Sources are an iRiS feature; other families just open the picker |
 | `status` | Return picker style, open surface, target monitor and selection target as JSON |
 
@@ -878,6 +891,7 @@ iRiS bar and Island design. Available while the iRiS bar is enabled.
 | `morph` | Set how iRiS morphs: `direct`, `liquid`, `glide`, `snap`, `elastic` or `instant` |
 | `set` | Set any iRiS option by path, e.g. `iris.appearance.theme.pieceShape squircle` or `iris.bubbles.scale 120` (values are JSON when they parse) |
 | `adaptive` | How much the wallpaper shapes iRiS, `0`-`100`; any other word prints what was read from the wallpaper |
+| `tokens` | JSON with the colours iRiS resolved for the current look and the contrast of each text, accent and fill on the surface it sits on (worst case over glass), plus the ones below their target |
 | `spotlight` | Open Spotlight with a query already typed, e.g. `firefox` or `12*7` (empty for suggestions); while it is open, replaces the query |
 | `spotlightClose` | Close Spotlight |
 | `orbit` | Open Orbit with a search already typed, e.g. `firefox` (empty for all the workspaces) |
@@ -1016,6 +1030,7 @@ Shell update checker. Monitors the git repo for new commits and shows an update 
 | `dismiss` | Dismiss update notification |
 | `undismiss` | Un-dismiss update notification |
 | `diagnose` | Dump update state as JSON |
+| `simulate <state>` | `on` fakes a pending update to see the bubble, card and notification, `off` clears it; git and config are untouched and Update only plays a pretend run in the terminal. For testing |
 
 ---
 
@@ -1028,6 +1043,7 @@ Notification management.
 | `test` | Send test notifications |
 | `clearAll` | Dismiss all notifications |
 | `toggleSilent` | Toggle Do Not Disturb mode |
+| `invokeAction <identifier>` | Press a button on the newest notification that has it, as a click would (e.g. `open` on a new iNiR notice) |
 
 ---
 

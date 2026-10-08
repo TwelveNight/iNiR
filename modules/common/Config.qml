@@ -175,6 +175,12 @@ Singleton {
         root.configChanged();
     }
 
+    // A value shown while a control is being dragged: its consumers follow it, but nothing is written and the
+    // revision stays (every Settings row re-reads on a revision). The drag ends with setNestedValue.
+    function previewNestedValue(nestedKey, value) {
+        _applyNestedKey(nestedKey, value);
+    }
+
     // Batch multiple key-value pairs, emitting configChanged only once.
     // Usage: Config.setNestedValues({ "a.b.c": 1, "x.y": "hello" })
     function setNestedValues(updates) {
@@ -1067,15 +1073,16 @@ Singleton {
                     property bool enableZed: true
                     property bool enableVSCode: true
                     property bool enableChrome: true
-                    property bool enableSpicetify: false
+                    property bool enableFirefox: true
+                    property bool enableSpicetify: true
                     property string spicetifyTheme: "Inir"
-                    property bool enableSteam: false
+                    property bool enableSteam: true
                     property bool enablePearDesktop: true
                     property bool enableLimusic: false
                     property bool enableClaudeCode: false
                     property bool enableOpenCode: false
                     property bool enableNeovim: false
-                    property bool enableCava: false
+                    property bool enableCava: true
                     property real colorStrength: 1.0
                     property JsonObject vscodeEditors: JsonObject {
                         property bool code: true           // Official VSCode
@@ -2296,7 +2303,7 @@ Singleton {
                 }
                 property string wallpaperPath: ""
                 property string thumbnailPath: ""
-                property string fillMode: "fill" // "fill", "fit", "center", "tile"
+                property string fillMode: "fill" // "fill", "fit", "stretch", "tile", "center" or "span" (one picture across every screen); Wallpapers.fillMode
                 property bool enableAnimation: true // Enable animated wallpapers (video/gif). When disabled, shows thumbnail instead (better performance)
                 property bool pauseAnimationOnBattery: true // Freeze video/gif wallpapers while on battery power (all surfaces, both families)
                 property string videoPause: "covered" // when a live wallpaper stops decoding: "never", "fullscreen" or "covered" (tiled windows span the output)
@@ -2962,6 +2969,7 @@ Singleton {
                     property bool requirePasswordToPower: false
                 }
                 property bool materialShapeChars: true
+                property string loginScreen: "auto" // SDDM look: "auto" (iris under the iRiS family, else classic), "classic" or "iris"
                 property bool enableAnimation: false // Play video/GIF wallpapers on lock screen (default: show first frame)
                 property JsonObject dim: JsonObject {
                     property bool enable: false
@@ -3865,6 +3873,7 @@ Singleton {
                 property bool enabled: true
                 property int checkIntervalMinutes: 360
                 property string dismissedCommit: ""
+                property real dismissedAt: 0
                 property string lastNotifiedCommit: ""
                 // Days before a still-pending update is raised again. 0 tells it once and
                 // then stays quiet until the next upstream commit.
@@ -3980,16 +3989,31 @@ Singleton {
                     property string morph: "direct" // IrisStyle.morphStyles: direct, liquid, glide, snap, elastic, instant
                     property string accent: "blue" // "blue", "mint", "rose", "lilac" or "wallpaper"
                     property string scheme: "auto" // "auto" (follows the system), "dark", "ink" or "light"
+                    property string language: "iris" // the palette's style: "iris" (iRiS's own), "washi" (paper and pigment) or "material" (Material You)
+                    property string variant: "tonalSpot" // Material You's scheme: "tonalSpot", "vibrant", "expressive", "fidelity" or "monochrome"
+                    property string inkStyle: "washi" // Ink's own style: "washi" (paper and sumi, whatever the style) or "style" (follows language)
+                    property string darkStyle: "style" // Dark's: "style" (the style's own night) or "ink" (washi, a sumi night paper)
                     property bool followTheme: true // with a colour theme chosen, the shell wears its accent, highlight and material
                     property bool materialForApps: true // with the wallpaper colour theme, terminals and apps sit on the shell's material
+                    property bool accentForApps: true // with the wallpaper colour theme, apps take the shell's own accent when it has one
                     property string controlPlate: "none" // rows of round controls: "none", "veil", "glass" or "solid" (IrisControlPlate)
+                    property string texture: "solid" // what the material is drawn as: "solid" or "afterglow" (IrisField.frag)
+                    // Afterglow: grade "dusk", "cyber", "fog" or "wallpaper"; the rest 0..100 %; wallpaper grades the desktop too.
+                    property JsonObject afterglow: JsonObject {
+                        property string grade: "dusk"
+                        property int atmosphere: 60
+                        property int chrome: 65
+                        property int bloom: 50
+                        property int signal: 35
+                        property bool wallpaper: true
+                    }
                     // Per scheme: tone lifts or dims the material (-30..30), colour is how strong accents read (0..100 %),
                     // widgets is how colourful the desktop widgets read (40..160 %), lume makes bodies frost the wallpaper
-                    // shows through instead of solid.
+                    // shows through instead of solid; warmth (0..100) is how much washi fibre the paper (or Dark's ink night) carries.
                     property JsonObject tune: JsonObject {
-                        property JsonObject dark: JsonObject { property int tone: 0; property int colour: 100; property int widgets: 100; property bool lume: false }
-                        property JsonObject ink: JsonObject { property int tone: 0; property int colour: 100; property int widgets: 120; property bool lume: true }
-                        property JsonObject light: JsonObject { property int tone: 0; property int colour: 85; property int widgets: 110; property bool lume: true }
+                        property JsonObject dark: JsonObject { property int tone: 0; property int warmth: 20; property int colour: 100; property int widgets: 100; property bool lume: false }
+                        property JsonObject ink: JsonObject { property int tone: 0; property int warmth: 50; property int colour: 100; property int widgets: 100; property bool lume: true }
+                        property JsonObject light: JsonObject { property int tone: -8; property int warmth: 38; property int colour: 85; property int widgets: 110; property bool lume: true }
                     }
                     property string highlight: "orange" // "orange", "yellow", "red", "pink", "green", "accent" or "wallpaper"
                     property JsonObject anime: JsonObject {
@@ -4448,7 +4472,7 @@ Singleton {
                     property list<string> sections: ["connectivity", "media", "shortcuts", "levels", "notifications"]
                     property string preset: "iris"
                     property int columns: 4
-                    property bool labels: false
+                    property bool labels: true
                     property list<string> modules: ["platter", "media", "darkMode", "nightLight", "levels", "idle", "snip", "devices", "record", "notifications"]
                     // Per-module shapes, as "<id>:<columns>x<rows>" ("F" = full width).
                     property list<string> sizes: ["devices:2x1", "record:2x1"]

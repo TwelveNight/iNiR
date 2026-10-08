@@ -138,6 +138,12 @@ QtObject {
     }
     function pieceInsetOn(side: string): real { return root.band + root.pieceGapOn(side) }
     function pieceDepthOn(side: string): real { return root.pieceGapOn(side) + root.pieceBand }
+    // An announcement is never switched on: like Material's bar indicator it shows whenever its state is there.
+    readonly property var announcements: ["shellUpdate"]
+    property var availableExtras: null
+    function extraOn(extras: var, id: string): bool {
+        return root.announcements.includes(id) || Boolean(extras?.[id]?.enable ?? false)
+    }
     function edgeOf(place: string): string {
         if (place.startsWith("edge:")) return ["top", "bottom", "left", "right"].includes(place.slice(5)) ? place.slice(5) : ""
         if (place === "top-left" || place === "top-right") return "top"
@@ -154,7 +160,10 @@ QtObject {
         }
         for (const id of ["left", "right", "utility"]) note(o?.[id]?.place ?? "island")
         const extras = o?.extras ?? ({})
-        for (const id of Object.keys(extras)) if (extras[id]?.enable) note(extras[id]?.place)
+        // A piece that has nothing to show (no update, no player, an empty tray) is not on its edge: the edge
+        // reserves nothing for it. IrisPieces feeds availableExtras (it imports this singleton, not the other way).
+        for (const id of Object.keys(extras))
+            if (root.extraOn(extras, id) && (root.availableExtras === null || root.availableExtras.includes(id))) note(extras[id]?.place)
         for (const app of (o?.apps ?? [])) if (app) note(app?.place)
         return edges
     }

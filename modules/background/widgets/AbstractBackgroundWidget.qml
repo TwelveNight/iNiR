@@ -1572,7 +1572,15 @@ AbstractWidget {
         z: 202
         widget: root
         visible: GlobalStates.widgetEditMode && root.irisFaced && root.irisSizeChoices.length > 1 && !root.locked
-            && (root.editSelected || widgetEditHover.hovered || root._irisSizing)
+            && (root.editSelected || root._gripHover || root._irisSizing)
+    }
+    // The grip reads the hover a tick late: hiding it under the pointer re-delivers hover at once and
+    // re-entered its own visibility (a binding loop while editing).
+    property bool _gripHover: false
+    Timer { id: gripHoverSettle; interval: 0; onTriggered: root._gripHover = widgetEditHover.hovered }
+    Connections {
+        target: root.irisFaced ? widgetEditHover : null
+        function onHoveredChanged(): void { gripHoverSettle.restart() }
     }
 
     function commitIrisSize(size: string): void {
@@ -1761,7 +1769,8 @@ AbstractWidget {
         ?? (root._manifestKeyList.length > 0 ? root._autoPopoverComponent : null)
     property string _quickTab: "widget"
     readonly property string identityGlyph: DesktopWidgetIdentity.glyph(root.configEntryName)
-    readonly property color identityTint: DesktopWidgetIdentity.tint(root.configEntryName)
+    readonly property color identityTint: root.widgetIrisFamily ? IrisStyle.identityOf(DesktopWidgetIdentity.tint(root.configEntryName))
+        : DesktopWidgetIdentity.tint(root.configEntryName)
     // The page that holds position, lock and removal: "arrange" in an iRiS face's sheet, "layout" otherwise.
     readonly property string _arrangeTab: root.irisFaced ? "arrange" : "layout"
     readonly property Component _effectivePopover: root.irisFaced ? _irisPopoverRef : root._semanticPalettePopover
@@ -2266,9 +2275,9 @@ AbstractWidget {
     function setIrisOption(key: string, value: var): void {
         root._setOutputValue("iris." + key, value)
     }
+    // The sheet's own slider: not a gesture, so the sheet stays under the pointer that drags it.
     function previewIrisScale(percent: int): void {
-        root._resizePreviewValues = ({ widgetScale: percent })
-        root._irisSizing = true
+        root.previewIrisValue("widgetScale", percent)
     }
     function previewIrisValue(key: string, value: var): void {
         const preview = ({})
@@ -2289,9 +2298,8 @@ AbstractWidget {
         }
     }
     function commitIrisScale(percent: int): void {
-        if (percent !== Math.round(root._baseScale * 100) || root._irisSizing)
-            root._setOutputValue("widgetScale", percent)
-        root.commitIrisSize(root.irisSize)
+        root.commitIrisValue("widgetScale", percent)
+        _irisSizeSettle.restart()
     }
 
     readonly property Item irisFaceView: irisFaceLoader.item

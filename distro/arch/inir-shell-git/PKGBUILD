@@ -15,6 +15,7 @@ depends=(
   fish
   grim
   jq
+  go
   kirigami
   libnotify
   networkmanager
@@ -24,13 +25,12 @@ depends=(
   pipewire-alsa
   pipewire-pulse
   playerctl
-  polkit-gnome
+  polkit
   python
   qt6-5compat
   qt6-imageformats
   qt6-multimedia
   qt6-multimedia-ffmpeg
-  qt6-quicktimeline
   quickshell
   rsync
   slurp

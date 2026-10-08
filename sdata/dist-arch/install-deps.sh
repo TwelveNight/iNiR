@@ -29,7 +29,6 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [git]="git"
     [python3]="python"
     [wlsunset]="wlsunset"
-    [dunstify]="dunst"
     [fish]="fish"
     [magick]="imagemagick"
     [swaylock]="swaylock"
@@ -39,7 +38,6 @@ if [[ -n "${ONLY_MISSING_DEPS:-}" ]]; then
     [cliphist]="cliphist"
     [wl-copy]="wl-clipboard"
     [wl-paste]="wl-clipboard"
-    [fuzzel]="fuzzel"
     [hyprpicker]="hyprpicker"
     [songrec]="songrec"
     [trans]="translate-shell"
@@ -278,8 +276,8 @@ OFFICIAL_PACKAGES=(
   # File manager
   nautilus
   
-  # Polkit agent (needed for auth dialogs — gnome agent works universally)
-  polkit-gnome
+  # Polkit, for the shell's own authentication dialogs
+  polkit
   
   # Icon themes - fallbacks from official repos (always available)
   hicolor-icon-theme
@@ -302,7 +300,6 @@ OFFICIAL_PACKAGES=(
   # SDDM login screen (users without another DE need this to log in)
   sddm
   qt6-svg
-  qt6-virtualkeyboard
   qt6-multimedia-ffmpeg
 
   # Video wallpaper support (thumbnail + SDDM background extraction)

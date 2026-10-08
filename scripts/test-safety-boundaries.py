@@ -203,13 +203,16 @@ second=$?
         self.assertNotIn("-Sy", (self.base / "commands").read_text())
 
     def test_chrome_never_prepares_system_policy_permissions(self):
-        source = (ROOT / "scripts/colors/apply-chrome-theme.sh").read_text()
-        function = source.split("ensure_policy_dir_writable() {", 1)[1].split("# ── Resolve theme color", 1)[0]
+        source = (ROOT / "scripts/colors/modules/40-chrome.sh").read_text().split('\nmain "$@"', 1)[0]
+        source = source.replace('source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/module-runtime.sh"',
+                                'source "$1/scripts/colors/lib/module-runtime.sh"')
         self.env["INIR_INSTALL_SHARED_APP_CONFIGS"] = "true"
-        result = self.shell('''log() { :; }
-elevate() { touch "$TMPDIR/elevated"; }
-ensure_policy_dir_writable() {''' + function + '\nensure_policy_dir_writable "$TMPDIR/new-policies" fixture\n')
-        self.assertNotEqual(result.returncode, 0)
+        result = self.shell(source + '''
+sudo() { touch "$TMPDIR/elevated"; return 99; }
+pkexec() { touch "$TMPDIR/elevated"; return 99; }
+write_policy "$TMPDIR/new-policies" "#aabbcc"
+''')
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.base / "new-policies").exists())
         self.assertFalse((self.base / "elevated").exists())
 

@@ -28,6 +28,7 @@ class PersonalOverlayTests(unittest.TestCase):
         self.env.pop("INIR_CONFIG_DIR", None)
         self.env.pop("INIR_STATE_DIR", None)
         self.env.pop("INIR_VENV", None)
+        self.env.pop("INIR_RUNTIME_DIR", None)
         self.env["REPO_ROOT"] = str(ROOT)
 
     def bash(self, script):
@@ -321,6 +322,8 @@ install-python-packages
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)
         setup = fixture / "setup"
+        for name in ["inir-hyprland-watch.service", "hyprland-session-lifetime.conf", "autostart-desktop-ready.conf"]:
+            entry.with_name(name).write_text((ROOT / "scripts/personal" / name).read_text())
         setup.write_text('''#!/bin/sh
 printf "%s\\n" "$@" > "$MOCK_SETUP_LOG"
 printf 'environment {}\\n' > "$XDG_CONFIG_HOME/niri/config.kdl"
@@ -533,7 +536,7 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         module.configure_hyprland_session(self.config)
         self.assertEqual(target.read_bytes(), (ROOT / "scripts/personal/hyprland-session.target").read_bytes())
         self.assertIn("BindsTo=graphical-session.target", target.read_text())
-        self.assertIn("PropagatesStopTo=graphical-session.target", target.read_text())
+        self.assertNotIn("PropagatesStopTo=graphical-session.target", target.read_text())
         self.assertIn("ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland", target.read_text())
         target.write_text("my existing session unit")
         module.configure_hyprland_session(self.config)

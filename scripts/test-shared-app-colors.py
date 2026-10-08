@@ -108,6 +108,18 @@ style = 'bold primary'
             self.terminals("starship")
             self.assertEqual(path.read_text(), other)
 
+    def test_fuzzel_preserves_base_config(self):
+        path = self.write("fuzzel/fuzzel.ini", '[main]\nfont=Personal Font:size=13\ninclude=personal-theme.ini\n[border]\nwidth=9\n')
+        original = path.read_bytes()
+        for _ in range(2):
+            self.terminals("fuzzel")
+            self.assertEqual(path.read_bytes(), original)
+            theme = self.config / "fuzzel/fuzzel_theme.ini"
+            self.assertTrue(theme.is_file(), "Fuzzel output must honor XDG_CONFIG_HOME")
+            self.assertIn("[colors]", theme.read_text())
+            self.assertIn("aabbcc", theme.read_text())
+            self.assertFalse((self.base / ".config").exists())
+
     def gtk_fixture(self):
         settings = {}
         for version in (3, 4):
@@ -207,15 +219,15 @@ print(json.dumps([str(theme_template_output(p)) for p in sys.argv[2:]]))
                                              str(self.config / "fuzzel/fuzzel_theme.ini")])
 
     def chrome_call(self, directory):
-        # Execute the real function body with synthetic prefs/policy paths.
-        source = (ROOT / "scripts/colors/apply-chrome-theme.sh").read_text()
-        function = source.split("apply_to_browser() {", 1)[1].split("# ── Resolve variant", 1)[0]
-        script = '''log() { :; }
-fix_preferences() { printf 'unexpected prefs write\\n' >> "$MOCK_ACTIONS"; }
-ensure_policy_dir_writable() { return 0; }
-SCRIPT_DIR="$1/scripts/colors"
-apply_to_browser() {''' + function + '\napply_to_browser fixture-browser "$2" "$3" "#aabbcc" dark tonal_spot\n'
-        subprocess.run(["bash", "-euc", script, "fixture", str(ROOT), str(directory), str(self.base / "browser")],
+        self.browser_module("40-chrome.sh", 'write_policy "$2" "#aabbcc"', directory)
+
+    def browser_module(self, name, command, *arguments):
+        # Load production definitions, then replace discovery with fixture paths.
+        # Never let the real installed-browser registry reach /etc in a test.
+        source = (ROOT / "scripts/colors/modules" / name).read_text().split('\nmain "$@"', 1)[0]
+        source = source.replace('source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/module-runtime.sh"',
+                                'source "$1/scripts/colors/lib/module-runtime.sh"')
+        subprocess.run(["bash", "-euc", source + "\n" + command, "fixture", str(ROOT), *map(str, arguments)],
                        env=self.env, check=True, capture_output=True, text=True)
 
     def test_chrome_updates_only_color_and_preserves_invalid_policy(self):
@@ -227,6 +239,11 @@ apply_to_browser() {''' + function + '\napply_to_browser fixture-browser "$2" "$
         self.chrome_call(directory)
         expected = dict(original, BrowserThemeColor="#aabbcc")
         self.assertEqual(json.loads(policy.read_text()), expected)
+        written = policy.read_bytes()
+        modified = policy.stat().st_mtime_ns
+        self.chrome_call(directory)
+        self.assertEqual(policy.read_bytes(), written)
+        self.assertEqual(policy.stat().st_mtime_ns, modified, "unchanged policies must not trigger reloads")
         policy.write_text("{invalid policy}")
         self.chrome_call(directory)
         self.assertEqual(policy.read_text(), "{invalid policy}")
@@ -234,7 +251,83 @@ apply_to_browser() {''' + function + '\napply_to_browser fixture-browser "$2" "$
         self.chrome_call(directory)
         self.assertEqual(json.loads(policy.read_text()), {"BrowserThemeColor": "#aabbcc"})
         self.assertFalse((self.base / "browser").exists())
-        self.assertNotIn("unexpected", (self.base / "actions.log").read_text())
+        self.assertFalse((self.base / "actions.log").exists(), "policy writes must not launch browsers or request elevation")
+
+    def test_chrome_missing_directories_invalid_colors_and_policy_links_are_preserved(self):
+        missing = self.base / "missing-policies"
+        self.chrome_call(missing)
+        self.assertFalse(missing.exists())
+        directory = self.base / "policies"
+        directory.mkdir()
+        target = self.write("chromium/Default/Preferences", '{"personal":"keep"}')
+        policy = directory / "ii-theme.json"
+        policy.symlink_to(target)
+        self.chrome_call(directory)
+        self.assertTrue(policy.is_symlink())
+        self.assertEqual(target.read_text(), '{"personal":"keep"}')
+        self.browser_module("40-chrome.sh", 'write_policy "$2" "invalid" || test "$?" -eq 1', directory)
+        self.assertEqual(target.read_text(), '{"personal":"keep"}')
+        self.assertFalse((self.base / "actions.log").exists())
+
+    def test_chrome_module_preserves_profiles_disabled_policies_and_permissions(self):
+        directory = self.base / "policies"
+        directory.mkdir(mode=0o750)
+        policy = directory / "ii-theme.json"
+        policy.write_text('{"BackgroundModeEnabled":true,"UnrelatedPolicy":"keep"}')
+        policy.chmod(0o600)
+        prefs = self.write("chromium/Default/Preferences", '{"browser":{"theme":{"color_scheme":0}},"personal":"keep"}')
+        original = prefs.read_bytes()
+        self.env["INIR_INSTALL_SHARED_APP_CONFIGS"] = "true"
+        (self.generated / "app-palette.json").write_text('{"app_headerbar_bg":"#112233"}')
+        command = '''fixture_dir="$2" fixture_data="$3"
+installed_chromium_browsers() { printf '%s|%s|fixture-browser\\n' "$fixture_dir" "$fixture_data"; }
+main
+'''
+        self.browser_module("40-chrome.sh", command, directory, prefs.parent.parent)
+        self.assertEqual(prefs.read_bytes(), original)
+        self.assertEqual(json.loads(policy.read_text()), {"BackgroundModeEnabled": True, "UnrelatedPolicy": "keep", "BrowserThemeColor": "#112233"})
+        self.assertEqual(policy.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o750)
+        self.write("inir/config.json", '{"appearance":{"wallpaperTheming":{"enableChrome":false}}}')
+        original_policy = policy.read_bytes()
+        self.browser_module("40-chrome.sh", command, directory, prefs.parent.parent)
+        self.assertEqual(policy.read_bytes(), original_policy)
+        self.assertEqual(prefs.read_bytes(), original)
+        self.assertFalse((self.base / "actions.log").exists())
+
+    def test_firefox_generates_colors_without_touching_any_profile(self):
+        profile = self.write("mozilla/firefox/personal.default/user.js", 'user_pref("personal", true);\n')
+        self.write("mozilla/firefox/profiles.ini", '[Profile0]\nPath=personal.default\nIsRelative=1\n')
+        # Also preserve profiles that do not yet have user.js, and absolute paths.
+        other = self.base / "absolute-profile"
+        other.mkdir()
+        with (self.config / "mozilla/firefox/profiles.ini").open("a") as ini:
+            ini.write(f'[Profile1]\nPath={other}\nIsRelative=0\n')
+        original = profile.read_bytes()
+        palette = dict.fromkeys(["app_headerbar_bg", "app_surface_popup", "app_foreground", "app_subtext",
+                                "app_on_surface_popup", "app_selection", "app_on_selection", "app_accent",
+                                "app_on_accent", "app_border_subtle"], "#aabbcc")
+        (self.generated / "app-palette.json").write_text(json.dumps(palette))
+        self.env["INIR_INSTALL_SHARED_APP_CONFIGS"] = "true"
+        snippet = self.generated / "firefox-colors.js"
+        written = b""
+        for enabled in (True, False):
+            self.write("inir/config.json", json.dumps({"appearance": {"wallpaperTheming": {"enableFirefox": enabled}}}))
+            self.run_script("scripts/colors/modules/45-firefox.sh")
+            self.assertEqual(profile.read_bytes(), original)
+            self.assertFalse((other / "user.js").exists())
+            if enabled:
+                self.assertIn('user_pref("ui.accentcolor", "#aabbcc")', snippet.read_text())
+                written = snippet.read_bytes()
+            else:
+                self.assertEqual(snippet.read_bytes(), written)
+
+    def test_firefox_invalid_palette_preserves_last_generated_output(self):
+        snippet = self.generated / "firefox-colors.js"
+        snippet.write_text("last valid generated colours\n")
+        (self.generated / "app-palette.json").write_text('{"app_headerbar_bg":"bad colour"}')
+        self.run_script("scripts/colors/modules/45-firefox.sh")
+        self.assertEqual(snippet.read_text(), "last valid generated colours\n")
 
     def test_pear_refresh_does_not_select_a_theme_or_enable_debugging(self):
         self.executable("pear-desktop", '#!/bin/sh\n# wrapper reads pear-flags.conf\nexit 1\n')

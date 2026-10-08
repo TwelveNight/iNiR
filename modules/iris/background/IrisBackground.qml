@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtMultimedia
 import Quickshell
 import Quickshell.Wayland
 import qs
@@ -10,6 +9,7 @@ import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.iris.components
+import qs.modules.iris.style
 
 Variants {
     id: root
@@ -21,16 +21,21 @@ Variants {
 
         readonly property string monitorName: WallpaperListener.getMonitorName(panel.modelData)
         readonly property string configuredPath: Wallpapers.currentMainWallpaperPath(panel.monitorName)
-        readonly property string previewPath: Wallpapers.internalPreviewFor(panel.monitorName, panel.configuredPath)
+        readonly property string previewPath: Wallpapers.skwdBackendEnabled ? panel.configuredPath
+            : Wallpapers.internalPreviewFor(panel.monitorName, panel.configuredPath)
         readonly property bool video: Wallpapers.isVideoFile(panel.previewPath)
         readonly property bool gif: panel.previewPath.toLowerCase().endsWith(".gif")
         readonly property string effectivePath: panel.video ? Wallpapers.stillUrlFor(panel.previewPath) : panel.previewPath
         readonly property bool motion: (Config.options?.background?.enableAnimation ?? true)
             && !GlobalStates.screenLocked && !Appearance._gameModeActive && !Wallpapers.batteryPauseActive
             && Wallpapers.videoMotionAllowedOn(panel.monitorName)
-        readonly property bool externalWallpaper: Wallpapers.skwdBackendEnabled || AwwwBackend.supportsVisibleMainWallpaper(
-            panel.configuredPath, "fill", false, false)
-            && !Wallpapers.internalPreviewActive
+        // Scaling is Wallpapers.fillMode, as on every other desktop; awww only draws fill.
+        // These QML scaling modes do not control skwd's external desktop.
+        readonly property string fillMode: Wallpapers.fillMode
+        readonly property bool spanning: !Wallpapers.skwdBackendEnabled && panel.fillMode === "span"
+        readonly property bool externalWallpaper: Wallpapers.skwdBackendEnabled || (AwwwBackend.supportsVisibleMainWallpaper(
+            panel.configuredPath, panel.fillMode, false, false)
+            && !Wallpapers.internalPreviewActive)
         readonly property bool desktopMenuOpen: desktopMenu.active
 
         screen: modelData
@@ -46,46 +51,65 @@ Variants {
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"
 
-        Image {
+        // Fit and center leave bars: black, as awww draws them, never what awww still holds underneath.
+        Rectangle {
             anchors.fill: parent
-            visible: !panel.externalWallpaper && panel.effectivePath.length > 0
-            sourceSize: Qt.size(panel.width * (panel.screen?.devicePixelRatio ?? 1), panel.height * (panel.screen?.devicePixelRatio ?? 1))
-            source: {
-                const path = panel.effectivePath
-                if (!path || panel.externalWallpaper) return ""
-                return path.startsWith("file://") ? path : "file://" + FileUtils.trimFileProtocol(path)
+            color: "black" // iris-literal: letterbox bars, the same black awww pads with
+            visible: (panel.fillMode === "fit" || panel.fillMode === "center")
+                && !panel.externalWallpaper && panel.effectivePath.length > 0
+        }
+
+        // Span: this output's slice of one picture laid across the box around every screen.
+        Item {
+            id: canvas
+            x: panel.spanning ? Wallpapers.spanArea.x - panel.modelData.x : 0
+            y: panel.spanning ? Wallpapers.spanArea.y - panel.modelData.y : 0
+            width: panel.spanning ? Wallpapers.spanArea.width : parent.width
+            height: panel.spanning ? Wallpapers.spanArea.height : parent.height
+
+            Image {
+                anchors.fill: parent
+                visible: !panel.externalWallpaper && panel.effectivePath.length > 0
+                // Decoded at the size it is drawn; tile and center draw the picture at its own size.
+                sourceSize: panel.fillMode === "tile" || panel.fillMode === "center" ? Qt.size(0, 0)
+                    : Qt.size(canvas.width * (panel.screen?.devicePixelRatio ?? 1), canvas.height * (panel.screen?.devicePixelRatio ?? 1))
+                source: {
+                    const path = panel.effectivePath
+                    if (!path || panel.externalWallpaper) return ""
+                    return path.startsWith("file://") ? path : "file://" + FileUtils.trimFileProtocol(path)
+                }
+                fillMode: Wallpapers.imageFillFor(panel.fillMode)
+                asynchronous: true
+                cache: true
+                smooth: true
+                mipmap: false
             }
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: true
-            smooth: true
-            mipmap: false
-        }
 
-        AnimatedImage {
-            anchors.fill: parent
-            visible: panel.gif && status === AnimatedImage.Ready
-            source: panel.gif && !panel.externalWallpaper ? "file://" + FileUtils.trimFileProtocol(panel.previewPath) : ""
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: false
-            playing: visible && panel.motion
-        }
+            AnimatedImage {
+                anchors.fill: parent
+                visible: !panel.externalWallpaper && panel.gif && status === AnimatedImage.Ready
+                source: panel.gif && !panel.externalWallpaper ? "file://" + FileUtils.trimFileProtocol(panel.previewPath) : ""
+                fillMode: Wallpapers.imageFillFor(panel.fillMode)
+                asynchronous: true
+                cache: false
+                playing: visible && panel.motion
+            }
 
-        VideoCrossfader {
-            anchors.fill: parent
-            visible: panel.video
-            source: panel.video && !panel.externalWallpaper ? panel.previewPath : ""
-            fillMode: VideoOutput.PreserveAspectCrop
-            enableTransitions: Config.options?.background?.transition?.enable ?? true
-            transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800
-            shouldPlay: panel.motion
+            VideoCrossfader {
+                anchors.fill: parent
+                visible: panel.video && !panel.externalWallpaper
+                source: panel.video && !panel.externalWallpaper ? panel.previewPath : ""
+                fillMode: Wallpapers.videoFillFor(panel.fillMode)
+                enableTransitions: Config.options?.background?.transition?.enable ?? true
+                transitionBaseDuration: Config.options?.background?.transition?.duration ?? 800
+                shouldPlay: visible && panel.motion
+            }
         }
 
         Rectangle {
             anchors.fill: parent
             visible: !panel.externalWallpaper && panel.effectivePath.length === 0
-            color: Appearance.m3colors.m3background
+            color: IrisStyle.surfaceOpaque
         }
 
         MouseArea {

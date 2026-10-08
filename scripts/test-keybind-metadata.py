@@ -76,7 +76,9 @@ class MetadataTests(unittest.TestCase):
     def test_personal_wrappers_are_parsed_completely_and_consistently(self):
         path = ROOT / "defaults/niri/config.d/75-personal-binds.kdl"
         rows = metadata._read_bind_entries(path)
-        legacy = cheatsheet.parse_keybinds_from_block(path.read_text().split("binds {", 1)[1])
+        # Stop at the top-level block boundary; recent-windows has its own binds.
+        blocks, _ = cheatsheet.find_all_binds_blocks(path.read_text())
+        legacy = cheatsheet.parse_keybinds_from_block(blocks[0])
         self.assertEqual(len(rows), len(legacy))
         for row, old in zip(rows, legacy):
             with self.subTest(key=row["key_combo"]):

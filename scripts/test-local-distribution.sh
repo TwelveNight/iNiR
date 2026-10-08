@@ -2076,6 +2076,9 @@ if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-i
     step "Auto light/dark reads the wallpaper's brightness"
     python3 "$runtime_root/scripts/test-wallpaper-mode.py"
 
+    step "App theming runs on a machine without Steam or Spotify"
+    python3 "$runtime_root/scripts/test-applycolor-fingerprint.py"
+
     step "Terminal prose reads and nothing outshines it"
     python3 "$runtime_root/scripts/test-terminal-palette.py"
 
@@ -2087,6 +2090,9 @@ if command -v python3 &>/dev/null && [[ -f "$runtime_root/scripts/lib/generate-i
 
     step "iRiS performance contract"
     python3 "$runtime_root/scripts/test-iris-performance-contract.py"
+
+    step "iRiS Settings preview scenes"
+    python3 "$runtime_root/scripts/test-iris-preview-scenes.py"
 
     step "niri config rules and flags"
     python3 "$runtime_root/scripts/test-niri-config-rules.py"
@@ -2117,6 +2123,9 @@ python3 "$runtime_root/scripts/test-runtime-payload.py"
 
 step "shared application color boundaries"
 python3 "$runtime_root/scripts/test-shared-app-colors.py"
+
+step "skwd upstream renderer controls"
+python3 "$runtime_root/scripts/test-skwd-upstream-ui.py"
 
 step "maintenance and widget safety boundaries"
 python3 "$runtime_root/scripts/test-safety-boundaries.py"

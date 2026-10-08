@@ -1,10 +1,13 @@
 pragma Singleton
 
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import Quickshell.Services.SystemTray
 import qs.services
 import qs.services.deferred
 import qs.modules.common
+import qs.modules.iris.frame
 
 QtObject {
     id: root
@@ -53,6 +56,8 @@ QtObject {
     ]
     readonly property var slotIds: root.slots.map(piece => piece.id)
     readonly property var extraIds: root.extras.map(piece => piece.id)
+    readonly property var availableExtras: root.extraIds.filter(id => root.available(id))
+    readonly property Binding frameFeed: Binding { target: IrisFrame; property: "availableExtras"; value: root.availableExtras }
     readonly property var cardIds: root.extras.filter(piece => piece.card).map(piece => piece.id)
     readonly property string defaultPlace: "right"
     function labelOf(id: string): string {
@@ -60,6 +65,133 @@ QtObject {
     }
 
     readonly property bool hasPlayer: String(MprisController.titleOf(MprisController.activePlayer) ?? "").length > 0
+
+    // The music app an empty player offers to open, so "nothing playing" has a next step: the one you use most, from
+    // what stays on this machine. First the time each app has played (MPRIS, never a browser or a video player, kept
+    // in music-listening.json), then how long each was in front (Screen Time, when it is on), then the players people
+    // use most, in that order.
+    readonly property var knownMusicApps: ["spotify", "com.github.th-ch.youtube-music", "tidal-hifi", "cider",
+        "feishin", "io.bassi.Amberol", "org.gnome.Rhythmbox3", "org.kde.elisa", "org.strawberrymusicplayer.strawberry",
+        "org.gnome.Lollypop", "com.spotify.Client"]
+    // A music app: one of those, or a player for sound (Music, Audio or Player, or "music" in its name); never a browser
+    // or a video player, which "nothing playing" cannot hand anything to.
+    function isMusicApp(entry): bool {
+        if (!entry) return false
+        const kinds = Array.from(entry.categories ?? [])
+        if (kinds.includes("WebBrowser") || kinds.includes("Video")) return false
+        return root.knownMusicApps.includes(String(entry.id ?? "")) || kinds.includes("Music") || kinds.includes("Audio")
+            || kinds.includes("Player") || /music/i.test(String(entry.name ?? ""))
+    }
+    function musicEntry(appId: string): var {
+        const entry = appId.length > 0 ? AppSearch.lookupDesktopEntry(appId) : null
+        return root.isMusicApp(entry) ? entry : null
+    }
+    property var listening: ({})
+    readonly property FileView listeningStore: FileView {
+        path: Directories.stateUserPath + "/music-listening.json"
+        blockLoading: true
+        atomicWrites: true
+        printErrors: false
+    }
+    readonly property string playingApp: MprisController.activePlayer?.isPlaying
+        ? String(root.musicEntry(String(MprisController.activePlayer?.desktopEntry ?? ""))?.id ?? "") : ""
+    readonly property Timer listeningTick: Timer {
+        interval: 120000
+        repeat: true
+        running: root.playingApp.length > 0
+        onTriggered: {
+            const next = Object.assign({}, root.listening)
+            next[root.playingApp] = (next[root.playingApp] || 0) + 120
+            root.listening = next
+            root.listeningStore.setText(JSON.stringify(next))
+        }
+    }
+    // Screen Time keeps a file per day; the last month is read once, just after start, and kept.
+    property var focusTime: ({})
+    readonly property Connections focusSeen: Connections {
+        target: ScreenTime
+        function onRangeLoaded(days: int, data: var): void {
+            if (days !== 30) return
+            const seconds = {}
+            for (const app of ScreenTime.getAppList(30)) {
+                const id = String(root.musicEntry(String(app.originalId ?? ""))?.id ?? "")
+                if (id.length > 0) seconds[id] = (seconds[id] || 0) + Number(app.seconds || 0)
+            }
+            root.focusTime = seconds
+        }
+    }
+    readonly property Timer focusRead: Timer {
+        interval: 3000
+        running: ScreenTime.enabled
+        onTriggered: ScreenTime.requestDays(30)
+    }
+    readonly property var musicApp: {
+        void AppSearch.list
+        const known = root.knownMusicApps
+        const candidates = {}
+        for (const id of known.concat(Object.keys(root.listening), Object.keys(root.focusTime))) {
+            const entry = DesktopEntries.byId(id)
+            if (root.isMusicApp(entry)) candidates[String(entry.id)] = entry
+        }
+        for (const entry of AppSearch.list ?? [])
+            if (root.isMusicApp(entry)) candidates[String(entry.id)] = entry
+        const rank = id => [root.listening[id] || 0, root.focusTime[id] || 0, -(known.indexOf(id) < 0 ? known.length : known.indexOf(id))]
+        let best = null
+        for (const id in candidates) {
+            if (!best) { best = id; continue }
+            const a = rank(id), b = rank(best)
+            if (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])))) best = id
+        }
+        return best ? candidates[best] : null
+    }
+    // AppImage launchers add the version to the name ("limusic (1.1.0)"); the person knows the app, not the build.
+    function appName(entry): string { return String(entry?.name ?? "").replace(/\s*\(v?\d[\w.+-]*\)\s*$/, "") }
+    readonly property string musicAppName: root.appName(root.musicApp)
+    readonly property string musicAppIcon: String(root.musicApp?.icon ?? "")
+
+    // Opening says so, and says when the app never came: an app that dies at launch otherwise looks like a dead tap.
+    property string musicLaunch: ""          // "", "opening" or "failed"
+    property string musicLaunchName: ""
+    property string musicLaunchId: ""
+    function openMusic(): bool {
+        const entry = root.musicApp
+        if (!entry || root.musicLaunch === "opening") return false
+        root.musicLaunchId = String(entry.id ?? "")
+        root.musicLaunchName = root.appName(entry)
+        root.musicLaunch = "opening"
+        root.musicLaunchLimit.restart()
+        return AppSearch.launchEntry(entry)
+    }
+    function musicAppCame(): bool {
+        if (MprisController.activePlayer) return true
+        for (const window of NiriService.windows ?? [])
+            if (String(AppSearch.lookupDesktopEntry(String(window?.app_id ?? ""))?.id ?? "") === root.musicLaunchId) return true
+        return false
+    }
+    readonly property Timer musicLaunchLimit: Timer {
+        interval: 12000
+        onTriggered: root.musicLaunch = root.musicAppCame() ? "" : "failed"
+    }
+    readonly property Timer musicLaunchWatch: Timer {
+        interval: 500
+        repeat: true
+        running: root.musicLaunch === "opening"
+        onTriggered: if (root.musicAppCame()) { root.musicLaunchLimit.stop(); root.musicLaunch = "" }
+    }
+    readonly property Timer musicFailureFades: Timer {
+        interval: 8000
+        running: root.musicLaunch === "failed"
+        onTriggered: root.musicLaunch = ""
+    }
+    // What an empty player says under "Not playing": the next step, what it is doing, or why it did not happen.
+    readonly property string musicDetail: root.musicLaunch === "opening" ? Translation.tr("Opening %1…").arg(root.musicLaunchName)
+        : root.musicLaunch === "failed" ? Translation.tr("%1 didn't open").arg(root.musicLaunchName)
+        : root.musicAppName.length > 0 ? Translation.tr("Open %1").arg(root.musicAppName)
+        : Translation.tr("Your music appears here")
+    Component.onCompleted: {
+        try { root.listening = JSON.parse(root.listeningStore.text() || "{}") } catch (e) { root.listening = ({}) }
+    }
+
     readonly property int trayCount: SystemTray.items.values.filter(item => item && item.id).length
     function available(id: string): bool {
         if (id === "media" || id === "visualizer") return root.hasPlayer
@@ -67,7 +199,7 @@ QtObject {
         if (id === "battery") return Battery.available
         if (id === "bluetooth") return BluetoothStatus.available
         if (id === "updates") return Updates.available
-        if (id === "shellUpdate") return ShellUpdates.showUpdate
+        if (id === "shellUpdate") return ShellUpdates.showUpdate || ShellUpdates.isUpdating
         if (id === "vpn") return Vpn.available
         if (id === "watching") return AnimeWatch.available
         return root.extraIds.includes(id)
@@ -202,7 +334,7 @@ QtObject {
     }
     function floats(options: var, id: string): bool {
         const extra = options?.extras?.[id]
-        return (extra?.enable ?? false) && String(extra?.place ?? root.defaultPlace) !== "island" && !root.listedOnIsland(id)
+        return IrisFrame.extraOn(options?.extras, id) && String(extra?.place ?? root.defaultPlace) !== "island" && !root.listedOnIsland(id)
     }
     // What the Island carries: its own list, and any extra switched on whose place is the Island (a Settings switch
     // can turn one on there without adding it to the list; it must not vanish).
@@ -210,7 +342,7 @@ QtObject {
         const out = Array.from(listed ?? []).map(String)
         for (const id of root.extraIds) {
             const extra = options?.extras?.[id]
-            if ((extra?.enable ?? false) && String(extra?.place ?? root.defaultPlace) === "island" && !out.includes(id)) out.push(id)
+            if (IrisFrame.extraOn(options?.extras, id) && String(extra?.place ?? root.defaultPlace) === "island" && !out.includes(id)) out.push(id)
         }
         return out
     }

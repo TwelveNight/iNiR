@@ -28,8 +28,39 @@ Singleton {
         function dismiss(): void { root.dismiss() }
         function undismiss(): void { root.undismiss() }
         function diagnose(): string { return root.getDiagnostics() }
+        function simulate(state: string): string { return root.simulate(state) }
     }
     id: root
+
+    // A fake pending update for checking every surface that shows one; git, config and setup stay untouched.
+    property bool simulated: false
+    function simulate(state: string): string {
+        if (state === "off") {
+            if (!root.simulated) return "off"
+            root.simulated = false
+            root.commitLog = ""
+            root.hasUpdate = false
+            root.commitsBehind = 0
+            root.isUpdating = false
+            root.check()
+            return "off"
+        }
+        if (state !== "on" && state !== "") return "Use on or off"
+        if (state === "on") {
+            root.simulated = true
+            root.isUpdating = false
+            root.repoRelation = "behind"
+            root.commitsBehind = 3
+            root.remoteCommit = "simulated"
+            root.remoteVersion = root.localVersion.length > 0 ? root.localVersion + "+1" : ""
+            root.commitLog = ["a1b2c3d|feat(iris): a pending update to look at|1 hour ago|iNiR",
+                "e4f5a6b|fix(bar): a fix that comes with it|2 hours ago|iNiR",
+                "c7d8e9f|chore: one more commit|3 hours ago|iNiR"].join("\n")
+            root.latestMessage = "a1b2c3d feat(iris): a pending update to look at"
+            root.hasUpdate = true
+        }
+        return root.simulated ? "on: " + root.commitsBehind + " commits behind" : "off"
+    }
 
     // Public state
     property bool hasUpdate: false
@@ -113,7 +144,11 @@ Singleton {
     readonly property int remindDays: Math.max(0, Number(Config.options?.shellUpdates?.remindDays ?? 3))
     readonly property real lastNotifiedAt: Number(Config.options?.shellUpdates?.lastNotifiedAt ?? 0)
     readonly property bool showUpdate: hasUpdate && !isDismissed && !isUpdating
+    readonly property real dismissedAt: Number(Config.options?.shellUpdates?.dismissedAt ?? 0)
+    // Not now hides that version until `remindDays` have passed, then it shows again; 0 keeps it hidden.
+    property real _clock: Date.now()
     readonly property bool isDismissed: dismissedCommit.length > 0 && remoteCommit === dismissedCommit
+        && !(root.remindDays > 0 && root.dismissedAt > 0 && root._clock - root.dismissedAt >= root.remindDays * 86400000)
 
     // Repo path - try to get from version.json, fallback to config dir
     readonly property string configDir: FileUtils.trimFileProtocol(Quickshell.shellPath("."))
@@ -140,13 +175,7 @@ Singleton {
     onAvailableChanged: {
         if (initialAvailabilityChecked && !available && !unavailableNotificationShown && !managedExternally) {
             unavailableNotificationShown = true
-            Notifications.notify({
-                summary: root.unavailableTitle,
-                body: root.unavailableHint,
-                urgency: NotificationUrgency.Normal,
-                timeout: 10000,
-                appName: "iNiR Shell"
-            })
+            Notifications.send(root.unavailableTitle, root.unavailableHint, "normal", 10000)
             print("[ShellUpdates] Notification sent: Updates unavailable")
         }
         // Reset notification flag when available becomes true again
@@ -163,6 +192,10 @@ Singleton {
     function maybeNotifyUpdate(): void {
         if (!hasUpdate || !available || !initialUpdateCheckDone || isDismissed) return
         if (remoteCommit.length === 0) return
+        if (root.simulated) {
+            root.postUpdateNotice("iNiR Update Available (simulated)", "3 commits behind.")
+            return
+        }
         const now = Date.now()
         if (remoteCommit === lastNotifiedCommit) {
             if (root.remindDays <= 0 || root.lastNotifiedAt <= 0) return
@@ -173,18 +206,27 @@ Singleton {
         const commits = root.repoDiverged
             ? "Repository history changed upstream. iNiR will preserve local work and recover clean published checkouts automatically."
             : (root.commitsBehind > 0 ? (root.commitsBehind + " commits behind") : "New version available")
-        Notifications.notify({
-            summary: "iNiR Update Available" + version,
-            body: commits + ". Run `inir update`, or open it from the shell's own updater.",
-            urgency: NotificationUrgency.Normal,
-            timeout: 15000,
-            appName: "iNiR Shell"
-        })
+        root.postUpdateNotice("iNiR Update Available" + version,
+            commits + ". Run `inir update`, or open it from the shell's own updater.")
         Config.setNestedValues({
             "shellUpdates.lastNotifiedCommit": remoteCommit,
             "shellUpdates.lastNotifiedAt": now
         })
         print("[ShellUpdates] Notification sent: Update available" + version)
+    }
+
+    function postUpdateNotice(summary: string, body: string): void {
+        updateNotice.running = false
+        updateNotice.command = ["/usr/bin/notify-send", "-a", "iNiR", "-u", "normal", "-t", "15000", "-w",
+            "-A", "open=" + Translation.tr("What changed"), "--", summary, body]
+        updateNotice.running = true
+    }
+
+    Process {
+        id: updateNotice
+        stdout: StdioCollector {
+            onStreamFinished: if ((text ?? "").trim() === "open") root.openOverlay()
+        }
     }
 
     // A check that could not run for lack of internet; retried when the connection returns.
@@ -197,7 +239,8 @@ Singleton {
     }
 
     function check(): void {
-        if (!enabled || isChecking || isUpdating || managedExternally) return
+        if (!enabled || isChecking || isUpdating || managedExternally || simulated) return
+        root._clock = Date.now()
         root.waitingForNetwork = !Network.online
         if (root.waitingForNetwork) return
         root.isChecking = true
@@ -208,6 +251,7 @@ Singleton {
     // Fetch detailed info for the overlay (commit log, changelog, local mods)
     function fetchDetails(): void {
         if (isFetchingDetails || managedExternally) return
+        if (root.simulated) return
         root.isFetchingDetails = true
         root.commitLog = ""
         root.remoteChangelog = ""
@@ -248,6 +292,19 @@ Singleton {
 
     function performUpdate(): void {
         if (isUpdating || !hasUpdate || !available || managedExternally) return
+        if (root.simulated) {
+            root.overlayOpen = false
+            root.isUpdating = true
+            simulatedUpdate.restart()
+            if (Config.options?.shellUpdates?.openTerminalOnUpdate ?? true) {
+                const slot = (AppLauncher && typeof AppLauncher.commandFor === "function") ? AppLauncher.commandFor("terminal") : ""
+                ShellExec.execDetachedArgs([(slot.length > 0 ? slot : "kitty").trim().split(/\s+/)[0], "-e", "/usr/bin/bash", "-c",
+                    "echo 'Simulated iNiR update: nothing is downloaded or changed.'; echo; "
+                    + "for s in Fetching Applying 'Restarting the shell'; do echo \"==> $s\"; sleep 1; done; "
+                    + "echo; echo 'All good. You can close this window whenever you want.'; read -r _"], "Update iNiR", root.repoPath)
+            }
+            return
+        }
         root.isUpdating = true
         root.lastError = ""
         root.updateStep = 0
@@ -314,9 +371,16 @@ Singleton {
         updateProgressPoller.restart()
     }
 
+    Timer {
+        id: simulatedUpdate
+        interval: 4000
+        onTriggered: root.simulate("off")
+    }
+
     function dismiss(): void {
+        if (root.simulated) { root.simulate("off"); return }
         if (remoteCommit.length > 0) {
-            Config.setNestedValue("shellUpdates.dismissedCommit", remoteCommit)
+            Config.setNestedValues({ "shellUpdates.dismissedCommit": remoteCommit, "shellUpdates.dismissedAt": Date.now() })
         }
         root.overlayOpen = false
     }
@@ -340,6 +404,8 @@ Singleton {
             lastError: root.lastError,
             consecutiveFetchErrors: root.consecutiveFetchErrors,
             hasUpdate: root.hasUpdate,
+            isDismissed: root.isDismissed,
+            showUpdate: root.showUpdate,
             commitsBehind: root.commitsBehind,
             commitsAhead: root.commitsAhead,
             repoRelation: root.repoRelation,
@@ -830,13 +896,7 @@ Singleton {
                     root.fetchErrorNotificationShown = true
                     const title = "iNiR Update Check Failed"
                     const body = "Cannot reach remote repository. Check your internet connection or run './setup doctor'."
-                    Notifications.notify({
-                        summary: title,
-                        body: body,
-                        urgency: NotificationUrgency.Low,
-                        timeout: 8000,
-                        appName: "iNiR Shell"
-                    })
+                    Notifications.send(title, body, "low", 8000)
                     print("[ShellUpdates] Notification sent: Persistent fetch errors")
                 }
                 return
@@ -978,10 +1038,10 @@ Singleton {
                 root.repoRelation = "unknown"
                 root.isChecking = false
                 root.initialUpdateCheckDone = true
+                root.maybeNotifyUpdate()
                 return
             }
             root.hasUpdate = root.commitsBehind > 0
-            Qt.callLater(() => root.maybeNotifyUpdate())
             print("[ShellUpdates] Repo relation: " + root.repoRelation
                 + " (ahead=" + root.commitsAhead + ", behind=" + root.commitsBehind + "), hasUpdate: " + root.hasUpdate)
             if (root.hasUpdate) {
@@ -994,19 +1054,22 @@ Singleton {
         }
     }
 
-    // Step 7: Get latest commit message from remote
+    // Step 7: Get the pending commits; the newest is the latest message
     Process {
         id: latestMessageProc
         running: false
-        command: [...root._gitCmd, "log", "--oneline", "-1", "origin/" + root._remoteBranch]
+        command: [...root._gitCmd, "log", "--pretty=format:%h|%s|%cr|%an", "HEAD..origin/" + root._remoteBranch]
         stdout: StdioCollector {
             onStreamFinished: {
-                root.latestMessage = (text ?? "").trim()
+                root.commitLog = (text ?? "").trim()
+                const newest = root.commitLog.split("\n")[0].split("|")
+                root.latestMessage = newest.length > 1 ? newest[0] + " " + newest[1] : ""
             }
         }
         onExited: (exitCode, exitStatus) => {
             root.isChecking = false
             root.initialUpdateCheckDone = true
+            root.maybeNotifyUpdate()
         }
     }
 
