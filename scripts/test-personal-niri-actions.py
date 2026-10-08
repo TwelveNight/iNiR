@@ -77,6 +77,46 @@ class ActionsTests(unittest.TestCase):
             act.assert_called_once_with("move-window-to-tiling", "--id", 71)
 
 
+class HudFocusTests(unittest.TestCase):
+    def run_toggle(self, windows):
+        with patch.object(actions, "query", return_value=windows), \
+                patch.object(actions, "action") as act:
+            actions.main("hud-focus")
+            return [call.args for call in act.call_args_list]
+
+    def test_focus_exact_hud_from_another_app(self):
+        windows = [
+            {"id": 1, "app_id": "firefox", "title": "Hermes HUD", "is_focused": True},
+            {"id": 2, "app_id": "hermes", "title": "Hermes"},
+            {"id": 42, "app_id": "hermes", "title": "Hermes HUD"},
+        ]
+        self.assertEqual(self.run_toggle(windows), [("focus-window", "--id", 42)])
+
+    def test_hud_returns_to_most_recent_other_window(self):
+        windows = [
+            {"id": 42, "app_id": "hermes", "title": "Hermes HUD", "is_focused": True},
+            {"id": 7, "focus_timestamp": {"secs": 5, "nanos": 1}},
+            {"id": 9, "focus_timestamp": {"secs": 5, "nanos": 2}},
+            {"id": 3},
+        ]
+        self.assertEqual(self.run_toggle(windows), [("focus-window", "--id", 9)])
+
+    def test_closed_return_window_falls_back_without_stale_ids(self):
+        windows = [
+            {"id": 77, "app_id": "hermes", "title": "Hermes HUD", "is_focused": True},
+            {"id": 8, "focus_timestamp": {"secs": 10, "nanos": 0}},
+        ]
+        self.assertEqual(self.run_toggle(windows), [("focus-window", "--id", 8)])
+
+    def test_missing_hud_is_noop(self):
+        self.assertEqual(self.run_toggle([{"id": 7, "is_focused": True}]), [])
+
+    def test_hud_alone_and_pet_overlay_do_not_steal_return_focus(self):
+        hud = {"id": 42, "app_id": "hermes", "title": "Hermes HUD", "is_focused": True}
+        pet = {"id": 3, "app_id": "hermes", "title": "Hermes Pet Overlay"}
+        self.assertEqual(self.run_toggle([hud, pet]), [])
+
+
 class KeybindIsolationTests(unittest.TestCase):
     def test_ui_overrides_and_removal_leave_upstream_unchanged(self):
         with tempfile.TemporaryDirectory() as directory:

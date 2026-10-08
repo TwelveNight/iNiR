@@ -62,6 +62,26 @@ def toggle_float():
     action("center-window", "--id", window_id)
 
 
+def toggle_hud_focus():
+    windows = query("windows")
+    hud = next((w for w in windows if w.get("app_id") == "hermes"
+                and w.get("title") == "Hermes HUD"), None)
+    if hud is None:
+        return
+    target = hud
+    if hud.get("is_focused"):
+        # Niri's focus history survives HUD recreation and never holds closed ids.
+        candidates = [w for w in windows if w["id"] != hud["id"]
+                      and not (w.get("app_id") == "hermes"
+                               and w.get("title") == "Hermes Pet Overlay")]
+        def recent(window):
+            timestamp = window.get("focus_timestamp") or {}
+            return timestamp.get("secs", 0), timestamp.get("nanos", 0)
+        target = max(candidates, key=recent, default=None)
+    if target is not None:
+        action("focus-window", "--id", target["id"])
+
+
 def main(command):
     if command == "empty-move":
         empty_workspace(True)
@@ -69,6 +89,8 @@ def main(command):
         empty_workspace()
     elif command == "float":
         toggle_float()
+    elif command == "hud-focus":
+        toggle_hud_focus()
     elif command == "tmux":
         # Uses the shared Kitty config and the most recently used tmux session.
         exists = subprocess.run(["tmux", "has-session"], capture_output=True).returncode == 0
