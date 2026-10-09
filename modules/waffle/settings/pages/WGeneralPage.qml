@@ -449,6 +449,7 @@ WSettingsPage {
         }
 
         WSettingsSwitch {
+            visible: GameMode.discoverOverlayInstalled
             label: Translation.tr("Disable Discover overlay")
             icon: "headphones"
             description: Translation.tr("Stop discover-overlay while game mode is active")
@@ -497,7 +498,7 @@ WSettingsPage {
             label: Translation.tr("Password")
             icon: "key"
             description: Translation.tr("WPA2 passphrase for the hotspot")
-            text: Config.options?.hotspot?.password ?? "inirhotspot"
+            text: Config.options?.hotspot?.password ?? ""
             onTextEdited: (newText) => Config.setNestedValue("hotspot.password", newText)
         }
 

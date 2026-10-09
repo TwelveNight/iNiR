@@ -1269,7 +1269,7 @@ Singleton {
                 property bool disableVisualizers: true
                 property bool disableNiriAnimations: true
                 property bool disableReloadToasts: true
-                property bool disableDiscoverOverlay: true
+                property bool disableDiscoverOverlay: true // Only where discover-overlay is installed
                 property bool suppressNotifications: true // Hide notification popups during GameMode
                 property bool minimalMode: true // Make panels transparent/minimal during GameMode
                 // Throttle Niri window list updates - 100ms = 10 FPS, sufficient for smooth UI
@@ -1305,7 +1305,7 @@ Singleton {
                 property string browser: "firefox" // Used by launcher-backed browser shortcuts
                 property string volumeMixer: "pavucontrol"
                 property string discord: "discord" // Shell command to launch Discord client
-                property string update: "kitty -e sudo pacman -Syu" // Command to run system updates
+                property string update: "" // Empty uses the package-manager-aware update backend
                 property string manageUser: "kcmshell6 kcm_users" // User account management
             }
 
@@ -2970,6 +2970,7 @@ Singleton {
                 }
                 property bool materialShapeChars: true
                 property string loginScreen: "auto" // SDDM look: "auto" (iris under the iRiS family, else classic), "classic" or "iris"
+                property string loginStyle: "lens" // the iRiS login's composition: "cover", "frame" or "lens"
                 property bool enableAnimation: false // Play video/GIF wallpapers on lock screen (default: show first frame)
                 property JsonObject dim: JsonObject {
                     property bool enable: false
@@ -3006,7 +3007,7 @@ Singleton {
 
             property JsonObject hotspot: JsonObject {
                 property string ssid: "iNiR Hotspot"
-                property string password: "inirhotspot"
+                property string password: ""
                 property string band: "bg" // "bg" = 2.4GHz, "a" = 5GHz
             }
 
@@ -3096,6 +3097,11 @@ Singleton {
                 property JsonObject floatingImage: JsonObject {
                     property string imageSource: "https://media.tenor.com/H5U5bJzj3oAAAAAi/kukuru.gif"
                     property real scale: 0.5
+                }
+                property JsonObject gamePerformance: JsonObject {
+                    property bool transparentBackground: false
+                    // -1 inherits overlay.backgroundOpacity.
+                    property real backgroundOpacity: -1
                 }
             }
 
@@ -4173,6 +4179,7 @@ Singleton {
                     property int height: 42
                     property int margin: 8
                     property bool autoHide: false // Rest the pointer at the Island's edge to bring it back
+                    property bool revealOnEmpty: true // Keep the Island visible on an empty workspace while auto-hide is on
                     property bool reserveSpace: true
                     property list<string> screenList: []
                     property list<string> leftModules: []

@@ -134,11 +134,47 @@ test -z "$(get_runtime_shell_dir)"
 source "{ROOT}/sdata/lib/environment-variables.sh"
 quiet=true
 v() {{ "$@"; }}
-source "{script}"
+initialize_fixture() {{ source "{script}"; }}
+initialize_fixture
 ''')
         self.assertEqual((shared / "todo.json").read_text(), '["II todo"]')
         self.assertEqual((cache / "notifications.json").read_text(), '["II notification"]')
         self.assertEqual(json.loads((self.state / "inir/user/todo.json").read_text()), [])
+
+    def test_turnstile_startup_preserves_private_venv(self):
+        source = (ROOT / "sdata/lib/functions.sh").read_text()
+        updater = source.split("  update_inir_startup_supervisor() {", 1)[1].split(
+            '  [[ -f "$startup_target" ]]', 1)[0]
+        startup = self.base / "startup.kdl"
+        startup.write_text("// fixture startup\n")
+        self.bash('update_inir_startup_supervisor() {' + updater +
+                  f'\nupdate_inir_startup_supervisor "{startup}" turnstile')
+        line = next(line for line in startup.read_text().splitlines()
+                    if line.startswith('spawn-sh-at-startup "export PATH='))
+        command = json.loads(line.removeprefix('spawn-sh-at-startup '))
+        binary = self.base / "mock-bin"
+        binary.mkdir()
+        helper = binary / "turnstile-update-runit-env"
+        helper.write_text('#!/bin/sh\nprintf "%s\\n" "$INIR_VENV" > "$HOME/venv.log"\n')
+        helper.chmod(0o755)
+        self.env.update(HOME=str(self.base), PATH=str(binary) + ":" + self.env["PATH"],
+                        WAYLAND_DISPLAY="fixture", XDG_RUNTIME_DIR=str(self.base / "runtime"),
+                        DBUS_SESSION_BUS_ADDRESS="fixture")
+        for override in [None, str(self.base / "private venv")]:
+            with self.subTest(override=override):
+                if override:
+                    self.env["INIR_VENV"] = override
+                else:
+                    self.env.pop("INIR_VENV", None)
+                self.bash(command)
+                expected = override or str(self.state / "inir/.venv")
+                self.assertEqual((self.base / "venv.log").read_text().strip(), expected)
+
+    def test_fresh_install_font_sync_requires_explicit_opt_in(self):
+        defaults = json.loads((ROOT / "defaults/config.json").read_text())
+        self.assertIs(defaults["appearance"]["typography"]["syncWithSystem"], False)
+        schema = (ROOT / "modules/common/Config.qml").read_text()
+        self.assertIn("property bool syncWithSystem: false", schema)
 
     def test_shared_theme_inputs_are_private_and_outputs_shared(self):
         manifest = json.loads((ROOT / "defaults/matugen/templates.json").read_text())
@@ -238,6 +274,12 @@ ensure_launcher_path_in_shells "$XDG_BIN_HOME"
         kitty.mkdir()
         (kitty / "kitty.conf").write_text("current settings")
         (kitty / "kitty.conf.old").write_text("stale unrelated backup")
+        foot_files = {"foot.ini": "font=Personal Font\n", "colors.ini": "legacy palette\n",
+                      "inir-colors.ini": "canonical palette\n"}
+        foot = self.config / "foot"
+        foot.mkdir()
+        for name, text in foot_files.items():
+            (foot / name).write_text(text)
         ii_runtime = self.config / "quickshell/ii"
         ii_runtime.mkdir(parents=True)
         (ii_runtime / "shell.qml").write_text("II")
@@ -260,6 +302,8 @@ uninstall_handle_quickshell_shared
         self.assertEqual(sentinel.read_text(), "II todo")
         self.assertEqual(palette.read_text(), "shared palette")
         self.assertEqual((kitty / "kitty.conf").read_text(), "current settings")
+        for name, text in foot_files.items():
+            self.assertEqual((foot / name).read_text(), text)
 
     def test_switchwall_dispatch_writes_only_after_success(self):
         config = self.inir / "config.json"

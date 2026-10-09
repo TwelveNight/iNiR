@@ -194,15 +194,15 @@ resolve_live_version_context() {
     repo_dir="${repo_dir/#\~/$HOME}"
 
     if [[ "$install_mode" == "repo-link" ]]; then
-        if [[ -n "$runtime_path" && -d "$runtime_path/.git" ]]; then
+        if [[ -n "$runtime_path" && -e "$runtime_path/.git" ]]; then
             printf '%s' "$runtime_path"
             return 0
         fi
-        if [[ -n "$repo_dir" && -d "$repo_dir/.git" ]]; then
+        if [[ -n "$repo_dir" && -e "$repo_dir/.git" ]]; then
             printf '%s' "$repo_dir"
             return 0
         fi
-        if [[ -n "$launcher_root" && -d "$launcher_root/.git" ]]; then
+        if [[ -n "$launcher_root" && -e "$launcher_root/.git" ]]; then
             printf '%s' "$launcher_root"
             return 0
         fi
@@ -277,7 +277,7 @@ print_cli_context() {
     printf '  launcher: %s\n' "$launcher_path"
     printf '  service: %s\n' "$service_state"
 
-    if [[ -n "$setup_dir" && -d "$setup_dir/.git" ]]; then
+    if [[ -n "$setup_dir" && -e "$setup_dir/.git" ]]; then
         branch="$(git -C "$setup_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
         if [[ -n "$branch" ]]; then
             printf '  branch: %s\n' "$branch"
@@ -443,37 +443,27 @@ _inir_detect_stale_local_qs() {
 
 # --- Quickshell install-kind detection ----------------------------------------
 # Returns "kind:pkgname". Used by check_qs_abi() and `inir doctor --fix-abi`.
-# Each kind needs a different rebuild path — there is no universal command:
-#   arch-aur-foreign      built locally from AUR     -> paru -S --rebuild
-#   arch-repo-binary      precompiled in 3rd-party repo (CachyOS, chaotic-aur)
-#                                                     -> paru -Sa (forces source build)
-#   arch-repo-official    extra/quickshell           -> sudo pacman -Syu (waits for maintainer)
-#   arch-aur-bin          quickshell-bin (precompiled tarball)
-#                                                     -> switch to quickshell-git
-#   fedora-pkg            rpm/COPR install            -> sudo dnf upgrade
-#   nixos                 nixpkgs/flake               -> nixos-rebuild switch --upgrade
-#   debian                apt/dpkg                    -> compile from source
-#   source                /usr/local install          -> compile from source
-#   unknown               nothing matches             -> point at Quickshell docs
+# Quickshell uses Qt internals and asks to be rebuilt after every Qt update. The repair rebuilds
+# what is installed against the installed Qt, never a different project:
+#   arch-repo       quickshell (Arch, CachyOS)   -> the same version from Arch's recipe
+#   arch-git        quickshell-git               -> rebuilt from its AUR recipe
+#   arch-provider   a fork or quickshell-bin providing quickshell
+#                                                -> quickshell from Arch's recipe replaces it (pacman asks)
+#   void-xbps, fedora-pkg, nixos                 -> the distro's own update
+#   debian, source, unknown                      -> no automatic path
 _inir_quickshell_install_kind() {
     if command -v pacman >/dev/null 2>&1; then
-        if pacman -Qi quickshell-bin &>/dev/null; then
-            printf 'arch-aur-bin:quickshell-bin'; return
-        elif pacman -Qi quickshell-git &>/dev/null; then
-            if pacman -Qm quickshell-git &>/dev/null; then
-                printf 'arch-aur-foreign:quickshell-git'
-            else
-                printf 'arch-repo-binary:quickshell-git'
-            fi
-            return
-        elif pacman -Qi quickshell &>/dev/null; then
-            if pacman -Qm quickshell &>/dev/null; then
-                printf 'arch-aur-foreign:quickshell'
-            else
-                printf 'arch-repo-official:quickshell'
-            fi
-            return
-        fi
+        # pacman -Q answers with whichever package provides the name, so read the real one.
+        local owner
+        owner="$(pacman -Qq quickshell 2>/dev/null | head -1)"
+        case "$owner" in
+            quickshell)     printf 'arch-repo:quickshell'; return ;;
+            quickshell-git) printf 'arch-git:quickshell-git'; return ;;
+            ?*)             printf 'arch-provider:%s' "$owner"; return ;;
+        esac
+    elif command -v xbps-query >/dev/null 2>&1 \
+            && xbps-query -p pkgver quickshell >/dev/null 2>&1; then
+        printf 'void-xbps:quickshell'; return
     elif command -v rpm >/dev/null 2>&1; then
         local q
         q="$(rpm -qa 2>/dev/null | grep -E '^quickshell(-git)?-[0-9]' | head -1)"
@@ -490,24 +480,73 @@ _inir_quickshell_install_kind() {
     printf 'unknown:'
 }
 
-# Echoes the rebuild command for a kind:pkg pair. Empty if no auto-rebuild path exists.
-_inir_quickshell_rebuild_cmd() {
-    local kind="${1%%:*}" pkg="${1#*:}"
-    local helper=""
-    if [[ "$kind" == arch-* ]]; then
-        for h in paru yay; do
-            if command -v "$h" >/dev/null 2>&1; then helper="$h"; break; fi
-        done
-        [[ -z "$helper" ]] && return  # No AUR helper means no automatic Arch path
+_INIR_QS_ARCH_RECIPE="https://gitlab.archlinux.org/archlinux/packaging/packages/quickshell.git"
+_INIR_QS_AUR_GIT_RECIPE="https://aur.archlinux.org/quickshell-git.git"
+
+# What the repair does for a kind:pkg pair, in words. Empty when there is no automatic path.
+_inir_quickshell_fix_plan() {
+    local pkg="${1#*:}"
+    case "${1%%:*}" in
+        arch-repo)     printf "rebuild quickshell %s from Arch's recipe" "$(pacman -Q quickshell 2>/dev/null | awk '{print $2}')" ;;
+        arch-git)      printf 'rebuild quickshell-git from its AUR recipe' ;;
+        arch-provider) printf "replace %s with quickshell built from Arch's recipe (pacman asks first)" "$pkg" ;;
+        void-xbps)     printf 'reinstall quickshell with xbps-install' ;;
+        fedora-pkg)    printf 'upgrade %s with dnf' "$pkg" ;;
+        nixos)         printf 'run nixos-rebuild switch --upgrade' ;;
+    esac
+}
+
+# Builds a quickshell package from its recipe against the installed Qt and installs it with pacman,
+# which asks before replacing another provider. A rebuild of the installed version gets a pkgrel one
+# step above it, so the next distro rebuild still replaces it as usual.
+_inir_quickshell_makepkg() {
+    local url="$1" mode="$2" dir rc=0
+    local -a flags=(--syncdeps --install --rmdeps)
+    [[ "$mode" == noninteractive ]] && flags+=(--noconfirm)
+    if ! command -v git >/dev/null 2>&1 || ! command -v makepkg >/dev/null 2>&1; then
+        echo "iNiR: rebuilding Quickshell needs git and makepkg: sudo pacman -S --needed git base-devel" >&2
+        return 1
     fi
+    dir="$(mktemp -d "${TMPDIR:-/tmp}/inir-quickshell.XXXXXX")" || return 1
+    if ! git clone --quiet --depth 1 "$url" "$dir/pkg"; then
+        echo "iNiR: could not download the recipe from $url" >&2
+        rm -rf "$dir"
+        return 1
+    fi
+    local name installed pkgver rel
+    name="$(sed -n 's/^pkgname=//p' "$dir/pkg/PKGBUILD" | head -1)"
+    pkgver="$(sed -n 's/^pkgver=//p' "$dir/pkg/PKGBUILD" | head -1)"
+    installed="$(pacman -Q "$name" 2>/dev/null | awk -v n="$name" '$1 == n {print $2}')"
+    if [[ -n "$installed" && "${installed%-*}" == "$pkgver" ]]; then
+        # makepkg allows integer[.integer]: 1 -> 1.1, 1.1 -> 1.2.
+        rel="${installed##*-}"
+        if [[ "$rel" == *.* ]]; then rel="${rel%.*}.$(( ${rel##*.} + 1 ))"; else rel="$rel.1"; fi
+        sed -i "s/^pkgrel=.*/pkgrel=$rel/" "$dir/pkg/PKGBUILD"
+    fi
+    # Keeps sudo's credentials fresh through the build so the install step does not stop on a prompt.
+    local keepalive=""
+    if sudo -n true 2>/dev/null; then
+        ( while sleep 50; do sudo -n -v 2>/dev/null || exit 0; done ) &
+        keepalive=$!
+    fi
+    (cd "$dir/pkg" && makepkg "${flags[@]}") || rc=$?
+    [[ -n "$keepalive" ]] && kill "$keepalive" 2>/dev/null
+    rm -rf "$dir"
+    return "$rc"
+}
+
+# Runs the repair for a kind:pkg pair. $2 = interactive | noninteractive (answers package prompts).
+_inir_quickshell_fix_run() {
+    local kind="${1%%:*}" pkg="${1#*:}" mode="$2"
+    local yes=""
+    [[ "$mode" == noninteractive ]] && yes="-y"
     case "$kind" in
-        arch-aur-foreign)   printf '%s -S --rebuild --noconfirm %s' "$helper" "$pkg" ;;
-        arch-repo-binary)   printf '%s -Sa --noconfirm --skipreview %s' "$helper" "$pkg" ;;
-        arch-repo-official) printf 'sudo pacman -Rdd --noconfirm quickshell && %s -S --noconfirm quickshell-git' "$helper" ;;
-        arch-aur-bin)       printf 'sudo pacman -Rdd --noconfirm quickshell-bin && %s -S --noconfirm quickshell-git' "$helper" ;;
-        fedora-pkg)         printf 'sudo dnf upgrade --refresh -y %s' "$pkg" ;;
-        nixos)              printf 'sudo nixos-rebuild switch --upgrade' ;;
-        debian|source|unknown|*) ;;  # No automatic path
+        arch-repo|arch-provider) _inir_quickshell_makepkg "$_INIR_QS_ARCH_RECIPE" "$mode" ;;
+        arch-git)                _inir_quickshell_makepkg "$_INIR_QS_AUR_GIT_RECIPE" "$mode" ;;
+        void-xbps)               sudo xbps-install -Sf $yes quickshell ;;
+        fedora-pkg)              sudo dnf upgrade --refresh $yes "$pkg" ;;
+        nixos)                   sudo nixos-rebuild switch --upgrade ;;
+        *)                       return 2 ;;
     esac
 }
 
@@ -525,6 +564,8 @@ _inir_quickshell_abi_status() {
     qs_output="$("$qs_bin" --version 2>&1 || true)"
     if echo "$qs_output" | grep -qiE "built against Qt|Qt.*mismatch|incompatible Qt"; then
         _inir_abi_msg="$(echo "$qs_output" | grep -iE "built against Qt|Qt.*mismatch|incompatible Qt" | head -1)"
+        _inir_abi_msg="${_inir_abi_msg#*WARN: }"
+        _inir_abi_msg="${_inir_abi_msg#*WARN: }"
         return 1
     fi
 
@@ -547,70 +588,74 @@ _inir_quickshell_abi_status() {
     return 0
 }
 
-# Auto-fix the ABI mismatch by rebuilding quickshell. Returns 0 on success.
-# $1 = "interactive" (default; prompts before running) | "noninteractive" (just runs)
+# Rebuilds Quickshell against the installed Qt. Returns 0 on success.
+# $1 = "interactive" (default: asks first, package prompts stay on screen) | "noninteractive"
 # Side effect: invalidates ~/.cache/inir/abi-check after a successful rebuild so
 # subsequent check_qs_abi calls re-scan the fresh binary.
 _inir_run_quickshell_rebuild() {
     local mode="${1:-interactive}"
 
-    # Precheck: don't waste 5 minutes rebuilding when nothing is wrong.
+    # Precheck: don't waste minutes rebuilding when nothing is wrong.
     if _inir_quickshell_abi_status; then
-        echo "iNiR: Quickshell/Qt ABI is already compatible — nothing to do." >&2
+        echo "iNiR: Quickshell matches the installed Qt, nothing to do." >&2
         if [[ -n "$_inir_abi_buildtime" ]]; then
             echo "      Build-time Qt: $_inir_abi_buildtime  ≡  Runtime Qt: $_inir_abi_runtime" >&2
         fi
         return 0
     fi
 
-    echo "iNiR: Qt/Quickshell ABI mismatch — $_inir_abi_msg" >&2
+    echo "iNiR: $_inir_abi_msg" >&2
 
-    local kind_pkg cmd
+    local kind_pkg plan
     kind_pkg="$(_inir_quickshell_install_kind)"
-    cmd="$(_inir_quickshell_rebuild_cmd "$kind_pkg")"
-    if [[ -z "$cmd" ]]; then
-        echo "iNiR: cannot auto-rebuild Quickshell — install kind '${kind_pkg%%:*}' has no automatic path." >&2
+    plan="$(_inir_quickshell_fix_plan "$kind_pkg")"
+    if [[ -z "$plan" ]]; then
+        echo "iNiR: no automatic rebuild for this Quickshell install (${kind_pkg%%:*})." >&2
         echo "      See: https://quickshell.org/docs/master/guide/install-setup" >&2
         return 1
     fi
-
-    echo "iNiR: planned fix → ${cmd//--noconfirm/}" >&2
+    echo "iNiR: the fix is to $plan." >&2
 
     if [[ "$mode" == "interactive" && -t 0 && -t 1 ]]; then
         local resp
-        read -r -p "Run this fix now to rebuild quickshell? [Y/n] " resp || true
+        read -r -p "Rebuild it now? [Y/n] " resp || true
         case "${resp:-}" in
             ""|[Yy]*) ;;
-            *) echo "iNiR: rebuild declined." >&2; return 1 ;;
+            *) echo "iNiR: nothing was rebuilt." >&2; return 1 ;;
         esac
-        # Interactive: strip --noconfirm so the AUR helper shows full progress
-        # and prompts naturally. The user already confirmed they want to proceed.
-        cmd="${cmd//--noconfirm/}"
+    else
+        mode="noninteractive"
     fi
 
     echo "" >&2
-    echo "iNiR: rebuilding quickshell against the current Qt version..." >&2
-    echo "      This compiles from source and may take 2-5 minutes." >&2
-    echo "      (timeout: 15 minutes to avoid indefinite hangs)" >&2
+    echo "iNiR: rebuilding Quickshell. It compiles for a few minutes and the build output shows below." >&2
+    echo "      Ctrl+C stops it; the installed Quickshell stays until the new one is built." >&2
     echo "" >&2
+
+    # Ask for the password before the build so its install step doesn't stop on a prompt
+    # minutes later. Anything that reads the terminal runs in the foreground: `timeout`
+    # without --foreground moves it to a background process group, where sudo cannot hide
+    # the password and its read never returns.
+    if ! sudo -n true 2>/dev/null; then
+        if [[ ! -t 0 || ! -t 1 ]]; then
+            echo "iNiR: the rebuild needs your password and there is no terminal to ask in." >&2
+            echo "      Run in a terminal: inir doctor --fix-abi" >&2
+            return 1
+        fi
+        echo "iNiR: the rebuild needs your password." >&2
+        if ! timeout --foreground 120 sudo -v; then
+            echo "iNiR: no password, nothing was rebuilt." >&2
+            return 1
+        fi
+        echo "" >&2
+    fi
 
     local rebuild_rc=0
-    if command -v timeout >/dev/null 2>&1; then
-        timeout 15m bash -c "$cmd" || rebuild_rc=$?
-    else
-        eval "$cmd" || rebuild_rc=$?
-    fi
+    _inir_quickshell_fix_run "$kind_pkg" "$mode" || rebuild_rc=$?
 
-    if [[ "$rebuild_rc" -eq 124 ]]; then
+    if [[ "$rebuild_rc" -ne 0 ]]; then
         echo "" >&2
-        echo "iNiR: rebuild timed out after 15 minutes." >&2
-        echo "      The AUR helper may be waiting for input or the build is stuck." >&2
-        echo "      Try manually: ${cmd//--noconfirm /}" >&2
-        return 1
-    elif [[ "$rebuild_rc" -ne 0 ]]; then
-        echo "" >&2
-        echo "iNiR: rebuild failed (exit $rebuild_rc). Try manually:" >&2
-        echo "      ${cmd//--noconfirm /}" >&2
+        echo "iNiR: the rebuild stopped (exit $rebuild_rc). Run it again: inir doctor --fix-abi" >&2
         return 1
     fi
 
@@ -618,20 +663,18 @@ _inir_run_quickshell_rebuild() {
     rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/inir/abi-check" 2>/dev/null
     if _inir_quickshell_abi_status; then
         echo "" >&2
-        echo "iNiR: Quickshell rebuilt successfully and ABI mismatch is resolved." >&2
-        echo "      Run 'inir restart' to apply the new binary." >&2
+        echo "iNiR: Quickshell is rebuilt for the installed Qt." >&2
+        echo "      Run 'inir restart' to use it." >&2
         return 0
     fi
 
     echo "" >&2
-    echo "iNiR: rebuild finished but ABI mismatch persists — $_inir_abi_msg" >&2
-    echo "      A stale local binary may be shadowing the system package." >&2
+    echo "iNiR: the rebuild finished but the mismatch persists: $_inir_abi_msg" >&2
     local stale_qs
     if stale_qs="$(_inir_detect_stale_local_qs)" && [[ -n "$stale_qs" ]]; then
-        echo "      Stale local binary detected: $stale_qs" >&2
+        echo "      A stale local binary shadows the package: $stale_qs" >&2
         echo "      Remove it: rm $stale_qs" >&2
     fi
-    echo "      Try manually: ${cmd//--noconfirm /}" >&2
     return 1
 }
 
@@ -754,6 +797,7 @@ _inir_perf_detect_temp_paths() {
 
     [[ -n "$cpu_path" ]] && printf 'cpu:%s:%s:%s\n' "$cpu_path" "$(_inir_perf_sensor_label "$cpu_path")" "$(_inir_perf_temp_celsius "$cpu_path")"
     [[ -n "$gpu_path" ]] && printf 'gpu:%s:%s:%s\n' "$gpu_path" "$(_inir_perf_sensor_label "$gpu_path")" "$(_inir_perf_temp_celsius "$gpu_path")"
+    return 0
 }
 
 _inir_perf_detect_gpu_usage_source() {
@@ -1216,7 +1260,10 @@ _inir_doctor_perf() {
     printf '=== inir.service cgroup ===\n'
     local unit_info unit_cgroup unit_main_pid unit_memory cgroup_rows=""
     local saw_awww=false saw_wlcopy=false saw_possible_app=false
-    unit_info="$(systemctl --user show -p MainPID -p ControlGroup -p MemoryCurrent inir.service 2>/dev/null || true)"
+    unit_info=""
+    if has_usable_systemd_user_manager; then
+        unit_info="$(systemctl --user show -p MainPID -p ControlGroup -p MemoryCurrent inir.service 2>/dev/null || true)"
+    fi
     unit_main_pid="$(printf '%s\n' "$unit_info" | awk -F= '$1=="MainPID"{print $2}')"
     unit_cgroup="$(printf '%s\n' "$unit_info" | awk -F= '$1=="ControlGroup"{print $2}')"
     unit_memory="$(printf '%s\n' "$unit_info" | awk -F= '$1=="MemoryCurrent"{print $2}')"
@@ -1393,7 +1440,7 @@ check_qs_abi() {
     fi
 
     echo "" >&2
-    echo "ERROR: Qt/Quickshell ABI mismatch detected" >&2
+    echo "WARNING: Quickshell was built for another Qt version" >&2
     echo "  $mismatch_msg" >&2
 
     # Detect stale local binary shadowing the system package
@@ -1406,40 +1453,16 @@ check_qs_abi() {
     fi
 
     echo "" >&2
-    echo "Quickshell was built against a different Qt version than what is installed." >&2
-    echo "The shell will crash on any UI interaction until quickshell is rebuilt." >&2
+    echo "Quickshell uses Qt internals and asks to be rebuilt after every Qt update. Until then it can crash." >&2
 
-    # Try auto-rebuild: interactive when in a terminal, noninteractive in service mode.
-    if [[ -t 0 && -t 1 ]]; then
-        if _inir_run_quickshell_rebuild interactive; then
-            return 0
-        fi
-    elif [[ "${_session_boot:-}" == "true" ]]; then
-        # In service mode, we can't reliably rebuild (no TTY for sudo).
-        # Instead of blocking startup entirely, warn and continue.
-        # The shell may partially work — enough for the user to open a terminal
-        # and run the fix. Blocking with exit 1 leaves them with no shell at all.
-        echo "" >&2
-        echo "WARNING: Continuing despite ABI mismatch. Some features may crash." >&2
-        echo "         Fix: inir doctor --fix-abi" >&2
-        echo "" >&2
-        return 0
+    # A terminal can rebuild now. Nothing blocks the start: the shell usually runs, and a
+    # session start has no terminal to rebuild in.
+    if [[ -t 0 && -t 1 && "${_session_boot:-}" != "true" ]]; then
+        _inir_run_quickshell_rebuild interactive && return 0
     fi
-
-    # Auto-fix declined, unavailable, or failed — fall through to manual instructions.
+    echo "Fix: inir doctor --fix-abi" >&2
     echo "" >&2
-    local _kind_pkg _fix_cmd
-    _kind_pkg="$(_inir_quickshell_install_kind)"
-    _fix_cmd="$(_inir_quickshell_rebuild_cmd "$_kind_pkg")"
-    if [[ -n "$_fix_cmd" ]]; then
-        echo "Manual fix: ${_fix_cmd//--noconfirm/}" >&2
-    else
-        echo "Manual fix: rebuild quickshell from source against the current Qt version." >&2
-        echo "            See https://quickshell.org/docs/master/guide/install-setup" >&2
-    fi
-    echo "Or run non-interactively: inir doctor --fix-abi --noninteractive" >&2
-    echo "" >&2
-    exit 1
+    return 0
 }
 
 # Warn if code version differs from what setup last installed.
@@ -1609,6 +1632,7 @@ _cached_systemd_env=""
 _cached_systemd_env_fetched=false
 
 _get_systemd_user_env() {
+    is_using_runit_supervisor && return 0
     if [[ "$_cached_systemd_env_fetched" == true ]]; then
         printf '%s' "$_cached_systemd_env"
         return 0
@@ -1617,6 +1641,19 @@ _get_systemd_user_env() {
     # Keep the lookup bounded for manual invocations outside the supervised path.
     _cached_systemd_env="$(timeout 3s systemctl --user show-environment 2>/dev/null)" || true
     printf '%s' "$_cached_systemd_env"
+}
+
+# The socket exists only while the user manager runs. A probe that times out is a busy manager, still systemd:
+# falling back to runit there would drive `sv` on a host that has none.
+has_usable_systemd_user_manager() {
+  [[ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/systemd/private" ]] || return 1
+  timeout 3s systemctl --user show-environment >/dev/null 2>&1
+  local rc=$?
+  [[ $rc -eq 0 || $rc -eq 124 ]]
+}
+
+is_using_runit_supervisor() {
+  ! has_usable_systemd_user_manager
 }
 
 _niri_app_environment_file() {
@@ -1911,7 +1948,7 @@ apply_qt_runtime_env() {
 }
 
 apply_qt_logging_rules() {
-    local extra_rules="quickshell.dbus.properties=false;qt.qml.settings.warning=false;qt.core.qsettings.warning=false;kf.xmlgui=false;kf.coreaddons=false;kf.config.core=false;kf.iconthemes=false"
+    local extra_rules="quickshell.dbus.properties=false;qt.qml.settings.warning=false;qt.core.qsettings.warning=false;kf.xmlgui=false;kf.coreaddons=false;kf.config.core=false;kf.iconthemes=false;qt.qpa.wayland.textinput.warning=false"
 
     if [[ -z "${QT_LOGGING_RULES:-}" ]]; then
         export QT_LOGGING_RULES="$extra_rules"
@@ -1919,7 +1956,7 @@ apply_qt_logging_rules() {
     fi
 
     case ";${QT_LOGGING_RULES};" in
-        *";qt.core.qsettings.warning=false;"*)
+        *";qt.qpa.wayland.textinput.warning=false;"*)
             ;;
         *)
             export QT_LOGGING_RULES="${QT_LOGGING_RULES};${extra_rules}"
@@ -1962,7 +1999,48 @@ resolve_config_dir() {
 }
 
 list_instances() {
-    "$qs_bin" -p "$1" list 2>/dev/null || true
+    local -a args=(-p "$1" list)
+    if [[ -z "${WAYLAND_DISPLAY:-}" && -z "${DISPLAY:-}" ]]; then
+        args+=(--any-display)
+    fi
+    "$qs_bin" "${args[@]}" 2>/dev/null || true
+}
+
+import_running_instance_environment() {
+    local dir="$1"
+
+    # Outside a graphical session, recover the authoritative environment from the live shell.
+    if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
+        return 0
+    fi
+
+    local target_qml pid env_file proc_root
+    target_qml="$(readlink -f "$dir/shell.qml" 2>/dev/null || printf '%s' "$dir/shell.qml")"
+    pid="$("$qs_bin" list --all 2>/dev/null | awk -v target="$target_qml" '
+        /^[[:space:]]*Process ID:/ { candidate=$3 }
+        /^[[:space:]]*Config path:/ {
+            path=$0
+            sub(/^[[:space:]]*Config path:[[:space:]]*/, "", path)
+            if (path == target && candidate != "") { print candidate; exit }
+            candidate=""
+        }
+    ')"
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+
+    proc_root="${INIR_PROC_ROOT:-/proc}"
+    env_file="$proc_root/$pid/environ"
+    [[ -r "$env_file" ]] || return 1
+
+    local key value
+    while IFS='=' read -r key value; do
+        case "$key" in
+            XDG_RUNTIME_DIR|WAYLAND_DISPLAY|NIRI_SOCKET|DBUS_SESSION_BUS_ADDRESS|QT_QPA_PLATFORM|XDG_SESSION_TYPE|XDG_CURRENT_DESKTOP|XDG_SESSION_DESKTOP|PATH|LANG|LC_ALL)
+                export "$key=$value"
+                ;;
+        esac
+    done < <(tr '\0' '\n' < "$env_file")
+
+    [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]
 }
 
 has_instances() {
@@ -2001,6 +2079,8 @@ terminate_qml_window() {
 ensure_running_instance() {
     local dir="$1"
 
+    import_running_instance_environment "$dir" >/dev/null 2>&1 || true
+
     if has_instances "$dir"; then
         return 0
     fi
@@ -2016,6 +2096,8 @@ ensure_running_instance() {
 ensure_running_instance_for_ipc() {
     local dir="$1"
     local function_name="${2:-}"
+
+    import_running_instance_environment "$dir" >/dev/null 2>&1 || true
 
     if has_instances "$dir"; then
         return 0
@@ -2069,6 +2151,12 @@ wait_for_qml_window_stop() {
 }
 
 is_inir_service_enabled() {
+    if is_using_runit_supervisor; then
+        # For runit, check if the service directory exists and has an executable run script
+        [[ -x "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir/run" ]]
+        return $?
+    fi
+
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
     fi
@@ -2101,6 +2189,10 @@ detect_compositor_service() {
 
 start_inir_service_if_enabled() {
     if is_inir_service_enabled; then
+        if is_using_runit_supervisor; then
+            sv up "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1
+            return 0
+        fi
         ensure_service_unit_available
         systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
         systemctl --user start inir.service >/dev/null 2>&1 || true
@@ -2113,6 +2205,10 @@ start_inir_service_if_enabled() {
 start_background() {
     local dir="$1"
     if is_inir_service_enabled; then
+        if is_using_runit_supervisor; then
+            sv up "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1
+            return 0
+        fi
         ensure_service_unit_available
         systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
         systemctl --user start inir.service >/dev/null 2>&1 || true
@@ -2137,7 +2233,11 @@ cleanup_orphans() {
     # inir.service. A foreground `qs -p ...` or another Quickshell config is not
     # owned by this service and must survive its ExecStopPost cleanup.
     local alive_pids service_main_pid=""
-    service_main_pid="$(systemctl --user show -p MainPID inir.service 2>/dev/null | cut -d= -f2 || true)"
+    if has_usable_systemd_user_manager; then
+        service_main_pid="$(systemctl --user show -p MainPID inir.service 2>/dev/null | cut -d= -f2 || true)"
+    elif command -v sv >/dev/null 2>&1; then
+        service_main_pid="$(sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>/dev/null | sed -n 's/.*(pid \([0-9][0-9]*\)).*/\1/p')"
+    fi
     alive_pids="$(pgrep -x 'quickshell|qs' 2>/dev/null || true)"
     if [[ -n "$alive_pids" ]]; then
         while IFS= read -r pid; do
@@ -2150,21 +2250,34 @@ cleanup_orphans() {
         done <<< "$alive_pids"
     fi
 
-    # Phase 5: Kill orphaned iNiR helper processes still in inir.service cgroup.
-    # KillMode=process only kills the main QS pid; swayidle, the keyboard daemon,
-    # and nmcli monitor can be reparented to the user manager while remaining in
-    # the service cgroup, accumulating across restarts.
-    local _pid _cgroup
+    # Runit reparents helpers to PID 1, so runtime paths are the ownership boundary.
+    local _pid _cgroup _ppid _cmdline _runtime_root _owned
+    local _using_runit=false
+    is_using_runit_supervisor && _using_runit=true
     while IFS= read -r _pid; do
         [[ -n "$_pid" ]] || continue
+        _ppid="$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ' || true)"
         # Skip processes owned by the live service main pid or its children
         if [[ -n "$service_main_pid" && "$service_main_pid" != "0" ]]; then
-            local _ppid
-            _ppid="$(ps -o ppid= -p "$_pid" 2>/dev/null | tr -d ' ' || true)"
             [[ "$_ppid" == "$service_main_pid" ]] && continue
         fi
-        _cgroup="$(cat /proc/$_pid/cgroup 2>/dev/null || true)"
-        [[ "$_cgroup" == *"inir.service"* ]] || continue
+
+        if [[ "$_using_runit" == true ]]; then
+            [[ "$_ppid" == "1" ]] || continue
+            _cmdline="$(tr '\0' ' ' < "/proc/$_pid/cmdline" 2>/dev/null || true)"
+            _owned=false
+            for _runtime_root in "$user_config_dir" "$system_config_dir" "$fallback_system_config_dir"; do
+                if [[ "$_cmdline" == *"$_runtime_root/scripts/daemon/keyboard_lock_state_daemon.py"* ]] \
+                        || { [[ "$_cmdline" == *"/swayidle -w"* ]] && [[ "$_cmdline" == *"$_runtime_root/scripts/inir"* ]]; }; then
+                    _owned=true
+                    break
+                fi
+            done
+            [[ "$_owned" == true ]] || continue
+        else
+            _cgroup="$(cat /proc/$_pid/cgroup 2>/dev/null || true)"
+            [[ "$_cgroup" == *"inir.service"* ]] || continue
+        fi
         kill "$_pid" 2>/dev/null || true
     done < <(pgrep -f 'keyboard_lock_state_daemon\.py|nmcli monitor|/usr/bin/swayidle -w' 2>/dev/null || true)
 
@@ -2221,7 +2334,9 @@ restart_shell() {
     local quiet="${2:-}"
 
     if is_inir_service_enabled; then
-        ensure_service_unit_available
+        if ! is_using_runit_supervisor; then
+            ensure_service_unit_available
+        fi
         [[ -z "$quiet" ]] && printf 'Restarting iNiR service... '
         restart_inir_service_or_fail "$dir" "$quiet"
         return 0
@@ -2345,7 +2460,7 @@ resolve_setup_dir() {
     fi
 
     stored_repo="${stored_repo/#\~/$HOME}"
-    if [[ -n "$stored_repo" && -d "${stored_repo}/.git" && -x "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
+    if [[ -n "$stored_repo" && -e "${stored_repo}/.git" && -x "${stored_repo}/setup" && -f "${stored_repo}/shell.qml" ]]; then
         printf '%s' "$stored_repo"
         return
     fi
@@ -2415,10 +2530,17 @@ show_logs() {
     if [[ "${1:-}" == "--debug" ]]; then
         echo "Stopping shell and relaunching in foreground with full debug logging." >&2
         echo "(QS_DEBUG=1, no QT_LOGGING_RULES filtering — Ctrl+C to stop, then 'inir restart')" >&2
-        stop_inir_service_if_active
+        if ! stop_inir_service_if_active; then
+            echo "Unable to stop the supervised iNiR service" >&2
+            return 1
+        fi
         kill_shell "$config_dir"
         sleep 1
         exec env QS_DEBUG=1 QT_LOGGING_RULES= "$qs_bin" -p "$config_dir"
+    fi
+
+    if [[ $# -eq 0 ]] && is_using_runit_supervisor; then
+        exec sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
     fi
 
     # --full decodes the ENTIRE qslog with no category filtering. Quickshell records
@@ -2702,6 +2824,10 @@ require_command() {
 }
 
 is_inir_service_active() {
+    if is_using_runit_supervisor; then
+        sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>/dev/null | grep -q '^run:'
+        return $?
+    fi
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
     fi
@@ -2710,16 +2836,21 @@ is_inir_service_active() {
 }
 
 is_current_process_inir_service() {
+    if is_using_runit_supervisor; then
+        return 1
+    fi
     grep -q '/inir\.service' "/proc/$$/cgroup" 2>/dev/null
 }
 
 stop_inir_service_if_active() {
-    if is_inir_service_active; then
-        systemctl --user stop inir.service >/dev/null 2>&1 || true
-        return 0
+    if is_using_runit_supervisor; then
+        is_inir_service_active || return 0
+        sv down "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1
+        return $?
     fi
-
-    return 1
+    is_inir_service_active || return 0
+    systemctl --user stop inir.service >/dev/null 2>&1
+    return $?
 }
 
 restart_inir_service_if_active() {
@@ -2729,6 +2860,12 @@ restart_inir_service_if_active() {
 
 report_inir_service_failure() {
     local lines="${1:-20}"
+
+    if is_using_runit_supervisor; then
+        printf '\n\033[31m── inir runit service status ──\033[0m\n' >&2
+        sv status "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" 2>&1 | sed -n '1,18p' >&2 || true
+        return 0
+    fi
 
     if ! command -v systemctl >/dev/null 2>&1; then
         return 1
@@ -2748,6 +2885,25 @@ report_inir_service_failure() {
 restart_inir_service_or_fail() {
     local dir="$1"
     local quiet="${2:-}"
+
+    if is_using_runit_supervisor; then
+        if ! sv restart "${XDG_CONFIG_HOME:-$HOME/.config}/service/inir" >/dev/null 2>&1; then
+            echo "Unable to restart the runit iNiR service" >&2
+            exit 1
+        fi
+        if ! wait_for_start "$dir"; then
+            echo "Timed out waiting for iNiR to start" >&2
+            report_inir_service_failure
+            exit 1
+        fi
+        if ! is_inir_service_active; then
+            echo "iNiR service failed to start" >&2
+            report_inir_service_failure
+            exit 1
+        fi
+        [[ -z "$quiet" ]] && printf 'done.\n'
+        return 0
+    fi
 
     ensure_service_unit_available
     systemctl --user reset-failed inir.service >/dev/null 2>&1 || true
@@ -2786,7 +2942,7 @@ install_user_service() {
         local launcher_real repo_launcher_real
         launcher_real="$(readlink -f "$launcher_path" 2>/dev/null || true)"
         repo_launcher_real="$(readlink -f "$setup_dir/scripts/inir" 2>/dev/null || true)"
-        if [[ -d "$setup_dir/.git" && -n "$launcher_real" && "$launcher_real" == "$repo_launcher_real" ]]; then
+        if [[ -e "$setup_dir/.git" && -n "$launcher_real" && "$launcher_real" == "$repo_launcher_real" ]]; then
             install_mode="repo-link"
         fi
     fi
@@ -2955,6 +3111,58 @@ ensure_service_unit_available() {
 run_service_command() {
     local action="${1:-status}"
     shift || true
+
+    local runit_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir"
+
+    if is_using_runit_supervisor; then
+        require_command sv
+        if [[ ! -x "$runit_service_dir/run" ]]; then
+            echo "runit service not installed at $runit_service_dir" >&2
+            return 1
+        fi
+        case "$action" in
+            install)
+                echo "Runit service already installed at $runit_service_dir"
+                ;;
+            uninstall|remove)
+                sv down "$runit_service_dir" >/dev/null 2>&1 || true
+                rm -rf "$runit_service_dir"
+                echo "Removed runit service"
+                ;;
+            enable)
+                sv up "$runit_service_dir" >/dev/null 2>&1
+                echo "Enabled runit service"
+                ;;
+            disable)
+                sv down "$runit_service_dir" >/dev/null 2>&1
+                echo "Disabled runit service"
+                ;;
+            start)
+                exec sv up "$runit_service_dir"
+                ;;
+            stop)
+                exec sv down "$runit_service_dir"
+                ;;
+            restart)
+                exec sv restart "$runit_service_dir"
+                ;;
+            status)
+                exec sv status "$runit_service_dir" "$@"
+                ;;
+            logs)
+                exec sv status "$runit_service_dir" "$@"
+                ;;
+            -h|--help|"")
+                service_usage
+                exit 0
+                ;;
+            *)
+                echo "Unknown service action: $action" >&2
+                exit 1
+                ;;
+        esac
+        return 0
+    fi
 
     case "$action" in
         install)
@@ -3127,7 +3335,7 @@ show_version() {
             local repo_dir=""
             repo_dir="$(jq -r '.repoPath // empty' "$version_file" 2>/dev/null || true)"
             [[ -z "$repo_dir" ]] && repo_dir="$runtime_path"
-            if [[ -n "$repo_dir" && -d "$repo_dir/.git" ]]; then
+            if [[ -n "$repo_dir" && -e "$repo_dir/.git" ]]; then
                 local git_branch
                 git_branch="$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
                 if [[ -n "$git_branch" ]]; then
@@ -4020,7 +4228,10 @@ case "$command_name" in
             esac
         done
         resolve_config_dir
-        stop_inir_service_if_active
+        if ! stop_inir_service_if_active; then
+            echo "Unable to stop the supervised iNiR service" >&2
+            exit 1
+        fi
         kill_shell "$config_dir"
         ;;
     run)
@@ -4064,6 +4275,8 @@ case "$command_name" in
             # Systemd manages lifecycle (Restart=on-failure) and I/O priority.
             _skip_running_detect=true
             resolve_config_dir
+            # Clean helpers orphaned by the previous supervised shell.
+            cleanup_orphans
             apply_hot_reload_policy_for_dir "$config_dir"
             check_qs_abi
             apply_qt_runtime_env          # import Niri-owned session env if needed
@@ -4085,7 +4298,7 @@ case "$command_name" in
         fi
         if [[ "$foreground" == true ]] && is_inir_service_active; then
             if ! is_current_process_inir_service; then
-                echo "iNiR is managed by inir.service. Stop it first before running manually." >&2
+                echo "iNiR is managed by a supervisor. Stop it first before running manually." >&2
                 exit 1
             fi
         fi
@@ -4093,7 +4306,6 @@ case "$command_name" in
             exec "$qs_bin" -n -p "$config_dir"
         fi
         if is_inir_service_enabled; then
-            ensure_service_unit_available
             start_inir_service_if_enabled
             exit 0
         fi
@@ -4153,7 +4365,10 @@ case "$command_name" in
             esac
         done
         resolve_config_dir
-        stop_inir_service_if_active
+        if ! stop_inir_service_if_active; then
+            echo "Unable to stop the supervised iNiR service" >&2
+            exit 1
+        fi
         kill_shell "$config_dir"
         ;;
     logs)
@@ -4492,6 +4707,9 @@ case "$command_name" in
         cleanup_orphans
         ;;
     doctor)
+        # Doctor may run outside the graphical session; reuse the live shell environment.
+        resolve_config_dir
+        import_running_instance_environment "$config_dir" >/dev/null 2>&1 || true
         # Quick path: `inir doctor --fix-abi` rebuilds quickshell directly without
         # running the full 22-step pipeline. Useful for pacman hooks and scripts.
         # `inir doctor --perf` dumps a runtime perf snapshot for triage — see

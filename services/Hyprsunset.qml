@@ -22,6 +22,20 @@ Singleton {
     property bool firstEvaluation: true
     property bool active: false
 
+    // A socket plus a bounded user-manager probe, not merely installed tools.
+    // A timeout means a busy systemd manager, never permission to spawn an
+    // unowned fallback in inir.service's cgroup. Without an owned non-systemd
+    // backend, fail closed instead of adopting or killing another wlsunset.
+    readonly property string _systemdUserManagerCheck: `
+        if [ -S "\${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/systemd/private" ] &&
+           [ -x /usr/bin/systemctl ] && [ -x /usr/bin/timeout ]; then
+            /usr/bin/timeout 3s /usr/bin/systemctl --user show-environment >/dev/null 2>&1
+            case $? in 0|124) ;; *) exit 1 ;; esac
+        else
+            exit 1
+        fi;
+    `
+
     property int fromHour: Number(from.split(":")[0])
     property int fromMinute: Number(from.split(":")[1])
     property int toHour: Number(to.split(":")[0])
@@ -41,7 +55,7 @@ Singleton {
         interval: 300
         onTriggered: {
             if (root._pendingRestart && root.active) {
-                root._doEnable()
+                root.enable()
             }
             root._pendingRestart = false
         }
@@ -101,15 +115,7 @@ Singleton {
 
     function _doEnable() {
         if (CompositorService.isNiri) {
-            // Keep night light outside inir.service's cgroup. It must survive
-            // shell reloads without being reported as a leaked child process.
-            // A transient user unit also gives us a precise lifecycle owner.
-            Quickshell.execDetached([
-                "/usr/bin/systemd-run", "--user", "--collect",
-                "--unit=inir-wlsunset.service", "--property=PartOf=niri.service",
-                "/usr/bin/wlsunset", "-T", "6500", "-t",
-                root.colorTemperature.toString(), "-s", "00:00", "-S", "23:59"
-            ]);
+            wlsunsetStartProc.running = true;
         } else {
             hyprsunsetStartProc.running = true;
         }
@@ -171,10 +177,28 @@ Singleton {
 
     // === Niri processes (wlsunset) ===
     Process {
+        id: wlsunsetStartProc
+        // Only the transient unit owns the daemon, outside the shell cgroup;
+        // it survives shell reloads but stops with the Niri session.
+        command: ["/usr/bin/bash", "-c", root._systemdUserManagerCheck + `
+            [ -x /usr/bin/systemd-run ] || exit 1
+            exec /usr/bin/systemd-run --user --collect --unit=inir-wlsunset.service --property=PartOf=niri.service /usr/bin/wlsunset -T 6500 -t "$1" -s 00:00 -S 23:59
+        `, "inir-nightlight", root.colorTemperature.toString()]
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0) root.active = false;
+        }
+    }
+
+    Process {
         id: wlsunsetKillProc
         // Stop only our own unit; another session may own its own wlsunset.
-        command: ["/usr/bin/systemctl", "--user", "stop", "inir-wlsunset.service"]
-        onExited: {
+        command: ["/usr/bin/bash", "-c", root._systemdUserManagerCheck +
+            "/usr/bin/systemctl --user stop inir-wlsunset.service >/dev/null 2>&1 || true"]
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0) {
+                root.active = false;
+                return;
+            }
             // If we're enabling, start wlsunset after kill completes
             if (root.active) {
                 root._doEnable();
@@ -185,7 +209,8 @@ Singleton {
     Process {
         id: niriFetchProc
         running: CompositorService.isNiri
-        command: ["/usr/bin/systemctl", "--user", "is-active", "--quiet", "inir-wlsunset.service"]
+        command: ["/usr/bin/bash", "-c", root._systemdUserManagerCheck +
+            "exec /usr/bin/systemctl --user is-active --quiet inir-wlsunset.service"]
         onExited: (exitCode, exitStatus) => {
             root.active = (exitCode === 0);
         }

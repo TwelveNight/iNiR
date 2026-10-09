@@ -153,7 +153,7 @@ Floating tools (Super+G): notes, images, crosshair, recorder, resources and othe
 | Function | Description |
 |----------|-------------|
 | `toggle` | Open/close Floating tools |
-| `tool` | Show or hide one floating tool by id (`crosshair`, `fpsLimiter`, `floatingImage`, `recorder`, `resources`, `notes`, `discord`, `volumeMixer`, `notifications`): `on`, `off` or `toggle` |
+| `tool` | Show or hide one floating tool by id (`crosshair`, `fpsLimiter`, `floatingImage`, `recorder`, `resources`, `notes`, `discord`, `volumeMixer`, `notifications`, `gamePerformance`): `on`, `off` or `toggle` |
 
 ```kdl
 Super+G { spawn "inir" "overlay" "toggle"; }
@@ -297,13 +297,14 @@ Super+Alt+L allow-when-locked=true { spawn "inir" "lock" "activate"; }
 
 ### loginScreen
 
-The login screen you see after starting the computer. It copies the lock screen and follows your colours.
+The login screen you see after starting the computer. It wears your wallpaper and colours.
 
 | Function | Description |
 |----------|-------------|
-| `set <look>` | `auto` (the iRiS lock while you use iRiS, Classic otherwise), `classic` or `iris` |
-| `status` | Print the choice and the look it gives (e.g. `auto (iris)`), or `not installed` |
-| `sync` | Copy the current lock, colours and wallpaper to the login screen now |
+| `set <look>` | `auto` (iRiS while you use iRiS, Classic otherwise), `classic` or `iris` |
+| `style <style>` | How the iRiS login is composed: `cover` (your picture sharp, the clock in a corner), `frame` (the picture hung in a mat) or `lens` (the time cut out of the picture) |
+| `status` | Print the choice and the look it gives (e.g. `auto (iris, lens)`), or `not installed` |
+| `sync` | Copy the current colours, wallpaper and style to the login screen now |
 
 ---
 
@@ -348,7 +349,7 @@ Close window confirmation dialog. Shows a prompt before closing the focused wind
 | `close` | Dismiss the dialog without closing |
 
 ```kdl
-Mod+Q repeat=false { spawn "inir" "close-window"; }
+Mod+Q repeat=false allow-inhibiting=false { spawn "inir" "close-window"; }
 ```
 
 By default, confirmation is disabled (closes immediately). Enable it in settings or config:
@@ -748,7 +749,7 @@ Shared multi-provider AI service. It supports Gemini, OpenAI-compatible chat and
 
 ### packageSearch
 
-Package search service. Searches pacman repos and installed packages.
+Package search service. Searches pacman/AUR or XBPS repositories and installed packages.
 
 | Function | Description |
 |----------|-------------|
@@ -799,6 +800,28 @@ Short notices when something is plugged in, connected, unplugged or lost: networ
 
 ---
 
+### bluetooth
+
+The Bluetooth adapter as every family shows it. `simulate` lets you see the Bluetooth surfaces without the hardware.
+
+| Function | Description |
+|----------|-------------|
+| `status` | Print `on`, `off`, `no adapter` or how many devices are connected, marked `(simulated)` while simulating |
+| `simulate <state>` | Pretend the adapter is `off`, `on`, has a number of connected devices (`2`) or is missing (`none`) until `clear` or a restart. For testing |
+
+---
+
+### battery
+
+The laptop battery as every family shows it. `simulate` lets you see the battery surfaces on a machine without one.
+
+| Function | Description |
+|----------|-------------|
+| `status` | Print the level and whether it is charging, discharging or plugged in, marked `(simulated)` while simulating |
+| `simulate <spec>` | Pretend the battery is at a level and state until the shell restarts: `14`, `"14 charging"`, `full` or `off`. Never suspends the machine. For testing |
+
+---
+
 ### network
 
 Whether the shell can reach the internet, as NetworkManager sees it. Surfaces that show online content (wallpaper sources, news, anime, weather, calendars, lyrics) read this to say why they are empty instead of failing quietly.
@@ -808,6 +831,7 @@ Whether the shell can reach the internet, as NetworkManager sees it. Surfaces th
 | `status` | Print the state as JSON: `online`, `connectivity` (`full`, `limited`, `portal`, `none`, `unknown`), connection name |
 | `check` | Ask NetworkManager to check connectivity again, for example after signing in to a captive portal |
 | `simulate <state>` | Pretend the connectivity is `none`, `limited`, `portal` or `full` until the shell restarts; any other value clears it. For testing |
+| `simulateLink <spec>` | Pretend the link is `"wifi 40"` (a signal strength), `searching`, `connecting`, `"radio off"`, `ethernet` or `none` (no adapter) until `off` or a restart. For testing |
 
 ---
 

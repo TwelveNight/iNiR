@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.32.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.33.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License"></a>
@@ -263,6 +263,8 @@ inir update                     # pull + migrate + restart
 ```
 
 </div>
+
+**التوزيعات المدعومة:** Arch، ويضيف هذا الفرع دعماً آلياً ومختبراً لـ Void Linux glibc + runit عبر XBPS. راجع [VOID.md](../VOID.md) لتعليمات Void و[PACKAGES.md](../PACKAGES.md) لباقي الحزم.
 
 طرق أخرى، إن لم يكن `./setup install` ما تريده:
 

@@ -4,7 +4,7 @@
 
 # shellcheck shell=bash
 
-INIR_CONFIG_DIR="${DOTS_CORE_CONFDIR:-${XDG_CONFIG_HOME}/inir}"
+INIR_CONFIG_DIR="${INIR_CONFIG_DIR:-${DOTS_CORE_CONFDIR:-${XDG_CONFIG_HOME}/inir}}"
 
 ###############################################################################
 # Configuration - What iNiR installs/manages
@@ -26,6 +26,9 @@ declare -A INIR_ONLY_PATHS=(
     ["${HOME}/.local/bin/inir_super_overview_daemon.py"]="iNiR super daemon"
     ["${XDG_CONFIG_HOME}/systemd/user/inir.service"]="iNiR user service"
     ["${XDG_CONFIG_HOME}/systemd/user/inir-super-overview.service"]="iNiR daemon service"
+    ["${XDG_CONFIG_HOME}/service/inir"]="iNiR runit user service"
+    ["${XDG_CONFIG_HOME}/service/inir-xembedsniproxy"]="iNiR XEmbed runit service"
+    ["${XDG_CONFIG_HOME}/service/inir-super-overview"]="iNiR Super-tap runit service"
     ["${XDG_DATA_HOME}/applications/inir.desktop"]="iNiR desktop entry"
     ["${XDG_DATA_HOME}/applications/inir-settings.desktop"]="iNiR settings desktop entry"
     ["${XDG_DATA_HOME}/icons/hicolor/scalable/apps/inir.svg"]="iNiR launcher icon"
@@ -220,6 +223,11 @@ package_has_dependents() {
             local deps=$(apt-cache rdepends "$pkg" 2>/dev/null | grep -v "^$pkg$" | head -1)
             [[ -n "$deps" ]]
             ;;
+        void)
+            # XBPS prints reverse dependencies one per line; no output means none.
+            local deps=$(xbps-query -X "$pkg" 2>/dev/null | head -1)
+            [[ -n "$deps" ]]
+            ;;
         *)
             # Can't check, assume it might have dependents
             return 0
@@ -277,15 +285,46 @@ get_package_removal_safety() {
 # Uninstall functions
 ###############################################################################
 
+uninstall_validate_owned_paths() {
+    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
+        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
+    # runit follows service aliases; never stop/delete another shell through one.
+    local root="${XDG_CONFIG_HOME:-$HOME/.config}/service" path
+    for path in "$root" "$root/inir" "$root/inir/run" \
+                "$root/inir-xembedsniproxy" "$root/inir-xembedsniproxy/run" \
+                "$root/inir-super-overview" "$root/inir-super-overview/run"; do
+        if [[ -L "$path" ]]; then
+            printf 'Unsafe iNiR service path (symlink): %s\n' "$path" >&2
+            return 2
+        fi
+    done
+}
+
 uninstall_stop_services() {
+    # Validate the installed path before qs resolves it or any supervisor acts.
+    uninstall_validate_owned_paths || return $?
     tui_info "Stopping iNiR services..."
+
+    local user_service_root="${XDG_CONFIG_HOME:-$HOME/.config}/service"
+    local service_dir
+    if command -v sv >/dev/null 2>&1; then
+        for service_dir in inir inir-xembedsniproxy inir-super-overview; do
+            [[ -d "$user_service_root/$service_dir" ]] || continue
+            sv down "$user_service_root/$service_dir" >/dev/null 2>&1 || true
+        done
+        if [[ ! -L "$user_service_root/ydotool" && ! -L "$user_service_root/ydotool/run" \
+                && -f "$user_service_root/ydotool/run" ]] \
+                && grep -q '^# Managed by iNiR\.' "$user_service_root/ydotool/run"; then
+            sv down "$user_service_root/ydotool" >/dev/null 2>&1 || true
+        fi
+    fi
 
     # Stop quickshell inir config
     local runtime_target="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/inir"
     qs -p "$runtime_target" kill 2>/dev/null || true
 
     # Stop super daemon if running
-    if command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
+    if has_usable_systemd_user_manager; then
         # Stop the service
         systemctl --user stop inir.service 2>/dev/null || true
         # Remove all wants links (compositor-specific and legacy graphical-session)
@@ -308,7 +347,7 @@ uninstall_stop_services() {
 }
 
 uninstall_reload_user_systemd() {
-    if command -v systemctl &>/dev/null && [[ -d /run/systemd/system ]]; then
+    if has_usable_systemd_user_manager; then
         systemctl --user daemon-reload 2>/dev/null || true
     fi
 }
@@ -437,8 +476,7 @@ uninstall_create_backup() {
 }
 
 uninstall_remove_inir_only() {
-    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
-        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
+    uninstall_validate_owned_paths || return $?
     local removed=0
     local _start=$SECONDS
 
@@ -530,9 +568,12 @@ uninstall_show_manual_steps() {
         echo -e "  ${STY_CYAN}# Remove i2c module autoload${STY_RST}"
         echo -e "  sudo rm /etc/modules-load.d/i2c-dev.conf"
         echo ""
-        if command -v systemctl &>/dev/null; then
+        if has_usable_systemd_user_manager; then
             echo -e "  ${STY_CYAN}# Disable ydotool${STY_RST}"
             echo -e "  systemctl --user disable ydotool"
+        elif command -v sv &>/dev/null; then
+            echo -e "  ${STY_CYAN}# Disable ydotool user service${STY_RST}"
+            echo -e "  sv down ~/.config/service/ydotool"
         fi
         echo ""
         echo -e "  ${STY_CYAN}# Remove SDDM theme${STY_RST}"
@@ -667,6 +708,18 @@ uninstall_show_packages() {
                 echo -e "  # sudo rm /usr/local/bin/niri"
                 echo ""
                 ;;
+            void)
+                if [[ ${#safe_to_remove[@]} -gt 0 ]]; then
+                    echo -e "  ${STY_GREEN}# Safe to remove:${STY_RST}"
+                    echo -e "  sudo xbps-remove -R ${safe_to_remove[*]}"
+                    echo ""
+                fi
+                if [[ ${#ask_before_remove[@]} -gt 0 ]]; then
+                    echo -e "  ${STY_YELLOW}# Check before removing:${STY_RST}"
+                    echo -e "  # sudo xbps-remove -R ${ask_before_remove[*]}"
+                    echo ""
+                fi
+                ;;
             *)
                 echo -e "${STY_FAINT}Remove packages using your package manager.${STY_RST}"
                 echo -e "${STY_FAINT}Check ~/.cargo/bin and ~/go/bin for tools installed there.${STY_RST}"
@@ -681,7 +734,12 @@ uninstall_show_packages() {
         echo ""
     fi
 
-    echo -e "${STY_FAINT}Tip: Run 'pacman -Qi <package>' or 'apt show <package>' to see what depends on a package.${STY_RST}"
+    case "$distro" in
+        void) echo -e "${STY_FAINT}Tip: Run 'xbps-query -X <package>' to see reverse dependencies.${STY_RST}" ;;
+        arch) echo -e "${STY_FAINT}Tip: Run 'pacman -Qi <package>' to inspect package dependencies.${STY_RST}" ;;
+        debian|ubuntu) echo -e "${STY_FAINT}Tip: Run 'apt-cache rdepends <package>' to see reverse dependencies.${STY_RST}" ;;
+        *) echo -e "${STY_FAINT}Review reverse dependencies with your package manager before removing shared tools.${STY_RST}" ;;
+    esac
     echo ""
 }
 
@@ -690,8 +748,7 @@ uninstall_show_packages() {
 ###############################################################################
 
 run_uninstall() {
-    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
-        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
+    uninstall_validate_owned_paths || return $?
     local _uninstall_start=$SECONDS
     local installed_mode
     local update_strategy
@@ -794,7 +851,7 @@ run_uninstall() {
     backup_dir=$(uninstall_create_backup) || { tui_warn "Backup failed; uninstall stopped"; return 1; }
 
     # Stop services
-    uninstall_stop_services
+    uninstall_stop_services || return $?
 
     # Remove iNiR-exclusive files (always safe)
     uninstall_remove_inir_only || return 1
@@ -857,8 +914,7 @@ EOF
 ###############################################################################
 
 run_uninstall_quick() {
-    INIR_CONFIG_DIR="$INIR_CONFIG_DIR" INIR_STATE_DIR="${INIR_STATE_DIR:-${XDG_STATE_HOME}/inir}" \
-        python3 "${REPO_ROOT}/scripts/lib/private_paths.py" || return $?
+    uninstall_validate_owned_paths || return $?
     echo ""
     tui_title "iNiR Quick Uninstall"
     echo ""
@@ -880,7 +936,7 @@ run_uninstall_quick() {
     backup_dir=$(uninstall_create_backup) || { tui_warn "Backup failed; uninstall stopped"; return 1; }
 
     # Stop services
-    uninstall_stop_services
+    uninstall_stop_services || return $?
 
     # Remove only iNiR-exclusive files
     ask=false  # Disable prompts for shared configs

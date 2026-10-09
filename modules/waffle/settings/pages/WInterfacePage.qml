@@ -53,6 +53,14 @@ WSettingsPage {
         GlobalStates.settingsOverlayOpen = false
         GlobalStates.overlayOpen = true
     }
+
+    function gamePerformanceBackgroundOpacity(): real {
+        const localValue = Number(Config.options?.overlay?.gamePerformance?.backgroundOpacity ?? -1)
+        const globalValue = Number(Config.options?.overlay?.backgroundOpacity ?? 0.9)
+        const value = isFinite(localValue) && localValue >= 0 ? localValue : globalValue
+        return Math.max(0, Math.min(1, isFinite(value) ? value : 0.9))
+    }
+
     readonly property var recordingAudioModeOptions: [
         { value: "none", displayName: Translation.tr("No audio") },
         { value: "system", displayName: Translation.tr("System audio") },
@@ -513,6 +521,26 @@ WSettingsPage {
             onValueChanged: Config.setNestedValue("overlay.backgroundOpacity", value / 100)
         }
 
+        WSettingsSpinBox {
+            label: Translation.tr("Game Performance background opacity (%)")
+            icon: "monitor_heart"
+            suffix: "%"
+            from: 0; to: 100; stepSize: 5
+            value: Math.round(root.gamePerformanceBackgroundOpacity() * 100)
+            enabled: !(Config.options?.overlay?.gamePerformance?.transparentBackground ?? false)
+            onValueChanged: Config.setNestedValue(
+                "overlay.gamePerformance.backgroundOpacity", value / 100)
+        }
+
+        WSettingsSwitch {
+            label: Translation.tr("Transparent Game Performance background")
+            icon: "opacity"
+            description: Translation.tr("Set panel opacity to 0%; metrics remain visible")
+            checked: Config.options?.overlay?.gamePerformance?.transparentBackground ?? false
+            onCheckedChanged: Config.setNestedValue(
+                "overlay.gamePerformance.transparentBackground", checked)
+        }
+
         WSettingsSwitch {
             label: Translation.tr("Enable opening zoom animation")
             icon: "play"
@@ -782,7 +810,7 @@ WSettingsPage {
             visible: MaterialThemeLoader.loginScreenInstalled
             label: Translation.tr("Login screen")
             icon: "key"
-            description: Translation.tr("Where you sign in after starting the computer. Automatic wears the iRiS lock while you use iRiS.")
+            description: Translation.tr("Where you sign in after starting the computer. Automatic shows iRiS while you use iRiS.")
             currentValue: Config.options?.lock?.loginScreen ?? "auto"
             options: [
                 { value: "auto", displayName: Translation.tr("Automatic") },
@@ -790,6 +818,22 @@ WSettingsPage {
                 { value: "iris", displayName: Translation.tr("iRiS") }
             ]
             onSelected: newValue => Config.setNestedValue("lock.loginScreen", newValue)
+        }
+
+        WSettingsDropdown {
+            readonly property string look: Config.options?.lock?.loginScreen ?? "auto"
+            visible: MaterialThemeLoader.loginScreenInstalled
+                && (look === "iris" || (look === "auto" && (Config.options?.panelFamily ?? "ii") === "iris"))
+            label: Translation.tr("Login style")
+            icon: "image"
+            description: Translation.tr("Cover shows your picture sharp, Frame hangs it in a mat, Lens cuts the time out of it.")
+            currentValue: Config.options?.lock?.loginStyle ?? "lens"
+            options: [
+                { value: "cover", displayName: Translation.tr("Cover") },
+                { value: "frame", displayName: Translation.tr("Frame") },
+                { value: "lens", displayName: Translation.tr("Lens") }
+            ]
+            onSelected: newValue => Config.setNestedValue("lock.loginStyle", newValue)
         }
     }
 

@@ -70,14 +70,23 @@ _show_privilege_instructions() {
     echo -e "${STY_CYAN}Recommended solutions:${STY_RST}" >&2
     echo "  1. Switch to a virtual terminal (Ctrl+Alt+F2-F6) and login as root" >&2
     echo "" >&2
-    echo "  2. Use 'su' with root password (set during Arch installation):" >&2
-    echo "     su -c 'pacman -S sudo'" >&2
-    echo "     # Then configure visudo as below" >&2
-    echo "" >&2
-    echo "  3. Boot from Arch ISO and chroot:" >&2
-    echo "     mount /dev/sdX1 /mnt" >&2
-    echo "     arch-chroot /mnt" >&2
-    echo "     pacman -S sudo" >&2
+    if [[ "${OS_GROUP_ID:-}" == "void" || -f /etc/void-release ]]; then
+      echo "  2. Login as root (or use su) and install sudo:" >&2
+      echo "     xbps-install -S sudo" >&2
+      echo "     # Then configure visudo as below" >&2
+      echo "" >&2
+      echo "  3. From Void live media, mount/chroot the installed system and run:" >&2
+      echo "     xbps-install -S sudo" >&2
+    else
+      echo "  2. Use 'su' with root password:" >&2
+      echo "     su -c 'pacman -S sudo'" >&2
+      echo "     # Then configure visudo as below" >&2
+      echo "" >&2
+      echo "  3. Boot from Arch ISO and chroot:" >&2
+      echo "     mount /dev/sdX1 /mnt" >&2
+      echo "     arch-chroot /mnt" >&2
+      echo "     pacman -S sudo" >&2
+    fi
     echo "" >&2
   fi
   
@@ -127,7 +136,7 @@ pkg_sudo() {
   fi
   
   # Priority 4: Fallback to su (for TTY/console environments)
-  # su requires root password (set during Arch installation)
+  # su requires the root password configured by the installed distribution.
   if command -v su &>/dev/null; then
     # Only use su in non-graphical environments (no D-Bus, no XDG)
     if ! _is_graphical_env && [[ -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
@@ -1083,34 +1092,6 @@ EOF
   fi
 
   log_success "Zsh shell configuration set"
-}
-
-#####################################################################################
-# Distro-specific Polkit Agent Detection
-#####################################################################################
-
-get-polkit-agent(){
-  # Returns the path to the polkit authentication agent for the current distro
-  local agents=(
-    "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
-    "/usr/lib/polkit-kde-authentication-agent-1"
-    "/usr/libexec/polkit-kde-authentication-agent-1"
-    "/usr/lib/mate-polkit/polkit-mate-authentication-agent-1"
-    "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
-    "/usr/libexec/polkit-gnome-authentication-agent-1"
-    "/usr/lib/lxpolkit/lxpolkit"
-  )
-
-  for agent in "${agents[@]}"; do
-    if [[ -x "$agent" ]]; then
-      echo "$agent"
-      return 0
-    fi
-  done
-
-  # Not found
-  echo ""
-  return 1
 }
 
 #####################################################################################

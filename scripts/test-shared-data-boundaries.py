@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -219,6 +220,10 @@ printf "'Shared Fixture Icons'\\n"
 
     def test_niri_nightlight_controls_only_its_owned_service(self):
         self.copy_singleton("services/Hyprsunset.qml")
+        manager = self.base / "runtime/systemd/private"
+        manager.parent.mkdir(parents=True, exist_ok=True)
+        with socket.socket(socket.AF_UNIX) as sock:
+            sock.bind(str(manager))
         self.stub("services", "CompositorService", 'property bool isNiri: true')
         (self.base / "services/DateTime.qml").write_text('''pragma Singleton
 import QtQuick

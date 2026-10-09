@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.32.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/snowarch/inir/releases"><img src="https://img.shields.io/badge/version-2.33.0-blue?style=flat-square" alt="Version"></a>
   <a href="https://github.com/snowarch/inir/stargazers"><img src="https://img.shields.io/github/stars/snowarch/inir?style=flat-square" alt="Stars"></a>
   <a href="https://discord.gg/pAPTfAhZUJ"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-green?style=flat-square" alt="License"></a>
@@ -249,6 +249,8 @@ inir logs                       # check runtime logs
 inir doctor                     # auto-diagnose and fix
 inir update                     # pull + migrate + restart
 ```
+
+**Distros suportadas:** Arch; este fork também adiciona um caminho automatizado e validado para Void Linux glibc + runit via XBPS. Veja [VOID.md](../VOID.md) para Void e [PACKAGES.md](../PACKAGES.md) para pacotes.
 
 Outras formas de instalar, se `./setup install` não for o que você quer:
 

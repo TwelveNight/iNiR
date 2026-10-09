@@ -47,6 +47,10 @@ Scope {
                 anchors.fill: parent
                 source: WallpaperListener.wallpaperUrlForScreen(panelWindow.screen)
                 fillMode: Image.PreserveAspectCrop
+                // Blur source: decode at the screen's pixels, not the file's
+                sourceSize: Qt.size(
+                    Math.ceil((panelWindow.screen?.width ?? 1920) * Math.max(1, panelWindow.devicePixelRatio ?? 1)),
+                    Math.ceil((panelWindow.screen?.height ?? 1080) * Math.max(1, panelWindow.devicePixelRatio ?? 1)))
                 visible: false
             }
 

@@ -310,7 +310,7 @@
             "titleFont": "Gabarito",
             "monospaceFont": "JetBrainsMono Nerd Font",
             "sizeScale": 1.0,
-            "syncWithSystem": true,
+            "syncWithSystem": false,
             "variableAxes": {
                 "wght": 300,
                 "wdth": 105,
@@ -354,7 +354,7 @@
         "taskManager": "missioncenter",
         "terminal": "kitty",
         "volumeMixer": "pavucontrol",
-        "update": "kitty -e arch-update"
+        "update": ""
     },
     "audio": {
         "protection": {
@@ -1499,6 +1499,7 @@
         "launchOnStartup": false,
         "materialShapeChars": true,
         "loginScreen": "auto",
+        "loginStyle": "lens",
         "enableAnimation": false,
         "notifications": {
             "enable": false,
@@ -2291,7 +2292,7 @@
     },
     "hotspot": {
         "ssid": "iNiR Hotspot",
-        "password": "inirhotspot",
+        "password": "",
         "band": "bg"
     },
     "keyboardIndicators": {
@@ -2642,6 +2643,7 @@
             "height": 42,
             "margin": 8,
             "autoHide": false,
+            "revealOnEmpty": true,
             "reserveSpace": true,
             "screenList": [],
             "leftModules": [],

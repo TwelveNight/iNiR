@@ -2,8 +2,14 @@
 
 import argparse
 import asyncio
+import atexit
+import fcntl
 import json
+import os
+from pathlib import Path
+import signal
 import sys
+import time
 
 from evdev import InputDevice, ecodes, list_devices
 
@@ -12,11 +18,72 @@ RELEVANT_KEY_CODES = {ecodes.KEY_CAPSLOCK, ecodes.KEY_NUMLOCK}
 RELEVANT_LED_CODES = {ecodes.LED_CAPSL, ecodes.LED_NUML}
 
 
+def _monitor_paths():
+    runtime_dir = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
+    prefix = "inir-keyboard-lock-state" if runtime_dir != Path("/tmp") else f"inir-{os.getuid()}-keyboard-lock-state"
+    return runtime_dir / f"{prefix}.pid", runtime_dir / f"{prefix}.lock"
+
+
+def _is_owned_monitor(pid):
+    if pid <= 1 or pid == os.getpid():
+        return False
+
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
+    except OSError:
+        return False
+
+    return "keyboard_lock_state_daemon.py" in cmdline and "--once" not in cmdline
+
+
+def claim_monitor_process():
+    """Ensure only the newest persistent monitor for this user stays alive."""
+    pid_path, lock_path = _monitor_paths()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with lock_path.open("a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+
+        old_pid = 0
+        try:
+            old_pid = int(pid_path.read_text().strip())
+        except (OSError, ValueError):
+            pass
+
+        if _is_owned_monitor(old_pid):
+            try:
+                os.kill(old_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+
+            deadline = time.monotonic() + 1.0
+            while _is_owned_monitor(old_pid) and time.monotonic() < deadline:
+                time.sleep(0.05)
+
+            if _is_owned_monitor(old_pid):
+                try:
+                    os.kill(old_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+
+        pid_path.write_text(f"{os.getpid()}\n")
+
+    def cleanup_pid_file():
+        try:
+            if pid_path.read_text().strip() == str(os.getpid()):
+                pid_path.unlink()
+        except OSError:
+            pass
+
+    atexit.register(cleanup_pid_file)
+
+
 class KeyboardLockMonitor:
     def __init__(self):
         self.devices = {}
         self.tasks = {}
         self.last_state = None
+        self.inspected = set()  # readable device nodes opened by the last refresh, keyboards or not
 
     def _is_candidate(self, dev):
         name = (dev.name or "").lower()
@@ -74,11 +141,13 @@ class KeyboardLockMonitor:
 
     async def refresh_devices(self):
         discovered = {}
+        inspected = set()
         for path in list_devices():
             try:
                 dev = InputDevice(path)
             except OSError:
                 continue
+            inspected.add(path)
 
             try:
                 if not self._is_candidate(dev):
@@ -108,6 +177,18 @@ class KeyboardLockMonitor:
 
             self.devices[path] = dev
             self.tasks[path] = asyncio.create_task(self.monitor_device(path))
+        self.inspected = inspected
+
+    def _forget(self, path):
+        """A keyboard that went away: the next refresh opens whatever takes its node."""
+        self.tasks.pop(path, None)
+        dev = self.devices.pop(path, None)
+        if dev is not None:
+            try:
+                dev.close()
+            except OSError:
+                pass
+        self.inspected.discard(path)
 
     async def monitor_device(self, path):
         dev = self.devices[path]
@@ -123,6 +204,7 @@ class KeyboardLockMonitor:
         except asyncio.CancelledError:
             return
         except OSError:
+            self._forget(path)
             return
 
     async def run(self):
@@ -134,7 +216,10 @@ class KeyboardLockMonitor:
 
         while True:
             await asyncio.sleep(5)
-            await self.refresh_devices()
+            # Opening every input device to read its capabilities is the costly part: only when the readable set
+            # changed (a hotplug, udev granting the seat's access after creating a node, a keyboard that left).
+            if set(list_devices()) != self.inspected:
+                await self.refresh_devices()
             if self.devices:
                 await self.emit_state()
 
@@ -173,6 +258,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
+
+    if not args.once:
+        claim_monitor_process()
 
     try:
         code = asyncio.run(async_main(args.once))

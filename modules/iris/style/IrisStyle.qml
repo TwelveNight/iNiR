@@ -273,6 +273,12 @@ QtObject {
         blue: 0.6, indigo: 0.67, purple: 0.78, pink: 0.95 })
     function materialSwatch(name: string): color { return Qt.color(root.washi?.materials?.[name] ?? "#000000") }
     readonly property string materialName: root.followsTheme ? "theme" : String(root.theme?.surface ?? "black")
+    // What each scheme calls its materials (Settings, the previews): the three stored names stay black, graphite, midnight.
+    readonly property var materialLabels: root.ink ? ({ black: "Washi", graphite: "Kraft", midnight: "Mist" })
+        : root.light ? ({ black: "Snow", graphite: "Silver", midnight: "Sky" }) : ({ black: "Black", graphite: "Graphite", midnight: "Midnight" })
+    function materialLabel(name: string): string {
+        return root.materialLabels[name] ?? (name === "wallpaper" ? "Wallpaper" : name === "theme" ? "Theme" : name)
+    }
     readonly property color surfaceOpaque: root.role("surface", "#000000")
     readonly property color darkSurfaceOpaque: Qt.color(root.washiDark?.materials?.[root.materialName] ?? "#000000")
     readonly property bool plainBlack: root.materialName === "black"
@@ -566,6 +572,8 @@ QtObject {
     readonly property color fillStrong: ColorUtils.applyAlpha(root.light ? root.text : root.fillInk, Math.min(0.9, (root.light ? 0.46 : 0.82) * root.preset.fill * root.tweak("fill", 0.3, 2)))
     // The palette solves the accent as text on this wash (washi.go): it stays within that, whatever Fills says.
     function tintFill(tint: color): color { return ColorUtils.applyAlpha(tint, Math.min(0.15, root.fillAlpha(0.13))) }
+    // The unread part of a reading (rings, gauges): the reading's own colour, faint but present on every material.
+    function trackOf(tint: color): color { return ColorUtils.applyAlpha(tint, root.fillAlpha(0.38)) }
     function tintFillHover(tint: color): color { return ColorUtils.applyAlpha(tint, root.fillAlpha(0.2)) }
     function tintBorder(tint: color): color { return ColorUtils.applyAlpha(tint, 0.7) }
 

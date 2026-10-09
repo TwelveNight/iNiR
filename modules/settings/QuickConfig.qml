@@ -1910,6 +1910,7 @@ ContentPage {
             }
 
             SettingsSwitch {
+                visible: GameMode.discoverOverlayInstalled
                 buttonIcon: "visibility_off"
                 text: Translation.tr("Disable Discover overlay")
                 checked: Config.options?.gameMode?.disableDiscoverOverlay ?? true

@@ -132,6 +132,26 @@ inir version
 
 Shell 的 `background.fillMode`、parallax 和桌面效果不等同于 skwd 的控制命令，因此相关设置按后端隐藏，缩放、播放和过渡在 skwd 设置中管理。Afterglow 的 Shell 外观仍保留，但壁纸调色选项在 skwd 模式明确只作用于 Shell 锁屏，不会改变 skwd 桌面。浏览器配色仅使用已有可写 policy 目录；不会自动提权、改权限或编辑真实浏览器 profile。
 
+### Void / 非 systemd 上游兼容边界
+
+同步上游 Void 支持时仍保留个人所有权边界：不因安装其他桌面包而删除 II，
+不替换 GDM，不清理 II 的 Super-tap 服务，也不自动覆盖共享 GTK/终端基础设置。
+`inir.service` 继续由 Niri 会话启动，不挂到用户 `default.target`。
+Turnstile 的启动环境遵守已有 `INIR_VENV`，否则从 iNiR 私有状态目录解析 `.venv`。
+Niri 夜灯仅控制 `inir-wlsunset.service`；没有可用 systemd 用户管理器时保持关闭，
+不启动无归属的 `wlsunset`、不杀其他会话的进程。非 systemd 夜灯后端尚未接入个人层。
+
+服务协调器在写入或清理前拒绝目标文件及父目录的符号链接别名，并把写入、权限
+和启动配置更新失败传回安装器；systemd 模式不生成 iNiR 的 runit 启动文件。
+Qt 6.11 的面板家族重启助手使用 `INIR_CONFIG_DIR` / 私有 iNiR 设置路径，不写 II；
+GameMode 等待 Discover Overlay 停止完成后重新协调当前状态，避免切换期间遗漏恢复。
+新安装的字体同步默认关闭，只有显式 opt-in 才应用系统字体同步。
+
+Foot 的新生成文件为 `${XDG_CONFIG_HOME:-~/.config}/foot/inir-colors.ini`。
+默认只更新颜色，不改现有 `foot.ini`；旧 `colors.ini` 仅在现有配置引用且带有生成器
+标记时刷新，不迁移用户的 include，也不覆盖手写旧调色板。共享配置显式 opt-in
+时才接入新 include。个人卸载保留 Foot 基础配置和新旧颜色文件。
+
 ## 触控板方向
 
 `config.d/95-personal-input.kdl` 单独启用触控板 `natural-scroll`，与个人 Hyprland

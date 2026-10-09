@@ -1,6 +1,6 @@
 pkgbase = inir-shell
 	pkgdesc = iNiR shell payload, launcher, and user service
-	pkgver = 2.32.0
+	pkgver = 2.33.0
 	pkgrel = 1
 	url = https://github.com/snowarch/iNiR
 	arch = any
@@ -68,6 +68,8 @@ pkgbase = inir-shell
 	optdepends = kvantum: Qt style engine
 	optdepends = libqalculate: calculator widget backend
 	optdepends = mission-center: graphical system monitor (default task manager)
+	optdepends = mangohud: live FPS and frametime telemetry for the Game Performance overlay
+	optdepends = lib32-mangohud: MangoHud support for 32-bit games
 	optdepends = mpv: media playback and YouTube Music support
 	optdepends = mpv-mpris: richer mpv media session integration
 	optdepends = deno: JavaScript runtime required by current yt-dlp YouTube extraction
@@ -98,7 +100,7 @@ pkgbase = inir-shell
 	conflicts = noctalia-qs
 	conflicts = noctalia-shell
 	conflicts = cachyos-niri-noctalia
-	source = inir-2.32.0.tar.gz::https://github.com/snowarch/iNiR/archive/refs/tags/v2.32.0.tar.gz
+	source = inir-2.33.0.tar.gz::https://github.com/snowarch/iNiR/archive/refs/tags/v2.33.0.tar.gz
 	sha256sums = SKIP
 
 pkgname = inir-shell
