@@ -332,26 +332,16 @@ binds {
     // Next track.
     Ctrl+Alt+MouseForward allow-when-locked=true repeat=false hotkey-overlay-title="Next track" { spawn "playerctl" "next"; }
 
-    // Mute toggle.
-    Ctrl+Alt+M allow-when-locked=true repeat=false hotkey-overlay-title="Mute toggle" { spawn "wpctl" "set-mute" "@DEFAULT_SINK@" "toggle"; }
+    // Mute toggle through iNiR (same OSD-aware path as the hardware key).
+    Ctrl+Alt+M allow-when-locked=true repeat=false hotkey-overlay-title="Mute toggle" { spawn "inir" "audio" "mute"; }
 
-    // Volume down.
-    Ctrl+Alt+J allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
-
-    // Volume down.
-    Ctrl+Alt+Down allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%-" "-l" "1.5"; }
-
-    // Volume up.
-    Ctrl+Alt+K allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
-
-    // Volume up.
-    Ctrl+Alt+Up allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "2%+" "-l" "1.5"; }
-
-    // Volume up.
-    Ctrl+Alt+WheelScrollUp allow-when-locked=true hotkey-overlay-title="Volume up" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%+" "-l" "1.5"; }
-
-    // Volume down.
-    Ctrl+Alt+WheelScrollDown allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "1%-" "-l" "1.5"; }
+    // Volume shortcuts through iNiR (same OSD/EasyEffects-aware path as hardware keys).
+    Ctrl+Alt+J allow-when-locked=true repeat=false hotkey-overlay-title="Volume down" { spawn "inir" "audio" "volumeDown"; }
+    Ctrl+Alt+Down allow-when-locked=true repeat=false hotkey-overlay-title="Volume down" { spawn "inir" "audio" "volumeDown"; }
+    Ctrl+Alt+K allow-when-locked=true repeat=false hotkey-overlay-title="Volume up" { spawn "inir" "audio" "volumeUp"; }
+    Ctrl+Alt+Up allow-when-locked=true repeat=false hotkey-overlay-title="Volume up" { spawn "inir" "audio" "volumeUp"; }
+    Ctrl+Alt+WheelScrollUp allow-when-locked=true repeat=false hotkey-overlay-title="Volume up" { spawn "inir" "audio" "volumeUp"; }
+    Ctrl+Alt+WheelScrollDown allow-when-locked=true repeat=false hotkey-overlay-title="Volume down" { spawn "inir" "audio" "volumeDown"; }
 }
 
 // Personal native switcher shortcuts, restricted to the current workspace.
