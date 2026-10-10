@@ -186,6 +186,8 @@ Item {
                 dimOpacity: root.dimOpacity
                 titled: root.titleMode === "always" || (root.titleMode === "hover" && (tile.cursor || (tile.hovered && root.interactive)))
 
+                onHoveredChanged: if (tile.hovered) root.windowHovered(tile.modelData.id)
+
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
@@ -193,7 +195,6 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                     Accessible.role: Accessible.Button
                     Accessible.name: tile.title
-                    onEntered: root.windowHovered(tile.modelData.id)
                     onClicked: mouse => root.windowClicked(tile.modelData.id, mouse.button)
                 }
             }
