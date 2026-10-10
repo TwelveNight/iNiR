@@ -141,8 +141,8 @@ binds {
     // Window Management
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Close through the compositor directly, including XWayland windows.
-    Mod+Q repeat=false hotkey-overlay-title="Close window" { close-window; }
+    // Close focused window (same action as Mod+Q).
+    Alt+Q repeat=false hotkey-overlay-title="Close window" { close-window; }
 
     // Maximize column.
     Mod+O repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
