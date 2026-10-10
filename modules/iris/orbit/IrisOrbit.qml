@@ -116,13 +116,6 @@ Item {
         root.cursorId = cursor !== undefined && cursor >= 0 ? cursor : root.defaultCursor(card)
         previewTimer.restart()
     }
-    // The mouse drifting over a neighbour's window selects that card and points at the window,
-    // the way focus-follows-mouse works on the desktop itself.
-    function hoverWindow(index: int, windowId: int): void {
-        if (root.searching) return
-        if (index !== root.selectedIndex) root.select(index, windowId)
-        else root.cursorId = windowId
-    }
 
     // ---- Finding ------------------------------------------------------------------------------------------------------
     property string query: ""
@@ -678,7 +671,7 @@ Item {
                                         titleMode: String(root.options?.titles ?? "hover")
                                         dimOpacity: 1 - Math.max(0, Math.min(95, Number(root.options?.dimMatches ?? 78))) / 100
                                         onCardClicked: slot.hero ? root.goToWorkspace(slot.ws.id) : root.select(slot.index, -1)
-                                        onWindowHovered: windowId => root.hoverWindow(slot.index, windowId)
+                                        onWindowHovered: windowId => { if (slot.hero && !root.searching) root.cursorId = windowId }
                                         onWindowClicked: (windowId, button) => {
                                             if (!slot.hero) { root.select(slot.index, windowId); return }
                                             if (button === Qt.MiddleButton) NiriService.closeWindow(windowId)
