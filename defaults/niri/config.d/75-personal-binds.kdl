@@ -144,14 +144,12 @@ binds {
     // Maximize column.
     Mod+O repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
 
-    // Toggle windowed fullscreen.
-    Mod+Shift+O repeat=false hotkey-overlay-title="Toggle windowed fullscreen" { toggle-windowed-fullscreen; }
+    // True fullscreen: the focused window fills the monitor.
+    Mod+Shift+O repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
 
-    // Toggle windowed fullscreen.
-    Mod+Shift+MouseMiddle repeat=false hotkey-overlay-title="Toggle windowed fullscreen" { toggle-windowed-fullscreen; }
-
-    // Fullscreen.
-    Mod+Shift+F repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
+    // Toggle fake fullscreen: tell the app it is fullscreen without enlarging it.
+    Mod+Shift+F repeat=false hotkey-overlay-title="Fake fullscreen (windowed)" { toggle-windowed-fullscreen; }
+    Mod+Shift+MouseMiddle repeat=false hotkey-overlay-title="Fake fullscreen (windowed)" { toggle-windowed-fullscreen; }
 
     // Fullscreen.
     Mod+Alt+O repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
