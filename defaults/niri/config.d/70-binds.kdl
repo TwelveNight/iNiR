@@ -114,6 +114,9 @@ binds {
     // Center the focused column on screen.
     Mod+C { center-column; }
 
+    // Center the focused column on screen.
+    Alt+C repeat=false hotkey-overlay-title="Center focused column" { center-column; }
+
     // Center all fully visible columns.
     // Mod+Ctrl+C { center-visible-columns; }
 
