@@ -147,6 +147,9 @@ binds {
     // Maximize column.
     Mod+O repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
 
+    // Maximize column (same action as Mod+O).
+    Alt+M repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
+
     // True fullscreen: the focused window fills the monitor.
     Mod+Shift+O repeat=false hotkey-overlay-title="Fullscreen" { fullscreen-window; }
 
