@@ -112,10 +112,11 @@ Scope {
     function _beginTransition(): void {
             watchdog.restart()
 
-            // Side effect kept out of the source binding: make sure the still
-            // for a video/GIF wallpaper exists before the overlay asks for it.
-            const wp = Config.options?.background?.wallpaperPath ?? ""
-            if (wp) {
+            // Warm stills from skwd's live state, not the shell's potentially
+            // stale wallpaperPath setting. The overlay may span several outputs.
+            for (const output of Quickshell.screens) {
+                const wp = Wallpapers.currentMainWallpaperPath(output?.name ?? "")
+                if (!wp) continue
                 Wallpapers.ensureVideoFirstFrame(FileUtils.trimFileProtocol(wp))
                 Wallpapers.ensureVideoStill(wp)
             }
@@ -243,6 +244,7 @@ Scope {
         active: GlobalStates.familyTransitionActive || root._active
 
         sourceComponent: PanelWindow {
+            id: transitionWindow
             visible: true
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
@@ -284,16 +286,10 @@ Scope {
                         id: wallpaperImg
                         anchors.fill: parent
                         source: {
-                            let path = ""
-                            if (root._isWaffle) {
-                                const wBg = Config.options?.waffles?.background ?? {}
-                                const useMain = wBg.useMainWallpaper ?? true
-                                path = useMain
-                                    ? (Config.options?.background?.wallpaperPath ?? "")
-                                    : (wBg.wallpaperPath ?? Config.options?.background?.wallpaperPath ?? "")
-                            } else {
-                                path = Config.options?.background?.wallpaperPath ?? ""
-                            }
+                            // skwd owns the desktop wallpaper for every shell family.
+                            // Resolve against this panel's output so multi-monitor
+                            // transitions use the image actually shown there.
+                            const path = Wallpapers.currentMainWallpaperPath(transitionWindow.screen?.name ?? "")
                             if (!path) return ""
                             // Image cannot decode a video, so a video wallpaper
                             // used to log "Formato de imagen no soportado" and
