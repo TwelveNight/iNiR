@@ -29,6 +29,9 @@ binds {
     // Toggle focus between the existing Hermes HUD and the previous window.
     Mod+Z repeat=false hotkey-overlay-title="Toggle Hermes HUD focus" { spawn "bash" "-c" "python3 \"$INIR_RUNTIME_DIR/scripts/personal/niri-actions.py\" hud-focus"; }
 
+    // Switch column width preset (same action as Mod+R).
+    Alt+R hotkey-overlay-title="Switch preset column width" { switch-preset-column-width; }
+
     // Suspend computer.
     Mod+Shift+BackSpace repeat=false hotkey-overlay-title="Suspend computer" { spawn "systemctl" "suspend"; }
 
