@@ -16,6 +16,13 @@ focused_window_json=$(niri msg -j focused-window 2>/dev/null)
 focused_id=$(printf '%s' "$focused_window_json" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
 focused_app_id=$(printf '%s' "$focused_window_json" | grep -o '"app_id":"[^"]*"' | sed 's/"app_id":"\([^"]*\)"/\1/')
 
+# Folia treats compositor close requests as application exit, even with its
+# close-to-tray setting enabled. Use its tray menu before IPC/fallback handling;
+# failure must leave the player alive rather than fall back to closing it.
+if [ "${focused_app_id,,}" = "folia-major" ]; then
+    exec python3 "$script_dir/personal/niri-actions.py" folia-hide "$focused_id"
+fi
+
 close_focused() {
     if [ "${focused_app_id,,}" = "spotify" ]; then
         # Keep Spotify running but hide its window from current workspace.
