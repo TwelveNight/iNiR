@@ -26,22 +26,21 @@ ContentPage {
             ThemeService.setTheme(preset.id)
             return
         }
-        const current = Config.options?.appearance?.customTheme ?? ({})
-        const updates = ({})
-        for (const key in preset.colors) {
-            if (current.hasOwnProperty(key))
-                updates[`appearance.customTheme.${key}`] = preset.colors[key]
-        }
-        Config.setNestedValues(updates)
+        ThemeService.applyCustomColors(preset.colors)
         root.activeSavedTheme = preset.id
-        ThemePresets.applyPreset("custom")
-        if (ThemeService.currentTheme !== "custom")
-            ThemeService.setTheme("custom")
+    }
+
+    Connections {
+        target: Hub
+        function onChanged(kind: string, id: string): void {
+            if (kind === "theme")
+                root.refreshSavedThemes()
+        }
     }
 
     Process {
         id: savedThemesProcess
-        command: ["/usr/bin/bash", "-lc", `for f in "${root.savedThemesDir}"/*.json; do [ -f "$f" ] || continue; /usr/bin/jq -c --arg name "$(/usr/bin/basename "$f" .json)" '{id:("saved:" + $name),name:$name,description:"Saved custom theme",tags:["saved"],saved:true,colors:.}' "$f"; done`]
+        command: ["/usr/bin/bash", "-lc", `for f in "${root.savedThemesDir}"/*.json; do [ -f "$f" ] || continue; /usr/bin/jq -c --arg name "$(/usr/bin/basename "$f" .json)" '{id:("saved:" + $name),name:(.name // $name),description:(.description // "Saved custom theme"),tags:["saved"],saved:true,colors:.}' "$f"; done`]
         stdout: SplitParser {
             onRead: data => {
                 try {
@@ -1321,22 +1320,27 @@ ContentPage {
                 colBackground: Appearance.colors.colLayer1
                 colBackgroundHover: Appearance.colors.colLayer1Hover
 
-                contentItem: RowLayout {
-                    id: detectRow
-                    anchors.centerIn: parent
-                    spacing: 6
+                contentItem: Item {
+                    implicitWidth: detectRow.implicitWidth
+                    implicitHeight: detectRow.implicitHeight
+                    RowLayout {
+                        id: detectRow
+                        width: Math.min(implicitWidth, parent.width)
+                        anchors.centerIn: parent
+                        spacing: 6
 
-                    MaterialSymbol {
-                        text: "search"
-                        iconSize: 14
-                        color: Appearance.colors.colOnLayer1
-                    }
+                        MaterialSymbol {
+                            text: "search"
+                            iconSize: 14
+                            color: Appearance.colors.colOnLayer1
+                        }
 
-                    StyledText {
-                        text: terminalColorsSection.detectionDone
-                            ? Translation.tr("Re-detect installed")
-                            : Translation.tr("Auto-detect installed")
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        StyledText {
+                            text: terminalColorsSection.detectionDone
+                                ? Translation.tr("Re-detect installed")
+                                : Translation.tr("Auto-detect installed")
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                        }
                     }
                 }
 
@@ -1525,20 +1529,25 @@ ContentPage {
                 colBackground: Appearance.colors.colLayer1
                 colBackgroundHover: Appearance.colors.colLayer1Hover
 
-                contentItem: RowLayout {
-                    id: resetRow
-                    anchors.centerIn: parent
-                    spacing: 6
+                contentItem: Item {
+                    implicitWidth: resetRow.implicitWidth
+                    implicitHeight: resetRow.implicitHeight
+                    RowLayout {
+                        id: resetRow
+                        width: Math.min(implicitWidth, parent.width)
+                        anchors.centerIn: parent
+                        spacing: 6
 
-                    MaterialSymbol {
-                        text: "restart_alt"
-                        iconSize: 14
-                        color: Appearance.colors.colOnLayer1
-                    }
+                        MaterialSymbol {
+                            text: "restart_alt"
+                            iconSize: 14
+                            color: Appearance.colors.colOnLayer1
+                        }
 
-                    StyledText {
-                        text: Translation.tr("Reset to defaults")
-                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        StyledText {
+                            text: Translation.tr("Reset to defaults")
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                        }
                     }
                 }
 
@@ -1564,28 +1573,33 @@ ContentPage {
                 colBackgroundHover: Appearance.zzzEverywhere ? Appearance.colors.colPrimaryHover : Appearance.colors.colPrimaryContainerHover
                 colRipple: Appearance.zzzEverywhere ? Appearance.colors.colPrimaryActive : Appearance.colors.colPrimaryContainerActive
 
-                contentItem: RowLayout {
-                    id: applyNowRow
-                    anchors.centerIn: parent
-                    spacing: 8
+                contentItem: Item {
+                    implicitWidth: applyNowRow.implicitWidth
+                    implicitHeight: applyNowRow.implicitHeight
+                    RowLayout {
+                        id: applyNowRow
+                        width: Math.min(implicitWidth, parent.width)
+                        anchors.centerIn: parent
+                        spacing: 8
 
-                    MaterialSymbol {
-                        text: "sync"
-                        iconSize: 16
-                        color: Appearance.zzzEverywhere ? Appearance.zzz.onSticker : Appearance.colors.colOnPrimaryContainer
-                        Behavior on color {
-                            enabled: Appearance.animationsEnabled
-                            ColorAnimation { duration: Appearance.animation.elementMoveFast.duration }
+                        MaterialSymbol {
+                            text: "sync"
+                            iconSize: 16
+                            color: Appearance.zzzEverywhere ? Appearance.zzz.onSticker : Appearance.colors.colOnPrimaryContainer
+                            Behavior on color {
+                                enabled: Appearance.animationsEnabled
+                                ColorAnimation { duration: Appearance.animation.elementMoveFast.duration }
+                            }
                         }
-                    }
 
-                    StyledText {
-                        text: Translation.tr("Apply to open terminals")
-                        font.pixelSize: Appearance.font.pixelSize.small
-                        color: Appearance.zzzEverywhere ? Appearance.zzz.onSticker : Appearance.colors.colOnPrimaryContainer
-                        Behavior on color {
-                            enabled: Appearance.animationsEnabled
-                            ColorAnimation { duration: Appearance.animation.elementMoveFast.duration }
+                        StyledText {
+                            text: Translation.tr("Apply to open terminals")
+                            font.pixelSize: Appearance.font.pixelSize.small
+                            color: Appearance.zzzEverywhere ? Appearance.zzz.onSticker : Appearance.colors.colOnPrimaryContainer
+                            Behavior on color {
+                                enabled: Appearance.animationsEnabled
+                                ColorAnimation { duration: Appearance.animation.elementMoveFast.duration }
+                            }
                         }
                     }
                 }

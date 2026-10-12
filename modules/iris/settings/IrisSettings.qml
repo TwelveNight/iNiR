@@ -179,6 +179,7 @@ Item {
     function irisPageFor(key: string): string {
         if (key === "about") return "modules/iris/settings/IrisAboutPage.qml"
         if (key === "shortcuts") return "modules/iris/settings/IrisShortcutsPage.qml"
+        if (key === "hub") return "modules/iris/settings/IrisHubPage.qml"
         return ""
     }
     property var unfolded: ({})
@@ -384,8 +385,8 @@ Item {
     Shortcut { sequences: ["Alt+Right", "Ctrl+]"]; enabled: GlobalStates.settingsOverlayOpen; onActivated: root.goForward() }
     MouseArea { anchors.fill: parent; enabled: !root.windowed; onClicked: GlobalStates.settingsOverlayOpen = false }
 
-    // Afterglow's bevel must follow the corners Niri clips the window to.
-    readonly property bool windowField: root.windowed && IrisStyle.afterglow
+    // A textured material (Afterglow's bevel, Light leak's lit rim) must follow the corners Niri clips the window to.
+    readonly property bool windowField: root.windowed && IrisStyle.textured
     onWindowFieldChanged: if (root.windowField) IrisNiri.reload(["window-rules"])
     // In a window Niri owns the shape, the corners and the open motion: the body fills it, already open.
     IrisMorphSurface {

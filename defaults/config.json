@@ -2265,6 +2265,9 @@
             "networkNameKeywords": []
         }
     },
+    "hub": {
+        "sources": []
+    },
     "idle": {
         "screenOffTimeout": 300,
         "lockTimeout": 600,
@@ -2423,6 +2426,25 @@
                 "bloom": 50,
                 "signal": 35,
                 "wallpaper": true
+            },
+            "leak": {
+                "grade": "prism",
+                "shape": "lens",
+                "x": 0,
+                "y": 0,
+                "light": 60,
+                "frame": 100,
+                "widgets": 100,
+                "spill": 55,
+                "prism": 50,
+                "grain": 55,
+                "grainSize": 1.6,
+                "streaks": 15,
+                "dust": 100,
+                "gate": true,
+                "wallpaper": 50,
+                "backdrop": "picture",
+                "develop": true
             },
             "fontFamily": "",
             "titleFontFamily": "",
@@ -3038,6 +3060,7 @@
             "showWeather": true,
             "showSystem": false,
             "showMedia": true,
+            "showCustom": true,
             "showQuickActions": false,
             "quickActions": [
                 "files",

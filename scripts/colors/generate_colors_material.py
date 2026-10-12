@@ -772,26 +772,31 @@ if args.scheme != "scheme-monochrome":
             continue
         tone = Hct.from_int(hex_to_argb(material_colors[key])).tone
         if darkmode and not 70.0 <= tone <= 85.0:
-            material_colors[key] = argb_to_hex(palette.tone(80))
+            material_colors[key] = argb_to_hex(palette.get_hct(80).to_int())
         elif not darkmode and not 25.0 <= tone <= 50.0:
-            material_colors[key] = argb_to_hex(palette.tone(40))
+            material_colors[key] = argb_to_hex(palette.get_hct(40).to_int())
         container, on_container = key + "Container", "on" + key[0].upper() + key[1:] + "Container"
         if container in material_colors:
             ctone = Hct.from_int(hex_to_argb(material_colors[container])).tone
             if darkmode and not 20.0 <= ctone <= 40.0:
-                material_colors[container] = argb_to_hex(palette.tone(30))
-                material_colors[on_container] = argb_to_hex(palette.tone(90))
+                material_colors[container] = argb_to_hex(palette.get_hct(30).to_int())
+                material_colors[on_container] = argb_to_hex(palette.get_hct(90).to_int())
             elif not darkmode and not 80.0 <= ctone <= 95.0:
-                material_colors[container] = argb_to_hex(palette.tone(90))
-                material_colors[on_container] = argb_to_hex(palette.tone(10))
+                material_colors[container] = argb_to_hex(palette.get_hct(90).to_int())
+                material_colors[on_container] = argb_to_hex(palette.get_hct(10).to_int())
         # A near-grey wallpaper still has a hue: the accent carries it at a chroma people read as colour, so no
         # wallpaper leaves the shell and its apps without one (a night wallpaper gave a grey #C2C7CE).
         # And a ceiling: a vivid green wallpaper gave #05E600 (chroma 102), a neon no text or fill sits well on.
+        # Both follow the person's colour strength and scheme: floors of 36/24 for every scheme made Neutral the
+        # twin of Tonal Spot and left the strength slider without effect below 140 %.
+        strength = max(0.3, args.color_strength)
+        ceiling = min(90.0, 60.0 * max(1.0, strength))
         hct = Hct.from_int(hex_to_argb(material_colors[key]))
-        if hct.chroma > 60.0:
-            material_colors[key] = argb_to_hex(Hct.from_hct(hct.hue, 60.0, hct.tone).to_int())
+        if hct.chroma > ceiling:
+            material_colors[key] = argb_to_hex(Hct.from_hct(hct.hue, ceiling, hct.tone).to_int())
         if key == "primary":
-            for role, floor in ((key, 36.0), (container, 24.0)):
+            base_floors = (16.0, 10.0) if args.scheme == "scheme-neutral" else (26.0, 18.0)
+            for role, floor in ((key, base_floors[0] * strength), (container, base_floors[1] * strength)):
                 if role in material_colors:
                     hct = Hct.from_int(hex_to_argb(material_colors[role]))
                     if 4.0 <= hct.chroma < floor:
