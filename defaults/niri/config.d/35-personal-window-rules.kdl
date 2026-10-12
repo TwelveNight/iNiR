@@ -2,6 +2,17 @@
 // Keep upstream 30-window-rules.kdl separate. Opening rules apply to new windows;
 // they do not force already-open windows to float after a config reload.
 // Portal dialogs may lack a transient parent, so Niri cannot auto-float them.
+// Override the upstream inactive-window dimming: focused 0.9, unfocused 0.7.
+window-rule {
+    match is-active=true
+    opacity 0.9
+}
+
+window-rule {
+    match is-active=false
+    opacity 0.7
+}
+
 window-rule {
     match app-id=r#"^xdg-desktop-portal-(gtk|gnome|kde)$"#
     match app-id=r#"^org\.freedesktop\.impl\.portal\.desktop\.(gtk|gnome|kde)$"#
