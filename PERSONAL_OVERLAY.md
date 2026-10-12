@@ -325,6 +325,8 @@ Niri 下跳过系统的 Xwayland Video Bridge XDG 自启动项，避免捕获辅
 通过生成服务的 `20-inir-session.conf` drop-in 检查桌面环境实现，不修改系统 desktop 文件，
 其他桌面仍沿用原启动行为。已有的 `xwayland-satellite` 和 Niri 屏幕共享 portal 不受影响。
 启用鼠标悬停聚焦，鼠标进入部分可见窗口时也允许对应列滚动到视野内。
+个人触摸板配置 `95-personal-input.kdl` 保留自然滚动，同时显式启用轻点和
+`left-right-middle` 按钮映射，避免覆盖上游触摸板段时丢失轻点设置。
 
 个人键位独立放在 `defaults/niri/config.d/75-personal-binds.kdl`，上游 `70-binds.kdl` 保持原样。
 个人文件沿用上游的分节注释，并用 Niri 原生 `hotkey-overlay-title="说明"` 定义显示名称。

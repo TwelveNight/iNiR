@@ -1,7 +1,10 @@
 // Personal touchpad preferences. Included by 90-user-extra.kdl.
 // Match the natural scrolling used in the personal Hyprland session.
+// Niri replaces the entire touchpad section, so retain tap settings here.
 input {
     touchpad {
+        tap
+        tap-button-map "left-right-middle"
         natural-scroll
     }
 }
