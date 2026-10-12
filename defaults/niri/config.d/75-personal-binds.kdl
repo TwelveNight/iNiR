@@ -9,6 +9,12 @@
 // Descriptions use Niri's native hotkey-overlay-title metadata.
 // iNiR categories are inferred from actions, not from these section comments.
 
+// Niri inherits the display-manager PATH, which omits the user launcher directory.
+// Keep its existing entries and make inir available to all shell shortcuts.
+environment {
+    PATH "/home/night/.local/bin:/opt/google-cloud-cli/bin:/opt/miniconda3/condabin:/home/night/bin:/usr/bin:/usr/local/bin:/var/lib/snapd/snap/bin:/var/lib/flatpak/exports/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
+}
+
 // Opening the lid clears a session-only off override on this laptop's panel.
 // Keep the saved mode, scale and position; Niri still handles lid close itself.
 switch-events {
