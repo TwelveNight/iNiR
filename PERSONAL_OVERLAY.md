@@ -506,3 +506,15 @@ sudo pacman -S --needed swaylock
 旧 Material/Waffle 的持久 backdrop 窗口在 skwd 模式下不创建，避免旧开关启用第二层桌面壁纸；桌面取色也不采用单独 backdrop 路径。锁屏、概览缩略图和选择器预览仍是 Shell UI，可从 skwd 视频生成静态预览，不是第二个桌面渲染后端。显式“仅从此图片取色”仍遵从用户选择，默认重新取色则查询 skwd；查询失败保留现有颜色。
 
 离屏回归覆盖静态图、视频、GIF、外部切换、多屏聚焦切换、断连保留最近状态及 CLI 查询失败。测试用模拟客户端，不实际切换桌面壁纸。本机只读状态确认两块连接的输出由 skwd 播放视频；真实 Niri 会话切换后的可视验收仍待完成。
+
+## 当前会话独占 Kitty 配色
+
+iNiR 的 skwd-session 使用 `start niri --no-ii-theme`，先停止 II 的壁纸配色监听，再交接 skwd。iNiR 自行生成共享 `kitty-theme.conf`，避免 II 在取色后覆盖。Hyprland 启动仍恢复 II 监听；skwd 的壁纸管理和用户服务启用链接保持不变。重复激活当前会话也会停止错误启动的 II 监听。
+
+## 壁纸应用配色与 NyxMellow 输入法
+
+ThemeService 的签名与 debounce 包含 skwd 活动壁纸，外部选择器和 iNiR 选择器均触发 `--noswitch` 取色。手动主题与独立设置窗口不自动取色。个人偏好 `defaults/personal-app-theming.json` 将 iRiS 的 `materialForApps`、`accentForApps` 关闭，Kitty 等应用跟随壁纸，而不是固定的黑色表面与蓝色强调色。只影响应用配色，不改 iRiS 外观。个人安装应用该文件；用户配置中的其他字段保留。
+
+NyxMellow 的三个模板来自 Nyxuri，加入私有 matugen/templates.json，由 iNiR 当前壁纸色板渲染。应用阶段只调用 Fcitx Classic UI 的 `ReloadAddonConfig`，不会重启输入法，也不修改输入法方案、字体或候选数量。共享主题已设为 nyxmellow；II 会话用自己的 Matugen 模板生成同名主题，按顺序登录时由当前桌面取色。
+
+Washi 在部署的运行目录中使用 `go build -buildvcs=false`，避免缺少 Git 元数据时编译失败并永久沿用旧缓存。

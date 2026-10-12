@@ -7,4 +7,4 @@ if [[ -z "${NIRI_SOCKET:-}" || -z "${WAYLAND_DISPLAY:-}" ]]; then
     exit 1
 fi
 
-exec python3 "$(dirname -- "${BASH_SOURCE[0]}")/../personal/desktop-session.py" start niri
+exec python3 "$(dirname -- "${BASH_SOURCE[0]}")/../personal/desktop-session.py" start niri --no-ii-theme

@@ -153,10 +153,20 @@ def configure_shell_preferences(config_dir):
     if config_dir.is_symlink() or target.is_symlink():
         raise ValueError("Personal shell config must not redirect to another desktop's files")
     options = json.loads(target.read_text()) if target.exists() else {}
-    weather = options.setdefault("bar", {}).setdefault("weather", {})
-    if weather.get("enable") is False:
+    before = json.dumps(options, sort_keys=True)
+    # Personal app colors follow the wallpaper, independently of iRiS's paper/accent.
+    preferences = Path(__file__).resolve().parents[2] / "defaults/personal-app-theming.json"
+    if preferences.is_file():
+        def merge(target, values):
+            for key, value in values.items():
+                if isinstance(value, dict):
+                    merge(target.setdefault(key, {}), value)
+                else:
+                    target[key] = value
+        merge(options, json.loads(preferences.read_text()))
+    options.setdefault("bar", {}).setdefault("weather", {})["enable"] = False
+    if json.dumps(options, sort_keys=True) == before:
         return
-    weather["enable"] = False
     config_dir.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(options, ensure_ascii=False, indent=4) + "\n")
 

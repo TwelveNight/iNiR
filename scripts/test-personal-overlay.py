@@ -212,7 +212,7 @@ printf '%s\\n' "$CONFIG_FILE" "$STATE_DIR"
                         XDG_CURRENT_DESKTOP="niri")
         subprocess.run(["bash", str(ROOT / "scripts/wallpaper/skwd-session.sh")], env=self.env, check=True)
         self.assertEqual(log.read_text().splitlines(), [
-            str(ROOT / "scripts/wallpaper/../personal/desktop-session.py") + " start niri"])
+            str(ROOT / "scripts/wallpaper/../personal/desktop-session.py") + " start niri --no-ii-theme"])
         self.env.pop("NIRI_SOCKET")
         result = subprocess.run(["bash", str(ROOT / "scripts/wallpaper/skwd-session.sh")],
                                 env=self.env, capture_output=True)

@@ -161,6 +161,7 @@ def main():
     parser.add_argument("--identity-file", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--unit", default="", help=argparse.SUPPRESS)
     parser.add_argument("--adopt", action="store_true", help="Monitor the live session without restarting its wallpaper")
+    parser.add_argument("--no-ii-theme", action="store_true", help="Keep II's global theme writer stopped for this desktop")
     args = parser.parse_args()
     env = dict(os.environ)
     directory = Path(env["XDG_RUNTIME_DIR"]) / "inir"
@@ -213,6 +214,10 @@ def main():
                     # Retire a delayed monitor before reusing the bound unit.
                     run("systemctl", "--user", "stop", watcher)
                     watch_active = False
+            if args.no_ii_theme and not args.adopt:
+                # Stop before restarting skwd so its initial wallpaper event
+                # cannot render II/GTK/Qt colors into the shared configuration.
+                run("systemctl", "--user", "stop", "ii-skwd-wall-theme.service")
             if state.exists() and json.loads(state.read_text()) == identity:
                 if watch_active and unit_active("skwd-walld.service") and not args.adopt:
                     return
@@ -231,7 +236,7 @@ def main():
             if not args.adopt:
                 run("systemctl", "--user", "restart", "skwd-walld.service")
                 config = Path(env.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-                if (config / "quickshell/ii/scripts/colors/skwd-wall-theme-listener.sh").is_file():
+                if not args.no_ii_theme and (config / "quickshell/ii/scripts/colors/skwd-wall-theme-listener.sh").is_file():
                     run("systemctl", "--user", "restart", "ii-skwd-wall-theme.service")
             print(f"desktop-session: activated {args.desktop} pid={identity['pid']} wayland={identity['wayland']}", flush=True)
 

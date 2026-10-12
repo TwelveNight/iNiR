@@ -40,7 +40,7 @@ Singleton {
         panelFamily: root.panelFamily,
         waffleUsesMainWallpaper: root.waffleUsesMainWallpaper,
         paletteType: Config.options?.appearance?.palette?.type ?? "auto",
-        themingWallpaperPath: Wallpapers.skwdBackendEnabled ? "" : (Wallpapers.effectiveWallpaperPath ?? ""),
+        themingWallpaperPath: Wallpapers.skwdBackendEnabled ? Wallpapers.activeWallpaperPath : (Wallpapers.effectiveWallpaperPath ?? ""),
         enableAppsAndShell: wallpaperThemingCfg?.enableAppsAndShell ?? true,
         enableTerminal: wallpaperThemingCfg?.enableTerminal ?? true,
         enableVesktop: wallpaperThemingCfg?.enableVesktop ?? true,
@@ -302,7 +302,7 @@ Singleton {
     }
 
     function _tryLiveRegenerateFromConfig(): void {
-        if (!Config.ready) return
+        if (!Config.ready || root.isStandaloneSettingsWindow) return
         if (root.liveRegenSignature === root._lastLiveRegenSignature) return
         // Always track the signature — even when not on auto theme.
         // Otherwise switching manual→auto sees the stale auto signature
@@ -319,6 +319,15 @@ Singleton {
         // Skip if a direct Wallpapers.apply() already launched switchwall.sh
         if (Wallpapers._applyInProgress) return
         root.regenerateAutoTheme()
+    }
+
+    // skwd events include changes made outside the iNiR picker.
+    Connections {
+        target: Wallpapers
+        function onActiveWallpaperPathChanged() {
+            if (!root.isStandaloneSettingsWindow && Wallpapers.activeWallpaperPath)
+                liveRegenerateDebounce.restart()
+        }
     }
 
     Connections {

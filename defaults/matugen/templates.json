@@ -29,6 +29,21 @@
       "name": "steam_millennium_material",
       "input": "steam/millennium-material.css",
       "output": "~/.local/state/quickshell/user/generated/steam-millennium-material.css"
+    },
+    {
+      "name": "fcitx5-panel-svg",
+      "input": "fcitx5/panel.svg",
+      "output": "~/.local/share/fcitx5/themes/nyxmellow/panel.svg"
+    },
+    {
+      "name": "fcitx5-highlight-svg",
+      "input": "fcitx5/highlight.svg",
+      "output": "~/.local/share/fcitx5/themes/nyxmellow/highlight.svg"
+    },
+    {
+      "name": "fcitx5-theme-conf",
+      "input": "fcitx5/theme.conf",
+      "output": "~/.local/share/fcitx5/themes/nyxmellow/theme.conf"
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "id": "fcitx5",
+  "label": "Fcitx5",
+  "module": "25-fcitx5.sh",
+  "category": "app",
+  "inputs": [
+    "palette.json"
+  ],
+  "description": "Reload the NyxMellow wallpaper-colored candidate panel.",
+  "configKey": "appearance.wallpaperTheming.enableAppsAndShell"
+}

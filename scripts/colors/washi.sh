@@ -25,7 +25,7 @@ if stale; then
   else
     mkdir -p "$bin_dir"
     tmp="$bin_dir/.inir-washi.$$"
-    if (cd "$root" && "$go_bin" build -trimpath -o "$tmp" ./scripts/colors/washi) >&2; then
+    if (cd "$root" && "$go_bin" build -buildvcs=false -trimpath -o "$tmp" ./scripts/colors/washi) >&2; then
       mv -f "$tmp" "$bin"
     else
       rm -f "$tmp"
