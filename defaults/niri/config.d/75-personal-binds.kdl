@@ -15,6 +15,9 @@ environment {
     PATH "/home/night/.local/bin:/opt/google-cloud-cli/bin:/opt/miniconda3/condabin:/home/night/bin:/usr/bin:/usr/local/bin:/var/lib/snapd/snap/bin:/var/lib/flatpak/exports/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
 }
 
+// Personal screen magnifier; absolute paths also work in Niri's startup environment.
+spawn-at-startup "/home/night/.local/bin/niri-zoomd"
+
 // Opening the lid clears a session-only off override on this laptop's panel.
 // Keep the saved mode, scale and position; Niri still handles lid close itself.
 switch-events {
@@ -92,6 +95,14 @@ binds {
 
     // Edit personal key bindings.
     Ctrl+Mod+Alt+Slash repeat=false hotkey-overlay-title="Edit personal key bindings" { spawn "bash" "-c" "xdg-open \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/75-personal-binds.kdl\""; }
+
+    // Screen magnifier (niri-zoom). Leave Ctrl+wheel to application zoom,
+    // Mod+Ctrl+wheel to workspace movement, and Ctrl+Alt+wheel to volume.
+    Ctrl+Alt+Equal hotkey-overlay-title="Screen magnifier: zoom in" { spawn "/home/night/.local/bin/niri-zoomctl" "in"; }
+    Ctrl+Alt+Minus hotkey-overlay-title="Screen magnifier: zoom out" { spawn "/home/night/.local/bin/niri-zoomctl" "out"; }
+    Ctrl+Shift+WheelScrollUp cooldown-ms=0 hotkey-overlay-title="Screen magnifier: zoom in" { spawn "/home/night/.local/bin/niri-zoomctl" "in"; }
+    Ctrl+Shift+WheelScrollDown cooldown-ms=0 hotkey-overlay-title="Screen magnifier: zoom out" { spawn "/home/night/.local/bin/niri-zoomctl" "out"; }
+    Ctrl+Alt+Z repeat=false hotkey-overlay-title="Screen magnifier: reset" { spawn "/home/night/.local/bin/niri-zoomctl" "reset"; }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Screenshots

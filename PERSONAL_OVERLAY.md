@@ -338,6 +338,8 @@ Niri 下跳过系统的 Xwayland Video Bridge XDG 自启动项，避免捕获辅
 
 | 快捷键 | Niri 行为 |
 |---|---|
+| Ctrl+Alt+= / -；Ctrl+Shift+滚轮上 / 下 | 通过本机安装的 `~/.local/bin/niri-zoomctl` 放大 / 缩小屏幕；登录时启动 `niri-zoomd`；快捷键在设置页和速查表归入 System |
+| Ctrl+Alt+Z | 重置屏幕放大镜；保留 Ctrl+滚轮的应用缩放、Super+Ctrl+滚轮的工作区移动、Ctrl+Alt+滚轮的音量操作 |
 | Super+Enter / Super+T | 打开配置的终端（默认 Kitty）；个人环境补齐 `~/.local/bin`，保证 Niri 能找到 `inir` 启动器 |
 | Super+Q / Alt+Q | 共用个人关闭动作，与 Nyxuri 一致：普通窗口直接关闭；仅 Folia 主窗口隐藏到自身托盘并继续播放，托盘不可用时不退出；Folia Remote 等其他窗口正常关闭 |
 | Ctrl+Shift+Esc | 在 Kitty 中打开 btop 系统监控 |

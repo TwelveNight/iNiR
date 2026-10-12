@@ -2888,6 +2888,12 @@ def _kb_special_metadata(action):
     app = Path(argv[0]).name
     if app == "true":
         return "Disabled (personal override)", "System"
+    if app == "niri-zoomctl" and len(argv) == 2:
+        return {
+            "in": ("Screen magnifier: zoom in", "System"),
+            "out": ("Screen magnifier: zoom out", "System"),
+            "reset": ("Screen magnifier: reset", "System"),
+        }.get(argv[1])
     if app == "bash" and len(argv) >= 3:
         script = argv[-1]
         if "scripts/personal/niri-actions.py" in script:
