@@ -83,9 +83,15 @@ def publish_environment(desktop, env):
     run("systemctl", "--user", "import-environment", *present, env=env)
 
 
+
+def manager_environment():
+    # Text output uses shell escaping (e.g. $'wayland;xcb'). It is not a
+    # literal KEY=value format. JSON preserves the actual activation values.
+    return json.loads(run("systemctl", "--user", "show-environment", "--output=json").stdout)
+
+
 def manager_owns(identity):
-    values = dict(line.split("=", 1) for line in
-                  run("systemctl", "--user", "show-environment").stdout.splitlines() if "=" in line)
+    values = manager_environment()
     desktop = values.get("XDG_CURRENT_DESKTOP", "")
     expected = "niri" if identity["desktop"] == "niri" else "Hyprland"
     if desktop and desktop != expected:
@@ -102,8 +108,7 @@ def manager_owns(identity):
 
 def ready_environment(directory, expected):
     """Validate the compositor, not just a target or a reusable socket name."""
-    values = dict(line.split("=", 1) for line in
-                  run("systemctl", "--user", "show-environment").stdout.splitlines() if "=" in line)
+    values = manager_environment()
     if values.get("XDG_CURRENT_DESKTOP", "").lower() != expected:
         raise ValueError("The new compositor has not published its environment")
     identity = session_identity(expected, values)

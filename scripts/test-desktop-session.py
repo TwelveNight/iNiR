@@ -30,7 +30,7 @@ class SessionTests(unittest.TestCase):
 
     def fake_run(self, *args, env=None):
         self.calls.append(args)
-        output = "\n".join(f"{k}={v}" for k, v in self.manager.items()) if args[-1] == "show-environment" else ""
+        output = json.dumps(self.manager) if "show-environment" in args else ""
         if args[:3] == ("systemctl", "--user", "unset-environment"):
             for name in args[3:]:
                 self.manager.pop(name, None)
@@ -40,6 +40,13 @@ class SessionTests(unittest.TestCase):
             # The host's dbus-broker mirrors updates back into the user manager.
             self.manager.update(dict(arg.split("=", 1) for arg in args[1:]))
         return subprocess.CompletedProcess(args, 0, output, "")
+
+    def test_manager_environment_preserves_platform_fallback_and_escaped_values(self):
+        self.manager = dict(QT_QPA_PLATFORM="wayland;xcb", XCURSOR_THEME="theme with spaces",
+                            DISPLAY=":0", XMODIFIERS="@im=fcitx")
+        with patch.object(session, "run", self.fake_run):
+            self.assertEqual(session.manager_environment(), self.manager)
+        self.assertEqual(self.calls, [("systemctl", "--user", "show-environment", "--output=json")])
 
     def test_niri_replaces_hyprland_gpu_and_identity_without_leaking_private_environment(self):
         self.manager = {"HYPRLAND_INSTANCE_SIGNATURE": "old", "LIBVA_DRIVER_NAME": "nvidia", "AQ_DRM_DEVICES": "old"}
