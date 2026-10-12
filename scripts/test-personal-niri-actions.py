@@ -134,10 +134,11 @@ class KeybindIsolationTests(unittest.TestCase):
             listing = command("get-binds")
             active = {b["key_combo"]: b for b in listing["binds"] if not b["commented"]}
             self.assertEqual(active["Mod+H"]["action"], "move-column-left")
-            self.assertEqual(active["Mod+Q"]["action"], "close-window")
+            self.assertEqual(active["Mod+Q"]["action"], active["Alt+Q"]["action"])
+            self.assertIn("scripts/personal/niri-actions.py", active["Mod+Q"]["action"])
             self.assertIn('"browser"', active["Mod+F"]["action"])
             self.assertIn("75-personal-binds.kdl", listing["config_file"])
-            self.assertEqual(active["Mod+Shift+O"]["action"], "toggle-windowed-fullscreen")
+            self.assertEqual(active["Mod+Shift+O"]["action"], "fullscreen-window")
             self.assertNotIn("Mod+D", active)
             self.assertTrue(command("set-bind", "Mod+T", 'spawn "kitty"')["success"])
             self.assertEqual(stock.read_bytes(), before)

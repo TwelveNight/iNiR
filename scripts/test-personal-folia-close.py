@@ -130,5 +130,58 @@ class CloseScriptTests(unittest.TestCase):
         self.assertIn(["msg", "action", "close-window", "--id", "20"], calls)
 
 
+class PersonalCloseTests(unittest.TestCase):
+    def run_close(self, window, fail_hide=False):
+        with patch.object(actions, "query", return_value=window) as query, \
+                patch.object(actions, "action") as close, \
+                patch.object(actions, "hide_folia") as hide:
+            if fail_hide:
+                hide.side_effect = RuntimeError("Tray unavailable")
+                with self.assertRaises(RuntimeError):
+                    actions.main("close")
+            else:
+                actions.main("close")
+            query.assert_called_once_with("focused-window")
+            return close, hide
+
+    def test_normal_apps_and_folia_other_windows_close_by_captured_id(self):
+        for app_id, title in [("firefox", "Browser"), ("spotify", "Spotify"),
+                              ("folia-major", "Folia Remote"), ("other", "Folia")]:
+            with self.subTest(app_id=app_id, title=title):
+                close, hide = self.run_close(dict(FoliaCloseTests.window, app_id=app_id, title=title))
+                close.assert_called_once_with("close-window", "--id", 20)
+                hide.assert_not_called()
+
+    def test_only_folia_player_hides_to_tray(self):
+        close, hide = self.run_close(FoliaCloseTests.window)
+        close.assert_not_called()
+        hide.assert_called_once_with(20)
+
+    def test_folia_failure_never_closes_player(self):
+        close, hide = self.run_close(FoliaCloseTests.window, fail_hide=True)
+        close.assert_not_called()
+        hide.assert_called_once_with(20)
+
+    def test_no_focused_window_is_noop(self):
+        close, hide = self.run_close(None)
+        close.assert_not_called()
+        hide.assert_not_called()
+
+    def test_both_effective_shortcuts_use_same_personal_action(self):
+        spec = importlib.util.spec_from_file_location("metadata", ROOT / "scripts/niri-config.py")
+        metadata = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(metadata)
+        rows = {}
+        for filename in ["70-binds.kdl", "75-personal-binds.kdl"]:
+            rows.update({row["key_combo"]: row for row in metadata._read_bind_entries(
+                ROOT / "defaults/niri/config.d" / filename)})
+        self.assertEqual(rows["Mod+Q"]["action"], rows["Alt+Q"]["action"])
+        self.assertIn("scripts/personal/niri-actions.py", rows["Mod+Q"]["action"])
+        self.assertTrue(rows["Mod+Q"]["action"].endswith(' close"'))
+        for key in ["Mod+Q", "Alt+Q"]:
+            self.assertIn("allow-inhibiting=false", rows[key]["options"])
+            self.assertEqual(rows[key]["category"], "Window Management")
+
+
 if __name__ == "__main__":
     unittest.main()

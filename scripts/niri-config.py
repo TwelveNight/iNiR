@@ -2892,6 +2892,7 @@ def _kb_special_metadata(action):
         script = argv[-1]
         if "scripts/personal/niri-actions.py" in script:
             return {
+                "close": ("Close window", "Window Management"),
                 "empty-move": ("Move window to empty workspace", "Workspaces"),
                 "empty-focus": ("Focus empty workspace", "Workspaces"),
                 "float": ("Toggle centered floating window", "Window Management"),

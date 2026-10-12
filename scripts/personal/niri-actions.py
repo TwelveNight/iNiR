@@ -130,8 +130,22 @@ def hide_folia(window_id):
     raise RuntimeError("Folia's hide menu is unavailable; leaving the player running")
 
 
+def close_window():
+    window = query("focused-window")
+    if window is None:
+        return
+    # Capture once: delayed tray calls must never close a newly focused window.
+    if (window.get("app_id") == "folia-major"
+            and window.get("title") == "Folia"):
+        hide_folia(window["id"])
+        return
+    action("close-window", "--id", window["id"])
+
+
 def main(command, *args):
-    if command == "empty-move":
+    if command == "close":
+        close_window()
+    elif command == "empty-move":
         empty_workspace(True)
     elif command == "empty-focus":
         empty_workspace()

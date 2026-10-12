@@ -141,8 +141,9 @@ binds {
     // Window Management
     // ═══════════════════════════════════════════════════════════════════════
 
-    // Close focused window (same action as Mod+Q).
-    Alt+Q repeat=false hotkey-overlay-title="Close window" { close-window; }
+    // Match Nyxuri: both keys close normally; only the Folia player hides to tray.
+    Mod+Q repeat=false allow-inhibiting=false hotkey-overlay-title="Close window" { spawn "bash" "-c" "python3 \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/inir/scripts/personal/niri-actions.py\" close"; }
+    Alt+Q repeat=false allow-inhibiting=false hotkey-overlay-title="Close window" { spawn "bash" "-c" "python3 \"${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/inir/scripts/personal/niri-actions.py\" close"; }
 
     // Maximize column.
     Mod+O repeat=false hotkey-overlay-title="Maximize column" { maximize-column; }
