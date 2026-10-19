@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Exercise upstream integration and failed-deploy boundaries in temporary repos."""
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -48,7 +50,9 @@ class UpdateTests(unittest.TestCase):
 
     def no_network(self, command, **kwargs):
         if "fetch" in command:
-            self.assertEqual(command[-2:], ["origin", "prerelease"])
+            self.assertEqual(command[-2:], ["origin", "+refs/heads/prerelease:refs/remotes/origin/prerelease"])
+            self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"], "0")
+            self.assertEqual(kwargs["timeout"], 60)
             return ""
         self.assertNotIn("reset", command)
         self.assertNotIn("rebase", command)
@@ -70,10 +74,68 @@ class UpdateTests(unittest.TestCase):
     def test_conflict_keeps_working_tree_for_review(self):
         self.branches(conflict=True)
         self.original_run = update.run
-        with patch.object(update, "run", side_effect=self.no_network), self.assertRaises(subprocess.CalledProcessError):
+        with patch.object(update, "run", side_effect=self.no_network), \
+                patch.object(update.shutil, "which", return_value=None), \
+                self.assertRaisesRegex(ValueError, "打开 AI"):
             update.sync("inir", self.repo)
         self.assertTrue((self.repo / ".git/MERGE_HEAD").is_file())
         self.assertIn("<<<<<<<", (self.repo / "base").read_text())
+
+    def registry(self, names=("inir",)):
+        registry = self.home / ".config/desktop-profiles/profiles.json"
+        registry.parent.mkdir(parents=True, exist_ok=True)
+        registry.write_text(json.dumps({name: {"source": str(self.repo)} for name in names}))
+
+    def test_online_check_reports_upstream_without_rejecting_local_work(self):
+        self.branches()
+        self.registry()
+        (self.repo / "pending-work").write_text("preserve me")
+        original = self.git("rev-parse", "HEAD")
+        self.original_run = update.run
+        output = io.StringIO()
+        with patch.object(Path, "home", return_value=self.home), \
+                patch.object(update, "run", side_effect=self.no_network), \
+                contextlib.redirect_stdout(output):
+            self.assertEqual(update.main(["check", "inir", "--json"]), 0)
+        report = json.loads(output.getvalue())
+        self.assertEqual((report["behind"], report["ahead"], report["status"]), (1, 1, "behind"))
+        self.assertEqual(report["upstream"], "origin/prerelease")
+        self.assertEqual(self.git("rev-parse", "HEAD"), original)
+        self.assertEqual((self.repo / "pending-work").read_text(), "preserve me")
+
+    def test_existing_conflict_repeats_ai_instructions_without_fetch(self):
+        self.branches(conflict=True)
+        subprocess.run(["git", "-C", str(self.repo), "merge", "--no-edit", "upstream"], capture_output=True)
+        with patch.object(update.shutil, "which", return_value=None), \
+                self.assertRaisesRegex(ValueError, "打开 AI"):
+            update.check_source("inir", self.repo)
+        self.assertTrue((self.repo / ".git/MERGE_HEAD").is_file())
+
+    def test_vitreus_wm_alias_syncs_shared_checkout_once_without_live_write(self):
+        self.registry(("vitreus", "vitreus-wm"))
+        with patch.object(Path, "home", return_value=self.home), \
+                patch.object(update, "check_source"), patch.object(update, "sync") as sync, \
+                patch.object(update, "checks", return_value=[]), \
+                patch.object(update, "profile_manager", return_value=Mock()), \
+                patch.object(update, "snapshot") as backup:
+            self.assertEqual(update.main(["sync", "vitreus-wm"]), 0)
+        sync.assert_called_once_with("vitreus", self.repo)
+        backup.assert_not_called()
+        self.assertEqual(update.deploy_command("vitreus", self.repo),
+                         ["python3", "-B", self.repo / "personal/install.py", "--apply"])
+
+    def test_conflict_in_update_never_runs_verification_or_deployment(self):
+        self.branches(conflict=True)
+        self.registry()
+        self.original_run = update.run
+        with patch.object(Path, "home", return_value=self.home), \
+                patch.object(update, "run", side_effect=self.no_network), \
+                patch.object(update.shutil, "which", return_value=None), \
+                patch.object(update, "checks") as checks, patch.object(update, "snapshot") as backup:
+            with self.assertRaisesRegex(ValueError, "live 未更新"):
+                update.main(["update", "inir"])
+        checks.assert_not_called()
+        backup.assert_not_called()
 
     def test_dirty_source_and_wrong_branch_are_rejected(self):
         (self.repo / "uncommitted").write_text("user work\n")
@@ -126,6 +188,37 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("sync", result.stdout)
         self.assertEqual((self.home / ".local/lib/desktop-profiles/desktop_update.py").read_bytes(), (ROOT / "scripts/personal/desktop-update.py").read_bytes())
+        service = (self.home / ".config/systemd/user/desktop-update-check.service").read_text()
+        self.assertIn("check all --notify", service)
+        self.assertNotIn(" update ", service)
+        self.assertTrue((self.home / ".config/systemd/user/desktop-update-check.timer").exists())
+
+    def test_notifications_are_once_per_revision_and_checks_do_not_deploy(self):
+        items = [dict(profile="inir", status="behind", upstream="origin/prerelease", behind=2,
+                      remote_commit="revision-one"), dict(profile="nyxuri", status="error")]
+        with patch.object(update.shutil, "which", return_value="notify-send"), \
+                patch.object(update.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as notify:
+            update.notify_updates(self.home, items)
+            update.notify_updates(self.home, items)
+            self.assertEqual(notify.call_count, 1)
+            command = notify.call_args.args[0]
+            self.assertEqual(command[:3], ["notify-send", "-a", "desktop-update"])
+            self.assertIn("desktop-update update inir", command[-1])
+            items[0]["remote_commit"] = "revision-two"
+            update.notify_updates(self.home, items)
+            self.assertEqual(notify.call_count, 2)
+
+    def test_check_all_continues_after_one_fetch_failure(self):
+        self.registry(("inir", "nyxuri"))
+        result = dict(profile="nyxuri", upstream="origin/main", ahead=0, behind=1, status="behind")
+        output = io.StringIO()
+        with patch.object(Path, "home", return_value=self.home), \
+                patch.object(update, "report", side_effect=[ValueError("offline"), result]) as report, \
+                patch.object(update, "sync") as sync, contextlib.redirect_stdout(output):
+            self.assertEqual(update.main(["check", "all", "--json"]), 1)
+        self.assertEqual([x["status"] for x in json.loads(output.getvalue())], ["error", "behind"])
+        self.assertEqual(report.call_count, 2)
+        sync.assert_not_called()
 
     def test_inir_gui_argument_order_uses_the_shared_pipeline(self):
         helper = self.home / ".local/bin/desktop-update"

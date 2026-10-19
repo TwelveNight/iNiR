@@ -67,11 +67,13 @@ Singleton {
     property int commitsBehind: 0
     property int commitsAhead: 0
     property string repoRelation: "unknown" // current | behind | ahead | diverged | unknown
-    readonly property bool repoDiverged: repoRelation === "diverged"
+    readonly property bool repoDiverged: repoRelation === "diverged" && !root.personalOverlay
     property string latestMessage: ""
     property string localCommit: ""
     property string remoteCommit: ""
     property string currentBranch: "main"  // Current git branch
+    readonly property bool personalOverlay: currentBranch === "night/personal-overlay"
+    readonly property string updateBranch: root.personalOverlay ? "prerelease" : root.currentBranch
     property string _remoteBranch: "main"  // Resolved remote branch (may differ from currentBranch if not pushed)
     readonly property bool isNonMainBranch: currentBranch.length > 0 && currentBranch !== "main" && currentBranch !== "master"
     property bool isChecking: false
@@ -951,7 +953,7 @@ Singleton {
     Process {
         id: remoteCommitProc
         running: false
-        command: [...root._gitCmd, "rev-parse", "--short", "origin/" + root.currentBranch]
+        command: [...root._gitCmd, "rev-parse", "--short", "origin/" + root.updateBranch]
         stdout: StdioCollector {
             onStreamFinished: {
                 root.remoteCommit = (text ?? "").trim()
@@ -959,11 +961,16 @@ Singleton {
         }
         onExited: (exitCode, exitStatus) => {
             if (exitCode !== 0) {
+                if (root.personalOverlay) {
+                    root.isChecking = false
+                    root.lastError = "Cannot resolve origin/prerelease; run desktop-update check inir."
+                    return
+                }
                 // Try origin/main as fallback (in case branch doesn't exist remotely)
                 remoteCommitFallbackProc.running = true
                 return
             }
-            root._remoteBranch = root.currentBranch
+            root._remoteBranch = root.updateBranch
             countCommitsProc.running = true
         }
     }
