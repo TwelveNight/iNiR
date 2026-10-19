@@ -60,6 +60,7 @@ def checks(name, source):
     if name == "inir":
         return [["python3", source / "scripts/test-personal-overlay.py"],
                 ["python3", source / "scripts/test-runtime-payload.py"],
+                ["python3", source / "scripts/test-supervisor-reconciliation.py"],
                 ["python3", "-m", "unittest", "discover", "-s", "scripts/personal/remote-desktop", "-q"]]
     if name == "hyprland-ii":
         return [["python3", source / "scripts/test-desktop-profiles.py"],

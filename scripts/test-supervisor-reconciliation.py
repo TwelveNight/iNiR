@@ -162,6 +162,34 @@ systemctl() { printf 'systemctl %s\\n' "$*" >> "$TMPDIR/calls"; }
         self.assertFalse((self.config / "service/inir-xembedsniproxy").exists())
         self.assertIn("BEGIN inir-systemd-environment", self.startup.read_text())
 
+    def managed_profile(self):
+        profile = self.config / "desktop-profiles/inir/niri"
+        profile.parent.mkdir(parents=True)
+        (self.config / "niri").rename(profile)
+        (self.config / "niri").symlink_to(profile)
+        (self.config / "desktop-profiles/profiles.json").write_text('{}')
+        manager = Path(self.env["HOME"]) / ".local/bin/desktop-profile"
+        manager.parent.mkdir(parents=True)
+        manager.write_text('#!/bin/sh\n[ "$1 $2" = "guard inir" ]\n')
+        manager.chmod(0o755)
+        return profile, manager
+
+    def test_guarded_managed_profile_supports_supervisor_reconciliation(self):
+        profile, _ = self.managed_profile()
+        result = self.shell(supervisor="systemd")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.config / "niri").is_symlink())
+        self.assertIn("BEGIN inir-systemd-environment", (profile / "config.d/50-startup.kdl").read_text())
+
+    def test_failed_profile_guard_stops_before_service_or_config_writes(self):
+        profile, manager = self.managed_profile()
+        before = self.snapshot(profile)
+        manager.write_text('#!/bin/sh\nexit 1\n')
+        result = self.shell(supervisor="systemd")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.snapshot(profile), before)
+        self.assertFalse(self.calls.exists())
+
     def assert_failure_propagated(self, inject, supervisor="runsvdir", code="reconcile_inir_supervisor"):
         before = self.startup.read_bytes()
         result = self.shell(code, supervisor, inject)

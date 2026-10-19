@@ -1068,15 +1068,20 @@ reconcile_inir_supervisor() {
   local runit_run_file="${runit_service_dir}/run"
   local xembed_service_dir="${XDG_CONFIG_HOME:-$HOME/.config}/service/inir-xembedsniproxy"
   local xembed_run_file="${xembed_service_dir}/run"
-  local startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/50-startup.kdl"
-  [[ -f "$startup_target" ]] || startup_target="${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl"
+  local niri_root="${XDG_CONFIG_HOME:-$HOME/.config}/niri"
+  if [[ -L "$niri_root" && -f "${XDG_CONFIG_HOME:-$HOME/.config}/desktop-profiles/profiles.json" ]]; then
+    "$HOME/.local/bin/desktop-profile" guard inir || return 1
+    niri_root="$(cd -P -- "$niri_root" && pwd)" || return 1
+  fi
+  local startup_target="$niri_root/config.d/50-startup.kdl"
+  [[ -f "$startup_target" ]] || startup_target="$niri_root/config.kdl"
 
   local supervisor
   supervisor="$(inir_supervisor)" || return 1
 
   validate_inir_supervisor_destinations "$runit_run_file" "$xembed_run_file" \
-    "${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.d/50-startup.kdl" \
-    "${XDG_CONFIG_HOME:-$HOME/.config}/niri/config.kdl" || return 1
+    "$niri_root/config.d/50-startup.kdl" \
+    "$niri_root/config.kdl" || return 1
   validate_audio_user_service_destinations || return 1
   if [[ "${OS_GROUP_ID:-}" == void ]]; then
     validate_ydotool_user_service_destinations || return 1
