@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import socket
+import stat
 import struct
 import time
 
@@ -84,10 +85,29 @@ class DesktopSession:
             if inherited.get(key):
                 result.env[key] = inherited[key]
         if result.env.get('DESKTOP_PROFILE', result.profile) != result.profile:
-            raise RuntimeError('Running compositor profile does not match its config link')
+            if not result.live_handoff(pid, process):
+                raise RuntimeError('Running compositor profile does not match its config link')
+            result.env['DESKTOP_PROFILE'] = result.profile
         if probe:
             result.outputs()
         return result
+
+    def live_handoff(self, pid, process):
+        """Accept only an explicit handoff bound to this exact Niri process."""
+        if self.kind != 'niri' or self.profile not in ('inir', 'nyxuri'):
+            return False
+        marker = Path(self.env['XDG_RUNTIME_DIR']) / 'desktop-profiles/niri-handoff.json'
+        try:
+            info = marker.lstat()
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+                return False
+            data = json.loads(marker.read_text())
+            started = (process / 'stat').read_text().rsplit(') ', 1)[1].split()[19]
+            return data == dict(pid=pid, started=started, socket=self.address,
+                                profile=self.profile, config=str(self.config_dir),
+                                origin_profile=self.env.get('DESKTOP_PROFILE'))
+        except (OSError, ValueError, KeyError, IndexError):
+            return False
 
     def _invoke(self, *args):
         self.assert_current()

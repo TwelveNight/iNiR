@@ -21,6 +21,14 @@ python3 -m unittest discover -s scripts/personal/remote-desktop -p 'test_*.py'
 `remote-panel__custom__.kdl`，由保留更新的个人入口加载。Hyprland 使用本机
 Lua `hl.monitor` API，不写 Niri 文件。
 
+同一 Niri 进程内的受控热切换使用
+`$XDG_RUNTIME_DIR/desktop-profiles/niri-handoff.json`。控制器仅接受当前用户拥有、
+其他用户不可写的普通文件，且其 `pid`、`started`（`/proc/PID/stat` 的启动时钟）、
+`socket`、`origin_profile`、`profile`、`config` 必须全部与已验证的 IPC 进程及
+实际配置目录一致。没有匹配记录时，仍拒绝进程身份与配置链接不一致的情况；
+记录不能跨重启或用于 Hyprland。切换过程须迁移远程布局快照与断开锁屏义务，
+不能把仍在线的客户端当作断开处理。
+
 VNC 连接时保存完整的内外屏状态，将 eDP-2 放在 `(0,0)`，关闭其他输出，
 只把 eDP-2 交给捕获服务。多客户端共用此状态，最后一个远程客户端离开后
 先确认锁屏，再恢复此前的分辨率、缩放、旋转、位置与启停状态。外屏先恢复，
@@ -67,3 +75,9 @@ Sunshine 准备与停止循环：KMS/VAAPI 就绪、eDP-2 位于原点、外屏�
 
 Nyxuri 和 Hyprland 的实际登录串流、平板显示/触控及断开锁屏尚未实测；
 这些桌面的当前证据为配置验证和适配器回归测试。
+
+随后完成一次远程 iNiR → Nyxuri 热切换：Niri 与 WayVNC 保持原 PID，现有
+VNC 客户端保持连接，内屏分辨率、缩放、位置及其他输出启停状态保持一致。
+已查看真实内屏画面确认 Noctalia 面板渲染，Nyxuri 剪贴板服务运行，控制器
+确认 `desktop_profile=nyxuri`、内屏捕获和断开锁屏义务。热切换期间没有注销，
+这不替代完整登录、客户端断开及重新连接的验收。新增身份记录回归后共 41 项通过。

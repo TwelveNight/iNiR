@@ -66,6 +66,38 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(current.profile, 'hyprland-ii')
         self.assertNotIn('DESKTOP_PROFILE', current.env)
 
+    def test_live_niri_handoff_requires_exact_process_and_installed_profile(self):
+        session = self.session('nyxuri')
+        session.env['DESKTOP_PROFILE'] = 'inir'
+        session.env['XDG_RUNTIME_DIR'] = str(self.home / 'runtime')
+        process = self.home / 'proc/42'
+        process.mkdir(parents=True)
+        (process / 'stat').write_text('42 (niri) ' + ' '.join(['S'] * 19 + ['12345']))
+        marker = Path(session.env['XDG_RUNTIME_DIR']) / 'desktop-profiles/niri-handoff.json'
+        marker.parent.mkdir(parents=True)
+        data = dict(pid=42, started='12345', socket=session.address, profile='nyxuri',
+                    config=str(session.config_dir), origin_profile='inir')
+        self.assertFalse(session.live_handoff(42, process))
+        marker.write_text(json.dumps(data))
+        marker.chmod(0o600)
+        self.assertTrue(session.live_handoff(42, process))
+        for key, value in dict(pid=43, started='999', socket='/old.sock', profile='inir',
+                               config='/other/config', origin_profile='other').items():
+            with self.subTest(key=key):
+                marker.write_text(json.dumps(dict(data, **{key: value})))
+                self.assertFalse(session.live_handoff(42, process))
+        marker.write_text(json.dumps(data))
+        marker.chmod(0o666)
+        self.assertFalse(session.live_handoff(42, process))
+        marker.chmod(0o600)
+        marker.rename(marker.with_suffix('.saved'))
+        marker.symlink_to(marker.with_suffix('.saved'))
+        self.assertFalse(session.live_handoff(42, process))
+
+    def test_live_handoff_never_adopts_hyprland(self):
+        session = self.session('hyprland-ii')
+        self.assertFalse(session.live_handoff(42, self.home / 'proc/42'))
+
     def test_hyprland_commands_keep_mode_scaling_and_use_lua_api(self):
         monitor = dict(name='eDP-2', width=2560, height=1600, refreshRate=165.004,
                        x=5402, y=160, scale=1.5, transform=0, disabled=False)
