@@ -17,7 +17,7 @@ class DesktopTests(unittest.TestCase):
         self.home = Path(self.temp.name)
 
     def session(self, profile, invoke=None):
-        compositor = 'hypr' if profile == 'hyprland-ii' else 'niri'
+        compositor = 'hypr' if profile in ('hyprland-ii', 'sekaipop') else 'niri'
         target = self.home / '.config/desktop-profiles' / profile / compositor
         target.mkdir(parents=True, exist_ok=True)
         link = self.home / '.config' / compositor
@@ -30,16 +30,16 @@ class DesktopTests(unittest.TestCase):
 
     def test_each_profile_owns_its_config_and_snapshots(self):
         keys = []
-        for profile in ['inir', 'nyxuri', 'hyprland-ii']:
+        for profile in ['inir', 'nyxuri', 'hyprland-ii', 'sekaipop']:
             session = self.session(profile)
             keys.append(session.key)
             self.assertEqual(session.profile, profile)
-            if profile == 'hyprland-ii':
+            if profile in ('hyprland-ii', 'sekaipop'):
                 self.assertIsNone(session.managed_config)
             else:
                 self.assertEqual(session.managed_config.parent, session.config_dir)
                 self.assertNotIn('nyxuri-desktop', str(session.managed_config))
-        self.assertEqual(len(set(keys)), 3)
+        self.assertEqual(len(set(keys)), 4)
 
     def test_json_environment_removes_other_desktop_and_preserves_literal_values(self):
         env = manager_environment(base={'NIRI_SOCKET': '/old', 'HYPRLAND_INSTANCE_SIGNATURE': 'old', 'PATH': '/bin'},
@@ -117,7 +117,7 @@ class DesktopTests(unittest.TestCase):
         self.assertEqual(calls[-1], ('hyprctl', 'dispatch', 'dpms', 'on', 'eDP-2'))
 
     def test_lock_routes_to_active_shell_and_confirms_compositor(self):
-        for profile in ['inir', 'nyxuri', 'hyprland-ii']:
+        for profile in ['inir', 'nyxuri', 'hyprland-ii', 'sekaipop']:
             calls = []
             states = iter([False, True])
             def invoke(*args):
@@ -131,10 +131,22 @@ class DesktopTests(unittest.TestCase):
             if profile == 'nyxuri':
                 self.assertIn(('noctalia', 'msg', 'session', 'lock'), calls)
             else:
-                expected = 'ii' if profile == 'hyprland-ii' else 'inir'
-                self.assertTrue(any(str(self.home / '.config/quickshell' / expected) in call for call in calls))
-            if profile == 'hyprland-ii':
+                expected = {'hyprland-ii': ('ii', 'activate'), 'inir': ('inir', 'activate'),
+                            'sekaipop': ('sekaipop', 'lock')}[profile]
+                self.assertIn(('qs', '-p', str(self.home / '.config/quickshell' / expected[0]),
+                               'ipc', 'call', 'lock', expected[1]), calls)
+                if profile == 'sekaipop':
+                    self.assertFalse(any(str(self.home / '.config/quickshell/ii') in call for call in calls))
+            if profile in ('hyprland-ii', 'sekaipop'):
                 self.assertEqual(calls[-1], ('hyprctl', '-j', 'status'))
+
+    def test_unknown_hyprland_shell_never_falls_back_to_ii(self):
+        calls = []
+        session = self.session('sekaipop', lambda *args: calls.append(args))
+        session.profile = 'future-desktop'
+        with self.assertRaisesRegex(RuntimeError, 'No verified lock backend'):
+            session.lock()
+        self.assertEqual(calls, [])
 
     def test_lease_restores_internal_and_external_and_rejects_another_session(self):
         initial = {

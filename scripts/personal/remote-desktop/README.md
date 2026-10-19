@@ -1,7 +1,7 @@
 # 所有桌面共享的远程桌面控制器
 
 这一目录是 `~/.local/libexec/remote-panel` 的可版本管理来源。适配本机的
-`inir`、`nyxuri`、`hyprland-ii` 三个登录配置；服务与认证信息仍全局共享。
+`inir`、`nyxuri`、`hyprland-ii`、`sekaipop` 四个登录配置；服务与认证信息仍全局共享。
 部署不需要运行整个 iNiR 安装器：
 
 ```sh
@@ -36,8 +36,9 @@ VNC 连接时保存完整的内外屏状态，将 eDP-2 放在 `(0,0)`，关闭�
 换桌面或重新登录后不会把另一会话的布局写到当前桌面。
 
 锁屏确认按实际桌面选择：iNiR 的 `lock status` 必须返回 `secure`；Nyxuri 用
-当前 Noctalia 的 `locked=true`；Hyprland 调用 II 锁屏并查询 compositor 的
-`hyprctl -j status`，要求 `locked=true`。锁屏失败保留远程布局并重试。
+当前 Noctalia 的 `locked=true`；Hyprland + II 调用 II 的 `lock activate`；SekaiPop 调用自己的 `lock lock`。
+两者都查询 compositor 的 `hyprctl -j status`，要求 `locked=true`，
+不会用 IPC 成功代替安全锁屏确认，也不会回退到另一套 shell。锁屏失败保留远程布局并重试。
 远程连接期间单独持有 logind 合盖处理抑制，断开后释放。
 控制器与准备服务使用 `KillMode=mixed`，停止时只先通知主进程，避免清理期间
 正在运行的 compositor/网络探测子进程被一并终止而导致错误退出。
@@ -61,7 +62,7 @@ cat "$XDG_RUNTIME_DIR/moonlight-inner.json"
 `manifest.json` 恢复原文件、删除此次新建文件，执行 `systemctl --user daemon-reload`
 并重启 `remote-panel.service`；应在没有远程客户端时进行。
 
-自动回归覆盖三个桌面的识别、命令与锁屏路由、快照隔离、内外屏恢复、
+自动回归覆盖四个桌面的识别、命令与锁屏路由、快照隔离、内外屏恢复、
 多客户端断开规则、锁屏失败重试与 Sunshine 门禁。实际跨桌面登录、合盖、
 平板触控和持续视频需在对应桌面与客户端验证；当前会话检查不能代替这些验收。
 
@@ -81,3 +82,18 @@ VNC 客户端保持连接，内屏分辨率、缩放、位置及其他输出启�
 已查看真实内屏画面确认 Noctalia 面板渲染，Nyxuri 剪贴板服务运行，控制器
 确认 `desktop_profile=nyxuri`、内屏捕获和断开锁屏义务。热切换期间没有注销，
 这不替代完整登录、客户端断开及重新连接的验收。新增身份记录回归后共 41 项通过。
+
+## SekaiPop 适配检查（2026-10-19）
+
+42 项共享控制器回归通过，覆盖四套 profile 的身份/快照隔离、各自锁屏 IPC、
+Hyprland 安全锁屏确认及未知 shell 拒绝回退。仅更新个人源码和下次启动使用的
+已部署文件；当前 Nyxuri、WayVNC 与控制器进程不重启，在线 VNC 客户端不主动断开。
+
+SekaiPop 使用与 II 相同的 Hyprland 输出适配器，个人配置已有内屏 Sunshine
+触摸映射与软件光标。当前安装的 Hyprland 和定制 WayVNC 都包含 screencopy、
+virtual-pointer/keyboard 协议实现；Sunshine 配置仍为 AMD VAAPI / KMS / eDP-2。
+这些是静态兼容性和回归证据，不代替 SekaiPop 的实际登录验收。
+
+待在 SekaiPop 登录后验证：VNC 重连/真实画面/主机 Fcitx 输入、多客户端最后断开
+时的原生锁屏和内外屏布局恢复，以及 `moonlight-inner.service` 准备、Moonlight
+画面/触控/音频、断开清理。Sunshine 空闲为 inactive 是显式准备策略的正常状态。

@@ -214,14 +214,22 @@ class DesktopSession:
         raise RuntimeError('No verified lock backend for desktop profile: ' + self.profile)
 
     def lock(self, timeout=8, sleep=time.sleep):
+        # Hyprland identifies the compositor, not the shell owning its lock.
+        # Refuse unknown profiles rather than addressing a dormant sibling shell.
+        shells = {'hyprland-ii': ('hyprland', 'ii', 'activate'),
+                  'sekaipop': ('hyprland', 'sekaipop', 'lock'),
+                  'inir': ('niri', 'inir', 'activate')}
+        if self.profile == 'nyxuri' and self.kind == 'niri':
+            request = ('noctalia', 'msg', 'session', 'lock')
+        elif self.profile in shells and self.kind == shells[self.profile][0]:
+            _, shell, method = shells[self.profile]
+            request = ('qs', '-p', str(self.home / '.config/quickshell' / shell),
+                       'ipc', 'call', 'lock', method)
+        else:
+            raise RuntimeError('No verified lock backend for desktop profile: ' + self.profile)
         if self.locked():
             return
-        if self.kind == 'hyprland':
-            self.invoke('qs', '-p', str(self.home / '.config/quickshell/ii'), 'ipc', 'call', 'lock', 'activate')
-        elif self.profile == 'inir':
-            self.invoke('qs', '-p', str(self.home / '.config/quickshell/inir'), 'ipc', 'call', 'lock', 'activate')
-        elif self.profile == 'nyxuri':
-            self.invoke('noctalia', 'msg', 'session', 'lock')
+        self.invoke(*request)
         deadline = time.monotonic() + timeout
         while not self.locked():
             if time.monotonic() >= deadline:
