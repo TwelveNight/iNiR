@@ -127,6 +127,26 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("sync", result.stdout)
         self.assertEqual((self.home / ".local/lib/desktop-profiles/desktop_update.py").read_bytes(), (ROOT / "scripts/personal/desktop-update.py").read_bytes())
 
+    def test_inir_gui_argument_order_uses_the_shared_pipeline(self):
+        helper = self.home / ".local/bin/desktop-update"
+        helper.parent.mkdir(parents=True)
+        helper.write_text('#!/bin/sh\nprintf "%s\\n" "$*"\n')
+        helper.chmod(0o755)
+        registry = self.home / ".config/desktop-profiles/profiles.json"
+        registry.parent.mkdir(parents=True)
+        registry.write_text('{}')
+        for args in (["-y", "update"], ["-y", "-q", "update"]):
+            command = ['bash', '-c', 'source "$1" "${@:2}"', '_', str(ROOT / 'scripts/personal/setup-entry.sh'), *args]
+            result = subprocess.run(command, env=dict(os.environ, HOME=str(self.home)), capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), 'update inir')
+
+    def test_hypr_gui_preferences_are_retained(self):
+        with patch.object(update, "running", return_value=True):
+            command = update.deploy_command("hyprland-ii", self.repo, no_hypr=True, no_restart=True)
+        self.assertIn('--no-hypr', command)
+        self.assertIn('--no-restart', command)
+
 
 if __name__ == "__main__":
     unittest.main()

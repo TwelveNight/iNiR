@@ -25,15 +25,23 @@ inir_personal_install_entry() {
 
 # Login owns the canonical compositor link. Never update a different profile.
 # Source integration is independent of the currently selected compositor.
-if [[ "${1:-}" == update && "${DESKTOP_UPDATE_LOCAL:-}" != 1 && -f "${HOME}/.config/desktop-profiles/profiles.json" ]]; then
-    local_update=false
-    for argument in "$@"; do [[ "$argument" != --local ]] || local_update=true; done
-    if [[ "$local_update" != true ]]; then
-        case "${2:-}" in
-            ''|-y|--yes) exec "$HOME/.local/bin/desktop-update" update inir ;;
-            --no-deploy) exec "$HOME/.local/bin/desktop-update" sync inir ;;
-            *) echo 'Personal updates: use desktop-update update inir, or inir update --local.' >&2; exit 2 ;;
+if [[ "${DESKTOP_UPDATE_LOCAL:-}" != 1 && -f "${HOME}/.config/desktop-profiles/profiles.json" ]]; then
+    update_command=""; local_update=false; source_only=false; unsupported=false
+    for argument in "$@"; do
+        case "$argument" in
+            -y|--yes|-q|--quiet) ;;
+            update) update_command=update ;;
+            --local) local_update=true ;;
+            --no-deploy) source_only=true ;;
+            *) unsupported=true ;;
         esac
+    done
+    if [[ "$update_command" == update && "$local_update" != true ]]; then
+        [[ "$unsupported" != true ]] || { echo 'Use desktop-update update inir, or inir update --local.' >&2; exit 2; }
+        if [[ "$source_only" == true ]]; then
+            exec "$HOME/.local/bin/desktop-update" sync inir
+        fi
+        exec "$HOME/.local/bin/desktop-update" update inir
     fi
 fi
 profile_manager="${HOME}/.local/bin/desktop-profile"

@@ -68,11 +68,13 @@ def checks(name, source):
     return [["python3", "-m", "unittest", "discover", "-s", "tests", "-q"]]
 
 
-def deploy_command(name, source):
+def deploy_command(name, source, no_hypr=False, no_restart=False):
     if name == "inir":
         return [str(source / "setup"), "update", "--local", "-y"]
     if name == "hyprland-ii":
-        options = [] if running("Hyprland") else ["--no-restart"]
+        options = [] if running("Hyprland") and not no_restart else ["--no-restart"]
+        if no_hypr:
+            options.append("--no-hypr")
         return [str(source / "setup-ii-p3drovfx.sh"), "update", "--local", str(source),
                 "--keep-config", "--yes", *options]
     return [str(source / "nyxuri/launcher.sh"), "update", "--local", "--yes"]
@@ -144,6 +146,8 @@ def main(argv=None):
     parser.add_argument("action", choices=("status", "sync", "verify", "deploy", "update"))
     parser.add_argument("profile", choices=(*POLICY, "all"))
     parser.add_argument("--plan", action="store_true", help="print commands without fetching or writing")
+    parser.add_argument("--no-hypr", action="store_true", help="keep existing Hyprland compositor files")
+    parser.add_argument("--no-restart", action="store_true", help="do not restart the II shell")
     args = parser.parse_args(argv)
     home = Path.home()
     registry = json.loads((home / ".config/desktop-profiles/profiles.json").read_text())
@@ -155,7 +159,7 @@ def main(argv=None):
         if args.action == "status":
             print("  upstream behind/ahead: " + git(source, "rev-list", "--left-right", "--count", f"origin/{POLICY[name][1]}...HEAD"))
         if args.plan:
-            print("  deploy: " + repr(deploy_command(name, source)))
+            print("  deploy: " + repr(deploy_command(name, source, args.no_hypr, args.no_restart)))
     if args.plan or args.action == "status":
         return 0
     state = home / ".local/state/desktop-profiles"
@@ -188,7 +192,7 @@ def main(argv=None):
                 if (runtime / "bus").is_socket():
                     env.setdefault("XDG_RUNTIME_DIR", str(runtime))
                     env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path={runtime}/bus")
-                command = deploy_command(name, source)
+                command = deploy_command(name, source, args.no_hypr, args.no_restart)
                 if name != "nyxuri":
                     command = [str(manager), "maintain", name, "--", *command]
                 subprocess.run(command, cwd=source, env=env, check=True)
