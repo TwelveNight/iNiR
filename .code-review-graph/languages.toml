@@ -1,0 +1,7 @@
+[languages.qml]
+extensions = [".qml"]
+grammar = "qmljs"
+function_node_types = ["function_declaration", "function_expression", "arrow_function"]
+import_node_types = ["ui_import"]
+call_node_types = ["call_expression"]
+comment = "QML JavaScript functions, imports and calls via the bundled qmljs grammar. Component instances and declarative bindings are not resolved."

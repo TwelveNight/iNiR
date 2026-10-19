@@ -1,0 +1,5 @@
+# Generated graph data stays local; keep configuration reproducible.
+*
+!.gitignore
+!languages.toml
+!README.md
