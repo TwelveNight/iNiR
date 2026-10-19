@@ -49,7 +49,7 @@ def configure_desktop_sessions(config_home):
         if text != updated:
             session_target.write_text(updated)
     for relative, template in (
-        ("systemd/user/inir-hyprland-watch.service", "inir-hyprland-watch.service"),
+        ("systemd/user/desktop-profile-hyprland-watch.service", "inir-hyprland-watch.service"),
         ("systemd/user/hyprland-session.target.d/40-compositor-lifetime.conf", "hyprland-session-lifetime.conf"),
         ("systemd/user/app-.service.d/40-desktop-ready.conf", "autostart-desktop-ready.conf"),
     ):

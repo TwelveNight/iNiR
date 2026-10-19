@@ -207,12 +207,12 @@ printf '%s\\n' "$CONFIG_FILE" "$STATE_DIR"
         listener.parent.mkdir(parents=True)
         listener.write_text("#!/bin/sh\n")
         listener.chmod(0o755)
-        self.env.update(PATH=str(binary) + ":" + self.env["PATH"],
+        self.env.update(HOME=str(self.base), PATH=str(binary) + ":" + self.env["PATH"],
                         MOCK_SYSTEMCTL_LOG=str(log), NIRI_SOCKET="fixture", WAYLAND_DISPLAY="fixture-wayland",
                         XDG_CURRENT_DESKTOP="niri")
         subprocess.run(["bash", str(ROOT / "scripts/wallpaper/skwd-session.sh")], env=self.env, check=True)
         self.assertEqual(log.read_text().splitlines(), [
-            str(ROOT / "scripts/wallpaper/../personal/desktop-session.py") + " start niri --no-ii-theme"])
+            str(self.base / ".local/lib/desktop-profiles/session_runtime.py") + " start niri --no-ii-theme"])
         self.env.pop("NIRI_SOCKET")
         result = subprocess.run(["bash", str(ROOT / "scripts/wallpaper/skwd-session.sh")],
                                 env=self.env, capture_output=True)

@@ -57,7 +57,7 @@ for name in org.kde.kgpg.desktop org.kde.kalendarac.desktop org.kde.kclockd-auto
     fi
 done
 # Back up shared lifecycle overrides separately from the user's desktop units.
-for name in systemd/user/inir-hyprland-watch.service systemd/user/hyprland-session.target.d systemd/user/app-.service.d; do
+for name in systemd/user/inir-hyprland-watch.service systemd/user/desktop-profile-hyprland-watch.service systemd/user/hyprland-session.target.d systemd/user/app-.service.d; do
     if [[ -e "$config_home/$name" || -L "$config_home/$name" ]]; then
         mkdir -p "$snapshot/config/$(dirname "$name")"
         cp -a "$config_home/$name" "$snapshot/config/$name"
