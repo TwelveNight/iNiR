@@ -236,9 +236,15 @@ case "${SKIP_NIRI}" in
     NIRI_CONFIG="${XDG_CONFIG_HOME}/niri/config.kdl"
 
     # On updates, preserve the user's config and only patch launcher/theme bits.
-    # On first run, always install iNiR defaults (backup_clashing_targets already
-    # saved the pre-existing config to the backup dir).
-    if [[ "${INSTALL_FIRSTRUN}" == true ]]; then
+    # A managed profile keeps its existing config even on the first shell run.
+    # Otherwise first-run installs defaults after the personal backup stage.
+    if [[ -f "$NIRI_CONFIG" && -f "${XDG_CONFIG_HOME}/desktop-profiles/profiles.json" ]]; then
+      # The profile was already installed before iNiR's shell marker existed.
+      # Keep its outputs, personal includes and remote-capture policy even on
+      # a first shell installation; only the launcher patches below apply.
+      "${HOME}/.local/bin/desktop-profile" guard inir || return 1
+      log_success "Preserving installed iNiR profile"
+    elif [[ "${INSTALL_FIRSTRUN}" == true ]]; then
       if [[ -d "defaults/niri" ]]; then
         install_dir__sync "defaults/niri" "${XDG_CONFIG_HOME}/niri"
         log_success "Niri config installed (defaults)"

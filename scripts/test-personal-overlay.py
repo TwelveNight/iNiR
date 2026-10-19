@@ -354,7 +354,88 @@ install-python-packages
         self.assertIn(str(self.state / "inir/.venv"), (self.base / "uv.log").read_text())
         self.assertEqual(sentinel.read_text(), "II dependencies")
 
+    def select_inir_profile(self):
+        import shutil
+        self.env["HOME"] = str(self.base / "home")
+        root = self.config / "desktop-profiles/inir/niri"
+        root.parent.mkdir(parents=True)
+        if (self.config / "niri").exists():
+            shutil.move(self.config / "niri", root)
+        else:
+            shutil.copytree(ROOT / "defaults/niri", root)
+        (self.config / "niri").symlink_to("desktop-profiles/inir/niri")
+        (self.config / "desktop-profiles/profiles.json").write_text('{}')
+        manager = Path(self.env["HOME"]) / ".local/bin/desktop-profile"
+        manager.parent.mkdir(parents=True)
+        manager.write_text('''#!/bin/sh
+[ "$1" = guard ] && [ "$2" = inir ] || exit 2
+[ "$(realpath "$XDG_CONFIG_HOME/niri")" = "$XDG_CONFIG_HOME/desktop-profiles/inir/niri" ]
+''')
+        manager.chmod(0o755)
+        return root
+
+    def test_first_shell_install_preserves_existing_profile_and_remote_policy(self):
+        root = self.select_inir_profile()
+        remote = root / "remote-panel__custom__.kdl"
+        remote.write_text('// remote capture policy\n')
+        extra = root / "config.d/90-user-extra.kdl"
+        extra.write_text(extra.read_text() + '\ninclude "../remote-panel__custom__.kdl"\n')
+        (root / "monitor.kdl").write_text('output "HDMI-A-1" { position x=-2560 y=0; }\n')
+        before = {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+        code = (ROOT / "sdata/subcmd-install/3.files.sh").read_text()
+        start = code.index('case "${SKIP_NIRI}" in')
+        end = code.index('    # Patch the Niri config:', start)
+        section = code[start:end] + '\n;;\nesac\n'
+        self.bash(f'''source "{ROOT}/sdata/lib/functions.sh"
+quiet=true
+ask=false
+SKIP_NIRI=false
+INSTALL_FIRSTRUN=true
+INSTALLED_LISTFILE="$XDG_STATE_HOME/installed"
+{section}
+''')
+        self.assertEqual({p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}, before)
+        self.assertTrue((self.config / "niri").is_symlink())
+
+    def test_wrong_profile_stops_install_and_update_before_preflight(self):
+        root = self.select_inir_profile()
+        other = self.config / "desktop-profiles/nyxuri/niri"
+        other.mkdir(parents=True)
+        (other / "config.kdl").write_text('// Nyxuri sentinel\n')
+        (self.config / "niri").unlink()
+        (self.config / "niri").symlink_to(other)
+        for command in ([str(ROOT / "setup"), "update", "--local"],
+                        [str(ROOT / "scripts/personal/install.sh"), "-y"]):
+            result = subprocess.run(command, env=self.env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((other / "config.kdl").read_text(), '// Nyxuri sentinel\n')
+        self.assertTrue((root / "config.kdl").is_file())
+        self.assertFalse((self.state / "inir/install-backups").exists())
+
+    def test_runtime_sync_keeps_profile_selector_and_refuses_wrong_profile(self):
+        root = self.select_inir_profile()
+        command = f'''source "{ROOT}/sdata/lib/functions.sh"
+_runtime_rsync "{ROOT}/defaults/niri" "$XDG_CONFIG_HOME/niri"
+'''
+        self.bash(command)
+        self.assertTrue((self.config / "niri").is_symlink())
+        self.assertEqual((root / "config.kdl").read_bytes(), (ROOT / "defaults/niri/config.kdl").read_bytes())
+        other = self.config / "desktop-profiles/nyxuri/niri"
+        other.mkdir(parents=True)
+        (other / "config.kdl").write_text('// Nyxuri sentinel\n')
+        (self.config / "niri").unlink()
+        (self.config / "niri").symlink_to(other)
+        result = subprocess.run(["bash", "-euc", command], env=self.env, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((other / "config.kdl").read_text(), '// Nyxuri sentinel\n')
+
     def test_personal_installer_snapshots_before_deployment(self):
+        self.exercise_installer_snapshot()
+
+    def test_personal_installer_snapshots_profile_contents_and_selector(self):
+        self.exercise_installer_snapshot(profile=True)
+
+    def exercise_installer_snapshot(self, profile=False):
         fixture = self.base / "fixture"
         entry = fixture / "scripts/personal/install.sh"
         entry.parent.mkdir(parents=True)
@@ -382,6 +463,9 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         niri = self.config / "niri/config.kdl"
         niri.parent.mkdir()
         niri.write_text("previous niri")
+        if profile:
+            root = self.select_inir_profile()
+            (root / "remote-panel__custom__.kdl").write_text('// saved remote policy\n')
         autostart = self.config / "autostart/org.kde.kgpg.desktop"
         autostart.parent.mkdir()
         previous_autostart = "[Desktop Entry]\nType=Application\nName=KGpg\nExec=kgpg\nHidden=false\n"
@@ -435,6 +519,11 @@ ln -s ../inir.service "$XDG_CONFIG_HOME/systemd/user/niri.service.wants/inir.ser
         self.assertEqual((snapshots[0] / "config/autostart/org.kde.kgpg.desktop").read_text(), previous_autostart)
         self.assertIn("Hidden=true", autostart.read_text())
         self.assertEqual((snapshots[0] / "config/niri/config.kdl").read_text(), "previous niri")
+        if profile:
+            self.assertFalse((snapshots[0] / "config/niri").is_symlink())
+            self.assertEqual((snapshots[0] / "niri-link").read_text().strip(), 'desktop-profiles/inir/niri')
+            self.assertEqual((snapshots[0] / "config/niri/remote-panel__custom__.kdl").read_text(), '// saved remote policy\n')
+            self.assertTrue((self.config / "niri").is_symlink())
         self.assertEqual((snapshots[0] / "inir-config/config.json").read_text(), previous_private_config)
         self.assertEqual((snapshots[0] / "config/systemd/user/default.target.wants/inir.service").readlink(),
                          Path("../inir.service"))

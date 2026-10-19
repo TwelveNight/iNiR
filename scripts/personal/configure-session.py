@@ -182,7 +182,7 @@ def configure(config_home, config_dir, state_dir, venv_dir, bin_home):
         raise ValueError("iNiR paths must be absolute, single-line paths")
     configure_shell_preferences(config_dir)
     configure_portals(config_home)
-    niri = config_home / "niri"
+    niri = (config_home / "niri").resolve()
     # Install the separate personal layer once; preserve subsequent user edits.
     root_config = niri / "config.kdl"
     root_text = root_config.read_text()

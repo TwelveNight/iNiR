@@ -22,4 +22,15 @@ inir_personal_install_entry() {
     [[ "$command" == install ]] || return 0
     exec "$REPO_ROOT/scripts/personal/install.sh" "${options[@]}"
 }
+
+# Login owns the canonical compositor link. Never update a different profile.
+profile_manager="${HOME}/.local/bin/desktop-profile"
+if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/desktop-profiles/profiles.json" ]]; then
+    [[ -x "$profile_manager" ]] || { echo 'Missing desktop-profile manager' >&2; exit 1; }
+    case "${1:-}" in
+        -h|--help|help|status|version|info|doctor|checkdeps) ;;
+        *) "$profile_manager" guard inir || exit $? ;;
+    esac
+fi
+
 inir_personal_install_entry "$@"

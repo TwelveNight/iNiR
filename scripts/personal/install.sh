@@ -26,6 +26,17 @@ for option in "$@"; do
     [[ "$option" != --check ]] || check_only=true
     [[ "$option" == --check || "$option" == -y || "$option" == --yes || "$option" == --quiet || "$option" == -q ]] || { echo "Unsupported install option: $option" >&2; exit 2; }
 done
+
+# Login owns the canonical compositor link. Never update a different profile.
+profile_manager="${HOME}/.local/bin/desktop-profile"
+if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/desktop-profiles/profiles.json" ]]; then
+    [[ -x "$profile_manager" ]] || { echo 'Missing desktop-profile manager' >&2; exit 1; }
+    case "${1:-}" in
+        -h|--help|help|status|version|info|doctor|checkdeps) ;;
+        *) "$profile_manager" guard inir || exit $? ;;
+    esac
+fi
+
 python3 "$repo/scripts/lib/private_paths.py" --runtime-links
 "$repo/scripts/personal/preflight.sh"
 [[ "$check_only" != true ]] || exit 0
@@ -54,7 +65,15 @@ done
 for name in systemd/user/inir-output-wallpaper.service systemd/user/niri.service.wants/inir-output-wallpaper.service niri xdg-desktop-portal/niri-portals.conf systemd/user/inir.service systemd/user/inir.service.d systemd/user/niri.service.d systemd/user/niri.service.wants/inir.service systemd/user/app-org.kde.xwaylandvideobridge@autostart.service.d systemd/user/hyprland-session.target hypr/hyprland/execs.lua hypr/custom/execs.lua hypr/custom/inir-session.lua systemd/user/skwd-walld.service.d systemd/user/ii-skwd-wall-theme.service.d systemd/user/graphical-session.target.wants/docker-desktop.service systemd/user/graphical-session.target.wants/app-dev.lizardbyte.app.Sunshine.service systemd/user/sunshine.service; do
     if [[ -e "$config_home/$name" || -L "$config_home/$name" ]]; then
         mkdir -p "$snapshot/config/$(dirname "$name")"
-        cp -a "$config_home/$name" "$snapshot/config/$name"
+        if [[ "$name" == niri && -L "$config_home/niri" && -f "$config_home/desktop-profiles/profiles.json" ]]; then
+            # Save installed contents, not a relative link that is dangling in
+            # the snapshot. Keep the login selector separately for rollback.
+            "$profile_manager" guard inir
+            readlink -- "$config_home/niri" > "$snapshot/niri-link"
+            cp -a "$(realpath -e -- "$config_home/niri")" "$snapshot/config/niri"
+        else
+            cp -a "$config_home/$name" "$snapshot/config/$name"
+        fi
     fi
 done
 # Service wiring removes obsolete iNiR links from other targets. Preserve those
