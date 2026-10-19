@@ -164,6 +164,47 @@ rsync_dir "$1/dots/.config/example" "$2/config-copy"
 ''', 'fixture', str(self.source), str(self.base)])
         self.assertTrue((self.base / 'config-copy/tools/tool.txt').is_file())
 
+    def test_directory_sync_follows_only_manager_approved_theme_links(self):
+        home = self.base / 'home'
+        canonical = home / '.config/matugen'
+        storage = home / '.config/desktop-profiles/inir/theme/matugen'
+        storage.mkdir(parents=True)
+        (storage / 'obsolete').write_text('old template')
+        canonical.symlink_to(storage)
+        (home / '.config/desktop-profiles/profiles.json').write_text('{}')
+        binary = home / '.local/bin'
+        binary.mkdir(parents=True)
+        manager = binary / 'desktop-profile'
+        manager.write_text('''#!/bin/sh
+case "$1:$2" in
+ guard:inir) exit 0;;
+ theme-path:inir) [ "$3" = "$APPROVED_THEME_LINK" ] || exit 9
+                 printf '%s\\n' "$APPROVED_THEME_STORAGE";;
+ *) exit 8;;
+esac
+''')
+        manager.chmod(0o755)
+        self.put('defaults/matugen/template.conf', 'new template')
+        env = dict(os.environ, HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'),
+                   APPROVED_THEME_LINK=str(canonical), APPROVED_THEME_STORAGE=str(storage))
+        command = ['bash', '-c', '''set -euo pipefail
+source "$1/sdata/lib/functions.sh"
+x() { "$@"; }
+INSTALLED_LISTFILE="$2/installed-files"
+rsync_dir__sync "$1/defaults/matugen" "$3"
+''', 'fixture', str(self.source), str(self.base), str(canonical)]
+        self.run_command(command, env=env)
+        self.assertTrue(canonical.is_symlink())
+        self.assertEqual((storage / 'template.conf').read_text(), 'new template')
+        self.assertFalse((storage / 'obsolete').exists())
+        # A different desktop's alias is rejected before rsync touches it.
+        other = home / '.config/kitty'
+        other.symlink_to(storage)
+        command[-1] = str(other)
+        result = subprocess.run(command, env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((storage / 'template.conf').read_text(), 'new template')
+
     def test_reject_escaping_symlinks_before_copy(self):
         outside = self.base / 'private-file'
         outside.write_text('EXCLUDED_SENTINEL')

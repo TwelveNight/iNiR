@@ -185,9 +185,14 @@ _runtime_rsync() {
   local -a exclusions
   mapfile -t exclusions <<< "$filters"
   local target="$2"
-  if [[ -L "$target" && "$target" == "${XDG_CONFIG_HOME:-$HOME/.config}/niri" && -f "${XDG_CONFIG_HOME:-$HOME/.config}/desktop-profiles/profiles.json" ]]; then
+  if [[ -L "$target" && -f "${XDG_CONFIG_HOME:-$HOME/.config}/desktop-profiles/profiles.json" ]]; then
     "$HOME/.local/bin/desktop-profile" guard inir || return
-    target="$(realpath -e -- "$target")" || return
+    if [[ "$target" == "${XDG_CONFIG_HOME:-$HOME/.config}/niri" ]]; then
+      target="$(realpath -e -- "$target")" || return
+    else
+      # Only the active profile's journaled theme links are valid aliases.
+      target="$("$HOME/.local/bin/desktop-profile" theme-path inir "$target")" || return
+    fi
   fi
   [[ ! -L "$target" ]] || { echo "Refusing symlink directory destination: $target" >&2; return 1; }
   shift 2

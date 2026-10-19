@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("desktop_update", ROOT / "scripts/personal/desktop-update.py")
@@ -146,6 +146,42 @@ class UpdateTests(unittest.TestCase):
             command = update.deploy_command("hyprland-ii", self.repo, no_hypr=True, no_restart=True)
         self.assertIn('--no-hypr', command)
         self.assertIn('--no-restart', command)
+
+
+    def test_palette_contract_failure_prevents_backup_and_all_installers(self):
+        registry = self.home / ".config/desktop-profiles/profiles.json"
+        registry.parent.mkdir(parents=True)
+        registry.write_text(json.dumps({"inir": {"source": str(self.repo)}}))
+        profiles = Mock()
+        profiles.verify_theme_contract.side_effect = ValueError("upstream output changed")
+        with patch.object(Path, "home", return_value=self.home), \
+                patch.object(update, "check_source"), \
+                patch.object(update, "checks", return_value=[]), \
+                patch.object(update, "profile_manager", return_value=profiles), \
+                patch.object(update, "snapshot") as backup, \
+                patch.object(update.subprocess, "run") as deploy:
+            with self.assertRaisesRegex(ValueError, "upstream output"):
+                update.main(["deploy", "inir"])
+        backup.assert_not_called()
+        deploy.assert_not_called()
+
+    def test_nyxuri_deployment_also_uses_managed_theme_maintenance(self):
+        registry = self.home / ".config/desktop-profiles/profiles.json"
+        registry.parent.mkdir(parents=True)
+        registry.write_text(json.dumps({"nyxuri": {"source": str(self.repo)}}))
+        profiles = Mock()
+        with patch.object(Path, "home", return_value=self.home), \
+                patch.object(update, "check_source"), \
+                patch.object(update, "checks", return_value=[]), \
+                patch.object(update, "profile_manager", return_value=profiles), \
+                patch.object(update, "snapshot"), \
+                patch.object(update, "chezmoi_before", return_value={}), \
+                patch.object(update.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as deploy:
+            self.assertEqual(update.main(["deploy", "nyxuri"]), 0)
+        profiles.verify_theme_contract.assert_called_once_with("nyxuri")
+        profiles.check_theme_maintenance.assert_called_once_with("nyxuri")
+        self.assertEqual(deploy.call_args.args[0][:4],
+                         [str(self.home / ".local/bin/desktop-profile"), "maintain", "nyxuri", "--"])
 
 
 if __name__ == "__main__":

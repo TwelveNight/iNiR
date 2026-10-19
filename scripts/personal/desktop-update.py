@@ -173,15 +173,16 @@ def main(argv=None):
         for name, source in sources.items():
             for command in checks(name, source):
                 run(command, cwd=source)
+        profiles = profile_manager(home)
+        for name in names:
+            profiles.verify_theme_contract(name)
         if args.action in ("deploy", "update"):
             manager = home / ".local/bin/desktop-profile"
-            profiles = profile_manager(home)
-            # iNiR and Hypr installers consume canonical paths. Preflight every
-            # guard before writing any profile. Nyxuri only writes its entity.
+            # Check all palette contracts and sessions before the first write.
+            # Nyxuri also needs theme routing during offline deployment.
             for name in names:
-                if name != "nyxuri":
-                    profiles.links(name)
-                    profiles.check_change(name)
+                profiles.links(name)
+                profiles.check_theme_maintenance(name)
             for name, source in sources.items():
                 before = chezmoi_before(home, name)
                 snapshot(home, name)
@@ -193,8 +194,7 @@ def main(argv=None):
                     env.setdefault("XDG_RUNTIME_DIR", str(runtime))
                     env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path={runtime}/bus")
                 command = deploy_command(name, source, args.no_hypr, args.no_restart)
-                if name != "nyxuri":
-                    command = [str(manager), "maintain", name, "--", *command]
+                command = [str(manager), "maintain", name, "--", *command]
                 subprocess.run(command, cwd=source, env=env, check=True)
                 chezmoi_after(before)
                 check_source(name, source)
