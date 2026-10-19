@@ -25,3 +25,5 @@ HDMI 在左、eDP-2 位于原点的显示配置都随现有 profile 保留。
 不要用备份目录替换整个 `~/.config`。
 
 隔离回归：`python3 scripts/test-personal-overlay.py`。
+
+三套源码合并、验证、live 更新和冲突处理见 [DESKTOP-UPDATES.md](DESKTOP-UPDATES.md)。

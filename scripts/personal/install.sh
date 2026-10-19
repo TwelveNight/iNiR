@@ -40,6 +40,7 @@ fi
 python3 "$repo/scripts/lib/private_paths.py" --runtime-links
 "$repo/scripts/personal/preflight.sh"
 [[ "$check_only" != true ]] || exit 0
+bash "$repo/scripts/personal/install-desktop-update.sh"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "$XDG_RUNTIME_DIR/bus" ]]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"

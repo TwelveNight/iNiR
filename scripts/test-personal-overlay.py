@@ -439,6 +439,7 @@ _runtime_rsync "{ROOT}/defaults/niri" "$XDG_CONFIG_HOME/niri"
         fixture = self.base / "fixture"
         entry = fixture / "scripts/personal/install.sh"
         entry.parent.mkdir(parents=True)
+        entry.with_name("install-desktop-update.sh").write_text("#!/bin/sh\nexit 0\n")
         helper = fixture / "scripts/lib/private_paths.py"
         helper.parent.mkdir(parents=True)
         helper.write_text((ROOT / "scripts/lib/private_paths.py").read_text())

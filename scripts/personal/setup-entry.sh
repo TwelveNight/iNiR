@@ -24,6 +24,18 @@ inir_personal_install_entry() {
 }
 
 # Login owns the canonical compositor link. Never update a different profile.
+# Source integration is independent of the currently selected compositor.
+if [[ "${1:-}" == update && "${DESKTOP_UPDATE_LOCAL:-}" != 1 && -f "${HOME}/.config/desktop-profiles/profiles.json" ]]; then
+    local_update=false
+    for argument in "$@"; do [[ "$argument" != --local ]] || local_update=true; done
+    if [[ "$local_update" != true ]]; then
+        case "${2:-}" in
+            ''|-y|--yes) exec "$HOME/.local/bin/desktop-update" update inir ;;
+            --no-deploy) exec "$HOME/.local/bin/desktop-update" sync inir ;;
+            *) echo 'Personal updates: use desktop-update update inir, or inir update --local.' >&2; exit 2 ;;
+        esac
+    fi
+fi
 profile_manager="${HOME}/.local/bin/desktop-profile"
 if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/desktop-profiles/profiles.json" ]]; then
     [[ -x "$profile_manager" ]] || { echo 'Missing desktop-profile manager' >&2; exit 1; }
