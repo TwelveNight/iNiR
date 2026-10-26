@@ -209,6 +209,13 @@ class DesktopSession:
         if self.profile == 'inir':
             return self.invoke('qs', '-p', str(self.home / '.config/quickshell/inir'),
                                'ipc', 'call', 'lock', 'status').strip() == 'secure'
+        if self.profile == 'dms-niri':
+            # DMS v2 Lock.qml exposes ext-session-lock acknowledgement here,
+            # not merely a requested lock or a logind hint.
+            status = json.loads(self.invoke('dms', 'ipc', 'call', 'lock', 'status'))
+            if not isinstance(status, dict) or type(status.get('sessionLockSecure')) is not bool:
+                raise RuntimeError('DMS did not provide a verifiable session lock status')
+            return status['sessionLockSecure']
         if self.profile == 'nyxuri':
             return json.loads(self.invoke('noctalia', 'msg', 'status')).get('locked') is True
         raise RuntimeError('No verified lock backend for desktop profile: ' + self.profile)
@@ -219,7 +226,9 @@ class DesktopSession:
         shells = {'hyprland-ii': ('hyprland', 'ii', 'activate'),
                   'sekaipop': ('hyprland', 'sekaipop', 'lock'),
                   'inir': ('niri', 'inir', 'activate')}
-        if self.profile == 'nyxuri' and self.kind == 'niri':
+        if self.profile == 'dms-niri' and self.kind == 'niri':
+            request = ('dms', 'ipc', 'call', 'lock', 'lock')
+        elif self.profile == 'nyxuri' and self.kind == 'niri':
             request = ('noctalia', 'msg', 'session', 'lock')
         elif self.profile in shells and self.kind == shells[self.profile][0]:
             _, shell, method = shells[self.profile]
