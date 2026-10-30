@@ -447,6 +447,22 @@ _runtime_rsync "{ROOT}/defaults/niri" "$XDG_CONFIG_HOME/niri"
             dest = entry.with_name(name)
             dest.write_text((ROOT / "scripts/personal" / name).read_text())
             dest.chmod(0o755)
+        # Snapshot tests exercise the real preflight ordering, not the remote
+        # host's distribution, package inventory, login files or display manager.
+        # Keep the systemctl probes real-to-the-fixture so failure still proves
+        # that no backup or setup stage was entered.
+        entry.with_name("dependencies.py").write_text("#!/usr/bin/env python3\nraise SystemExit(0)\n")
+        login = fixture / "host/wayland-sessions/niri.desktop"
+        login.parent.mkdir(parents=True)
+        login.write_text("[Desktop Entry]\nName=Niri fixture\n")
+        display_manager = fixture / "host/display-manager.service"
+        display_manager.symlink_to("gdm.service")
+        preflight = entry.with_name("preflight.sh")
+        preflight.write_text(preflight.read_text().replace(
+            "/usr/share/wayland-sessions/niri.desktop", str(login)).replace(
+            "/etc/systemd/system/display-manager.service", str(display_manager)))
+        entry.write_text(entry.read_text().replace(
+            "/etc/systemd/system/display-manager.service", str(display_manager)))
         setup = fixture / "setup"
         for name in ["inir-hyprland-watch.service", "hyprland-session-lifetime.conf", "autostart-desktop-ready.conf"]:
             entry.with_name(name).write_text((ROOT / "scripts/personal" / name).read_text())
